@@ -1,0 +1,33 @@
+/**
+ * Admin order — production design previews.
+ */
+
+.wc-gpd-order-designs {
+	display: flex;
+	flex-direction: column;
+	gap: 1.5rem;
+}
+
+.wc-gpd-order-design h4 {
+	margin: 0 0 0.75rem;
+}
+
+.wc-gpd-order-design__preview {
+	max-width: 320px;
+	max-height: 240px;
+	overflow: hidden;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	padding: 8px;
+	margin-bottom: 12px;
+}
+
+.wc-gpd-order-design__preview svg {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+
+.wc-gpd-download-svg {
+	margin-top: 0.25rem !important;
+}

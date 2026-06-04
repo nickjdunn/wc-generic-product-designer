@@ -1,0 +1,134 @@
+/**
+ * WC Generic Product Designer — frontend styles.
+ */
+
+.wc-gpd-designer {
+	--wc-gpd-border: #e2e2e2;
+	--wc-gpd-bg: #fafafa;
+	--wc-gpd-accent: #2271b1;
+	margin: 1.5rem 0 2rem;
+	padding: 1.25rem;
+	border: 1px solid var(--wc-gpd-border);
+	border-radius: 6px;
+	background: var(--wc-gpd-bg);
+	box-sizing: border-box;
+}
+
+.wc-gpd-designer *,
+.wc-gpd-designer *::before,
+.wc-gpd-designer *::after {
+	box-sizing: border-box;
+}
+
+.wc-gpd-designer__layout {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+	.wc-gpd-designer__layout {
+		flex-direction: row;
+		align-items: flex-start;
+	}
+}
+
+.wc-gpd-designer__toolbar {
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+@media (min-width: 768px) {
+	.wc-gpd-designer__toolbar {
+		flex: 0 0 240px;
+		max-width: 280px;
+	}
+}
+
+.wc-gpd-designer__toolbar-row {
+	margin-bottom: 0.75rem;
+}
+
+.wc-gpd-designer__hint {
+	margin: 0 0 1rem;
+	font-size: 0.875rem;
+	color: #555;
+}
+
+.wc-gpd-designer__controls {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.wc-gpd-designer__controls:disabled {
+	opacity: 0.55;
+	pointer-events: none;
+}
+
+.wc-gpd-designer__controls label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.wc-gpd-designer__controls select,
+.wc-gpd-designer__controls input[type="number"] {
+	width: 100%;
+	max-width: 100%;
+	padding: 0.45rem 0.5rem;
+	font-weight: 400;
+}
+
+.wc-gpd-designer__style-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+.wc-gpd-designer__style-row label {
+	flex-direction: row;
+	align-items: center;
+	font-weight: 500;
+}
+
+.wc-gpd-designer__align-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.wc-gpd-designer__align-row .button.is-active,
+.wc-gpd-designer__align-row .button[aria-pressed="true"] {
+	background: var(--wc-gpd-accent);
+	border-color: var(--wc-gpd-accent);
+	color: #fff;
+}
+
+.wc-gpd-designer__canvas-wrap {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: 100%;
+	max-width: 100%;
+	overflow: hidden;
+	background: #fff;
+	border: 1px solid var(--wc-gpd-border);
+	border-radius: 4px;
+	line-height: 0;
+}
+
+.wc-gpd-designer__canvas-wrap canvas {
+	display: block;
+	max-width: 100%;
+	height: auto !important;
+	margin: 0 auto;
+}
+
+.wc-gpd-btn-add-text {
+	width: 100%;
+}

@@ -1,0 +1,23 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# WordPress (if you develop inside a full site copy)
+wp-config.php
+.htaccess
+
+# Dependencies (if added later)
+/vendor/
+/node_modules/
+composer.lock
+package-lock.json
+
+# Secrets — never commit tokens
+.env
+*.pem
+
+# Local logs / cache
+*.log
