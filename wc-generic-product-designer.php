@@ -12,7 +12,7 @@
  * Text Domain:       wc-generic-product-designer
  * Domain Path:       /languages
  *
- * GitHub Plugin URI: your-github-username/wc-generic-product-designer
+ * GitHub Plugin URI: nickjdunn/wc-generic-product-designer
  * Primary Branch:    main
  * Requires Plugins:  woocommerce
  *
