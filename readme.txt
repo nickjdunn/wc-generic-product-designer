@@ -22,6 +22,14 @@ Allow customers to add styled text layers on a product canvas and export product
 3. Requires WooCommerce.
 4. Edit a product → **Product Designer** tab → enable and configure canvas + template image.
 
+== GitHub updates (Git Updater) ==
+
+1. Push this repo to GitHub (see `scripts/push-to-github.ps1`).
+2. On the store, install the **Git Updater** plugin.
+3. For a private repo, add `define( 'GITHUB_TOKEN', '...' );` to wp-config.php (see `git-updater.wp-config.example.php`).
+4. Install this plugin via Git Updater using your GitHub repo URL, or upload once — Git Updater detects it via the `GitHub Plugin URI` header.
+5. For each release: bump `Version` in the main plugin file, commit, push, then update from **Dashboard → Updates**.
+
 == Changelog ==
 
 = 1.0.0 =
