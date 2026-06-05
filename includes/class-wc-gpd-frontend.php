@@ -47,10 +47,58 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 */
 	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
-		add_action( 'woocommerce_before_single_product_summary', array( $this, 'render_designer_in_gallery' ), 19 );
+		add_action( 'wp', array( $this, 'setup_gallery_replacement' ), 20 );
 		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer_in_summary' ), 5 );
 		add_filter( 'body_class', array( $this, 'add_body_class' ) );
 		add_filter( 'woocommerce_product_supports', array( $this, 'disable_ajax_add_to_cart' ), 10, 3 );
+	}
+
+	/**
+	 * Whether the designer should replace the product gallery on this request.
+	 *
+	 * @return bool
+	 */
+	private function should_replace_gallery() {
+		if ( ! $this->is_designer_context() ) {
+			return false;
+		}
+		$settings = WC_GPD_Product_Meta::get_settings( get_queried_object_id() );
+		return ! empty( $settings['product_settings']['replace_product_gallery'] );
+	}
+
+	/**
+	 * Swap WooCommerce gallery output for the designer in the gallery column.
+	 */
+	public function setup_gallery_replacement() {
+		if ( ! $this->should_replace_gallery() ) {
+			return;
+		}
+
+		remove_action( 'woocommerce_before_single_product_summary', 'woocommerce_show_product_images', 20 );
+		add_action( 'woocommerce_before_single_product_summary', array( $this, 'render_designer_in_gallery' ), 20 );
+		add_filter( 'render_block', array( $this, 'replace_gallery_block' ), 9, 2 );
+	}
+
+	/**
+	 * Replace block-based product gallery (WooCommerce block themes).
+	 *
+	 * @param string $block_content Block HTML.
+	 * @param array  $block         Block data.
+	 * @return string
+	 */
+	public function replace_gallery_block( $block_content, $block ) {
+		if ( empty( $block['blockName'] ) || 'woocommerce/product-image-gallery' !== $block['blockName'] ) {
+			return $block_content;
+		}
+		if ( ! $this->should_replace_gallery() ) {
+			return $block_content;
+		}
+
+		ob_start();
+		$this->render_designer( 'gallery' );
+		$designer = ob_get_clean();
+
+		return $designer ? $designer : $block_content;
 	}
 
 	/**
@@ -251,12 +299,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 * Render designer in the product gallery column when enabled.
 	 */
 	public function render_designer_in_gallery() {
-		if ( ! $this->is_designer_context() ) {
-			return;
-		}
-		$product_id = get_queried_object_id();
-		$settings   = WC_GPD_Product_Meta::get_settings( $product_id );
-		if ( empty( $settings['product_settings']['replace_product_gallery'] ) ) {
+		if ( ! $this->should_replace_gallery() ) {
 			return;
 		}
 		$this->render_designer( 'gallery' );
@@ -310,9 +353,22 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			? ( $settings['width'] / $settings['height'] )
 			: ( 4 / 3 );
 
+		$designer_classes = array(
+			'wc-gpd-designer',
+			'wc-gpd-designer--' . $placement,
+		);
+		if ( $replace_gallery ) {
+			$designer_classes[] = 'wc-gpd-designer--replaces-gallery';
+		}
+		if ( 'gallery' === $placement ) {
+			$designer_classes[] = 'images';
+			$designer_classes[] = 'woocommerce-product-gallery';
+			$designer_classes[] = 'woocommerce-product-gallery--with-images';
+		}
+
 		?>
 		<div
-			class="wc-gpd-designer wc-gpd-designer--<?php echo esc_attr( $placement ); ?><?php echo $replace_gallery ? ' wc-gpd-designer--replaces-gallery' : ''; ?>"
+			class="<?php echo esc_attr( implode( ' ', $designer_classes ) ); ?>"
 			id="wc-gpd-designer"
 			data-canvas-width="<?php echo esc_attr( (string) $settings['width'] ); ?>"
 			data-canvas-height="<?php echo esc_attr( (string) $settings['height'] ); ?>"

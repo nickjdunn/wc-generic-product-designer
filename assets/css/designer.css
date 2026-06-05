@@ -12,16 +12,16 @@
 	--wc-gpd-muted: #6b7280;
 	--wc-gpd-radius: 8px;
 	--wc-gpd-shadow: 0 1px 3px rgba( 0, 0, 0, 0.08 );
-	clear: both;
 	width: 100%;
 	max-width: 100%;
-	margin: 0 0 1.25rem;
 	box-sizing: border-box;
 	color: var(--wc-gpd-text);
 	font-size: 14px;
 }
 
 .wc-gpd-designer--summary {
+	clear: both;
+	margin: 0 0 1.25rem;
 	padding: 1rem;
 	border: 1px solid var(--wc-gpd-border);
 	border-radius: var(--wc-gpd-radius);
@@ -29,9 +29,18 @@
 	box-shadow: var(--wc-gpd-shadow);
 }
 
+/* Occupy the WooCommerce product gallery column (classic themes). */
+.single-product.wc-gpd-replace-gallery .wc-gpd-designer--gallery.images,
+.woocommerce .wc-gpd-designer--gallery.images,
+.woocommerce-page .wc-gpd-designer--gallery.images {
+	clear: none;
+	float: left;
+	width: 48%;
+	margin: 0 3.8% 2em 0;
+}
+
 .wc-gpd-designer--gallery,
 .wc-gpd-designer--replaces-gallery {
-	margin: 0;
 	padding: 0;
 	border: none;
 	border-radius: 0;
@@ -39,8 +48,16 @@
 	box-shadow: none;
 }
 
-.single-product.wc-gpd-replace-gallery .woocommerce-product-gallery {
+/* Fallback: hide native gallery if theme still outputs it. */
+.single-product.wc-gpd-replace-gallery .woocommerce-product-gallery:not( .wc-gpd-designer ) {
 	display: none !important;
+}
+
+/* Block theme: designer fills the gallery block wrapper. */
+.wp-block-woocommerce-product-image-gallery .wc-gpd-designer--gallery {
+	float: none;
+	width: 100%;
+	margin: 0;
 }
 
 .single-product.wc-gpd-product:not(.wc-gpd-replace-gallery) .woocommerce-product-gallery {
