@@ -118,20 +118,25 @@
 		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
 		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
 		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
-		popoutBtn: document.getElementById( 'wc-gpd-popout-btn' ),
 		studio: document.getElementById( 'wc-gpd-studio' ),
 		studioPanel: document.getElementById( 'wc-gpd-studio-panel' ),
+		studioNav: document.getElementById( 'wc-gpd-studio-nav' ),
+		drawerTitle: document.getElementById( 'wc-gpd-studio-drawer-title' ),
 		sectionDetails: document.getElementById( 'wc-gpd-section-details' ),
-		customerAccordion: document.getElementById( 'wc-gpd-cust-accordion' ),
-		panelPositionSelect: document.getElementById( 'wc-gpd-panel-position-select' ),
-		viewPhotosBtn: document.getElementById( 'wc-gpd-view-photos-btn' ),
-		galleryModal: document.getElementById( 'wc-gpd-gallery-modal' ),
-		galleryScroll: document.getElementById( 'wc-gpd-gallery-scroll' ),
-		galleryClose: document.getElementById( 'wc-gpd-gallery-close' ),
-		galleryBackdrop: document.getElementById( 'wc-gpd-gallery-backdrop' ),
+		navDetails: document.getElementById( 'wc-gpd-nav-details' ),
+		designerAtc: document.getElementById( 'wc-gpd-designer-atc' ),
 		placeholderFields: document.getElementById( 'wc-gpd-placeholder-fields' ),
 		graphicPickers: document.getElementById( 'wc-gpd-graphic-pickers' ),
 	};
+
+	const sectionTitles = {
+		details: config.i18n?.panelDetails || 'Your details',
+		text: config.i18n?.panelText || 'Text',
+		layers: config.i18n?.panelLayers || 'Layers',
+	};
+
+	let designerOpen = false;
+	const isStartDesigningMode = config.launchMode === 'start_designing';
 
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
@@ -185,120 +190,58 @@
 		}
 	}
 
-	const PANEL_POSITIONS = [ 'left', 'right', 'top', 'bottom' ];
-	const PANEL_STORAGE_KEY = 'wc_gpd_panel_position_preview';
-
-	function isGalleryPlacement() {
-		return designerRoot.classList.contains( 'wc-gpd-designer--replaces-gallery' )
-			|| designerRoot.classList.contains( 'wc-gpd-designer--gallery' );
+	function isDesignerOpen() {
+		return designerOpen || designerRoot.classList.contains( 'wc-gpd-is-popout' );
 	}
 
-	function resolvePanelPosition() {
-		const urlParam = new URLSearchParams( window.location.search ).get( 'wc_gpd_panel' );
-		if ( urlParam && ( PANEL_POSITIONS.includes( urlParam ) || urlParam === 'auto' ) ) {
-			return urlParam;
-		}
-		try {
-			const stored = localStorage.getItem( PANEL_STORAGE_KEY );
-			if ( stored && ( PANEL_POSITIONS.includes( stored ) || stored === 'auto' ) ) {
-				return stored;
-			}
-		} catch ( e ) {
-			// Ignore storage errors.
-		}
-		return config.panelPosition || productSettings.customer_panel_position || 'auto';
-	}
-
-	function getEffectivePanelPosition( raw ) {
-		if ( raw && raw !== 'auto' && PANEL_POSITIONS.includes( raw ) ) {
-			return raw;
-		}
-		return isGalleryPlacement() ? 'bottom' : 'right';
-	}
-
-	function applyStudioPanelPosition( position ) {
-		if ( ! ui.studio ) {
+	function openCustomerSection( sectionName ) {
+		if ( ! sectionName || ! ui.studioPanel ) {
 			return;
 		}
-		const raw = position || resolvePanelPosition();
-		const pos = getEffectivePanelPosition( raw );
-		PANEL_POSITIONS.forEach( ( key ) => {
-			ui.studio.classList.remove( 'wc-gpd-studio--pos-' + key );
+		ui.studioPanel.querySelectorAll( '.wc-gpd-studio-panel-section' ).forEach( ( panel ) => {
+			const isTarget = panel.dataset.section === sectionName;
+			panel.hidden = ! isTarget;
+			panel.classList.toggle( 'is-active', isTarget );
 		} );
-		ui.studio.classList.add( 'wc-gpd-studio--pos-' + pos );
-		ui.studio.dataset.activePosition = pos;
+		if ( ui.studioNav ) {
+			ui.studioNav.querySelectorAll( '.wc-gpd-studio-nav__btn' ).forEach( ( btn ) => {
+				btn.classList.toggle( 'is-active', btn.dataset.section === sectionName );
+			} );
+		}
+		if ( ui.drawerTitle && sectionTitles[ sectionName ] ) {
+			ui.drawerTitle.textContent = sectionTitles[ sectionName ];
+		}
+	}
+
+	function initStudioNav() {
+		if ( ! ui.studioNav ) {
+			return;
+		}
+		ui.studioNav.querySelectorAll( '.wc-gpd-studio-nav__btn' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				if ( btn.hidden ) {
+					return;
+				}
+				openCustomerSection( btn.dataset.section || 'text' );
+			} );
+		} );
+	}
+
+	function openDesigner() {
+		if ( ! window.WcGpdPopout || designerOpen ) {
+			return;
+		}
+		window.WcGpdPopout.open( designerRoot, applyResponsiveScale, { fullscreen: true } );
+		designerOpen = true;
 		applyResponsiveScale();
 	}
 
-	function openCustomerSection( sectionName, exclusive ) {
-		if ( ! ui.customerAccordion || ! sectionName ) {
+	function closeDesigner() {
+		if ( ! window.WcGpdPopout ) {
 			return;
 		}
-		const onlyOne = exclusive !== false;
-		ui.customerAccordion.querySelectorAll( '.wc-gpd-cust-section' ).forEach( ( section ) => {
-			const isTarget = section.dataset.section === sectionName;
-			const toggle = section.querySelector( '.wc-gpd-cust-toggle' );
-			const body = section.querySelector( '.wc-gpd-cust-body' );
-			if ( onlyOne && ! isTarget ) {
-				section.classList.remove( 'is-open' );
-				if ( toggle ) {
-					toggle.setAttribute( 'aria-expanded', 'false' );
-				}
-				if ( body ) {
-					body.hidden = true;
-				}
-			}
-			if ( isTarget ) {
-				section.classList.add( 'is-open' );
-				if ( toggle ) {
-					toggle.setAttribute( 'aria-expanded', 'true' );
-				}
-				if ( body ) {
-					body.hidden = false;
-				}
-			}
-		} );
-	}
-
-	function initCustomerAccordion() {
-		if ( ! ui.customerAccordion ) {
-			return;
-		}
-		ui.customerAccordion.querySelectorAll( '.wc-gpd-cust-toggle' ).forEach( ( toggle ) => {
-			toggle.addEventListener( 'click', () => {
-				const section = toggle.closest( '.wc-gpd-cust-section' );
-				if ( ! section || section.hidden ) {
-					return;
-				}
-				if ( section.classList.contains( 'is-open' ) ) {
-					section.classList.remove( 'is-open' );
-					toggle.setAttribute( 'aria-expanded', 'false' );
-					const body = section.querySelector( '.wc-gpd-cust-body' );
-					if ( body ) {
-						body.hidden = true;
-					}
-				} else {
-					openCustomerSection( section.dataset.section || '' );
-				}
-			} );
-		} );
-	}
-
-	function initStudioLayout() {
-		if ( ui.panelPositionSelect ) {
-			ui.panelPositionSelect.value = resolvePanelPosition();
-			ui.panelPositionSelect.addEventListener( 'change', () => {
-				const value = ui.panelPositionSelect.value || 'auto';
-				try {
-					localStorage.setItem( PANEL_STORAGE_KEY, value );
-				} catch ( e ) {
-					// Ignore.
-				}
-				applyStudioPanelPosition( value );
-			} );
-		}
-		applyStudioPanelPosition( resolvePanelPosition() );
-		initCustomerAccordion();
+		window.WcGpdPopout.close( designerRoot, applyResponsiveScale );
+		designerOpen = false;
 	}
 
 	function applyProductToolSettings() {
@@ -313,7 +256,6 @@
 		setToolVisible( ui.lineHeightLabel || ui.lineHeight, productSettings.allow_line_height !== false );
 		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, productSettings.allow_letter_spacing !== false );
 		setToolVisible( ui.alignRow, productSettings.allow_text_align !== false );
-		setToolVisible( ui.popoutBtn, productSettings.enable_popout !== false );
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
 		if ( ui.textColor ) {
 			ui.textColor.value = defaultTextColor( activeText );
@@ -427,12 +369,21 @@
 		}
 
 		const isPopout = designerRoot.classList.contains( 'wc-gpd-is-popout' );
-		const isModal = designerRoot.classList.contains( 'wc-gpd-popout--modal' );
-		const popoutWidth = isModal ? designerRoot.clientWidth : window.innerWidth;
-		const maxWidth = isPopout
-			? Math.max( 1, Math.min( popoutWidth - 24, 1200 ) )
-			: Math.max( 1, wrap.clientWidth );
-		displayScale = Math.min( 1, maxWidth / PROD_WIDTH );
+		const isFullscreen = designerRoot.classList.contains( 'wc-gpd-popout--fullscreen' );
+		const canvasArea = designerRoot.querySelector( '.wc-gpd-studio-canvas-area' );
+		let maxWidth = Math.max( 1, wrap.clientWidth );
+		let maxHeight = PROD_HEIGHT;
+
+		if ( isFullscreen && canvasArea ) {
+			maxWidth = Math.max( 1, canvasArea.clientWidth - 32 );
+			maxHeight = Math.max( 1, canvasArea.clientHeight - 32 );
+		} else if ( isPopout ) {
+			const isModal = designerRoot.classList.contains( 'wc-gpd-popout--modal' );
+			const popoutWidth = isModal ? designerRoot.clientWidth : window.innerWidth;
+			maxWidth = Math.max( 1, Math.min( popoutWidth - 24, 1200 ) );
+		}
+
+		displayScale = Math.min( 1, maxWidth / PROD_WIDTH, maxHeight / PROD_HEIGHT );
 		const displayW = Math.max( 1, Math.floor( PROD_WIDTH * displayScale ) );
 		const displayH = Math.max( 1, Math.floor( PROD_HEIGHT * displayScale ) );
 
@@ -526,8 +477,11 @@
 
 		if ( ui.sectionDetails ) {
 			ui.sectionDetails.hidden = ! showFields;
+		}
+		if ( ui.navDetails ) {
+			ui.navDetails.hidden = ! showFields;
 			if ( showFields ) {
-				openCustomerSection( 'details', false );
+				openCustomerSection( 'details' );
 			}
 		}
 
@@ -1610,10 +1564,12 @@
 		submitApproved = true;
 		const btn = getAddToCartButton();
 
-		if ( btn ) {
-			btn.classList.add( 'wc-gpd-submitting' );
-			btn.setAttribute( 'aria-busy', 'true' );
-		}
+		[ btn, ui.designerAtc ].forEach( ( el ) => {
+			if ( el ) {
+				el.classList.add( 'wc-gpd-submitting' );
+				el.setAttribute( 'aria-busy', 'true' );
+			}
+		} );
 
 		log.info( 'Submitting add to cart with design SVG' );
 
@@ -1636,7 +1592,7 @@
 	 * Intercept add to cart (themes often use click/AJAX instead of form submit).
 	 */
 	function bindAddToCart() {
-		const onIntent = ( event ) => {
+		const onCartIntent = ( event ) => {
 			if ( submitApproved ) {
 				return;
 			}
@@ -1654,14 +1610,22 @@
 			submitCartForm();
 		};
 
+		if ( ui.designerAtc ) {
+			ui.designerAtc.addEventListener( 'click', onCartIntent );
+		}
+
 		form.addEventListener( 'submit', ( event ) => {
 			if ( submitApproved ) {
 				return;
 			}
-			onIntent( event );
+			if ( isStartDesigningMode && ! isDesignerOpen() ) {
+				event.preventDefault();
+				openDesigner();
+				return;
+			}
+			onCartIntent( event );
 		} );
 
-		// Capture phase runs before theme/WooCommerce jQuery handlers.
 		document.addEventListener(
 			'click',
 			( event ) => {
@@ -1671,10 +1635,19 @@
 				const btn = event.target.closest(
 					'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"]'
 				);
-				if ( ! btn || ! form.contains( btn ) ) {
+				if ( ! btn || ! form.contains( btn ) || btn.id === 'wc-gpd-designer-atc' ) {
 					return;
 				}
-				onIntent( event );
+				if ( isStartDesigningMode && ! isDesignerOpen() ) {
+					event.preventDefault();
+					event.stopPropagation();
+					if ( typeof event.stopImmediatePropagation === 'function' ) {
+						event.stopImmediatePropagation();
+					}
+					openDesigner();
+					return;
+				}
+				onCartIntent( event );
 			},
 			true
 		);
@@ -1821,14 +1794,10 @@
 		} );
 	}
 
-	if ( ui.popoutBtn && window.WcGpdPopout && productSettings.enable_popout !== false ) {
-		ui.popoutBtn.addEventListener( 'click', () => {
-			window.WcGpdPopout.toggle( designerRoot, applyResponsiveScale );
-		} );
-		designerRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
-	} else if ( ui.popoutBtn ) {
-		ui.popoutBtn.hidden = true;
-	}
+	designerRoot.addEventListener( 'wc-gpd-popout-closed', () => {
+		designerOpen = false;
+		applyResponsiveScale();
+	} );
 
 	window.addEventListener( 'resize', () => {
 		applyResponsiveScale();
@@ -1923,56 +1892,14 @@
 		return Promise.reject( new Error( 'no-design' ) );
 	}
 
-	function bindGalleryModal() {
-		if ( ! ui.galleryModal || ! Array.isArray( config.galleryImages ) ) {
-			return;
-		}
-
-		const images = config.galleryImages;
-		if ( ui.galleryScroll && images.length ) {
-			ui.galleryScroll.innerHTML = '';
-			images.forEach( ( image ) => {
-				const img = document.createElement( 'img' );
-				img.src = image.src;
-				img.alt = image.alt || '';
-				img.loading = 'lazy';
-				ui.galleryScroll.appendChild( img );
-			} );
-		}
-
-		const open = () => {
-			ui.galleryModal.hidden = false;
-			document.body.classList.add( 'wc-gpd-gallery-open' );
-		};
-		const close = () => {
-			ui.galleryModal.hidden = true;
-			document.body.classList.remove( 'wc-gpd-gallery-open' );
-		};
-
-		if ( ui.viewPhotosBtn && images.length ) {
-			ui.viewPhotosBtn.addEventListener( 'click', open );
-		} else if ( ui.viewPhotosBtn ) {
-			ui.viewPhotosBtn.hidden = true;
-		}
-		if ( ui.galleryClose ) {
-			ui.galleryClose.addEventListener( 'click', close );
-		}
-		if ( ui.galleryBackdrop ) {
-			ui.galleryBackdrop.addEventListener( 'click', close );
-		}
-	}
-
 	initFontSelect();
-	initStudioLayout();
+	initStudioNav();
 	applyProductToolSettings();
-	bindGalleryModal();
 	bindAddToCart();
+	openCustomerSection( 'text' );
 
-	if ( config.isEditing && config.i18n.updateCart ) {
-		const addBtn = getAddToCartButton();
-		if ( addBtn ) {
-			addBtn.textContent = config.i18n.updateCart;
-		}
+	if ( config.isEditing || config.orderEdit ) {
+		setTimeout( () => openDesigner(), 120 );
 	}
 
 	function bindOrderSave() {

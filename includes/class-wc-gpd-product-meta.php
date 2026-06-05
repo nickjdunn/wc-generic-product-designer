@@ -68,7 +68,7 @@ class WC_GPD_Product_Meta {
 			$template = WC_GPD_Design_Template::get_settings( $template_ref );
 			if ( $template ) {
 				$product_settings = $template['product_settings'];
-				$product_settings['replace_product_gallery'] = $replace_gallery;
+				$product_settings['replace_product_gallery'] = false;
 
 				return array(
 					'enabled'           => self::is_enabled( $product_id ),

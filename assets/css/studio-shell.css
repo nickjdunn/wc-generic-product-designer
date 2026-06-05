@@ -1,0 +1,360 @@
+/**
+ * Shared modern studio shell — customer fullscreen + admin template editor.
+ */
+
+.wc-gpd-modern-studio-root {
+	--wc-gpd-studio-nav-w: 72px;
+	--wc-gpd-studio-drawer-w: 300px;
+	--wc-gpd-studio-chrome-h: 52px;
+	--wc-gpd-studio-footer-h: 64px;
+	--wc-gpd-studio-bg: #f4f5f7;
+	--wc-gpd-studio-surface: #ffffff;
+	--wc-gpd-studio-border: #e8eaed;
+	--wc-gpd-studio-text: #1a1d21;
+	--wc-gpd-studio-muted: #6b7280;
+	--wc-gpd-studio-accent: #e85d4c;
+	--wc-gpd-studio-accent-hover: #d94a39;
+	--wc-gpd-studio-nav-active: #111827;
+}
+
+/* Top chrome */
+.wc-gpd-studio-chrome {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	min-height: var(--wc-gpd-studio-chrome-h);
+	padding: 0 1rem;
+	background: var(--wc-gpd-studio-surface);
+	border-bottom: 1px solid var(--wc-gpd-studio-border);
+	flex: 0 0 auto;
+}
+
+.wc-gpd-studio-chrome__left,
+.wc-gpd-studio-chrome__center,
+.wc-gpd-studio-chrome__right {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.wc-gpd-studio-chrome__center {
+	flex: 1 1 auto;
+	justify-content: center;
+}
+
+.wc-gpd-studio-chrome__right {
+	flex: 0 0 auto;
+}
+
+.wc-gpd-studio-chrome__product {
+	font-size: 0.9375rem;
+	font-weight: 600;
+	color: var(--wc-gpd-studio-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: min( 280px, 30vw );
+}
+
+.wc-gpd-studio-chrome__close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--wc-gpd-studio-text);
+	font-size: 1.5rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.wc-gpd-studio-chrome__close:hover {
+	background: #f3f4f6;
+}
+
+/* Main studio grid */
+.wc-gpd-modern-studio {
+	display: grid;
+	grid-template-columns: var(--wc-gpd-studio-nav-w) var(--wc-gpd-studio-drawer-w) minmax( 0, 1fr );
+	grid-template-areas: "nav drawer canvas";
+	flex: 1 1 auto;
+	min-height: 0;
+	background: var(--wc-gpd-studio-bg);
+}
+
+.wc-gpd-studio-nav {
+	grid-area: nav;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.25rem;
+	padding: 0.5rem 0.35rem;
+	background: var(--wc-gpd-studio-nav-active);
+}
+
+.wc-gpd-studio-nav__btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.2rem;
+	width: 100%;
+	min-height: 56px;
+	padding: 0.35rem 0.25rem;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: rgba( 255, 255, 255, 0.72 );
+	font-size: 0.625rem;
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s;
+}
+
+.wc-gpd-studio-nav__btn:hover {
+	background: rgba( 255, 255, 255, 0.08 );
+	color: #fff;
+}
+
+.wc-gpd-studio-nav__btn.is-active {
+	background: rgba( 255, 255, 255, 0.14 );
+	color: #fff;
+}
+
+.wc-gpd-studio-nav__btn[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-studio-nav__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.wc-gpd-studio-nav__label {
+	text-align: center;
+}
+
+.wc-gpd-studio-drawer {
+	grid-area: drawer;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	background: var(--wc-gpd-studio-surface);
+	border-right: 1px solid var(--wc-gpd-studio-border);
+	overflow: hidden;
+}
+
+.wc-gpd-studio-drawer__head {
+	padding: 0.75rem 1rem 0.5rem;
+	border-bottom: 1px solid var(--wc-gpd-studio-border);
+}
+
+.wc-gpd-studio-drawer__title {
+	margin: 0;
+	font-size: 0.9375rem;
+	font-weight: 700;
+	color: var(--wc-gpd-studio-text);
+}
+
+.wc-gpd-studio-drawer__body {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 0.75rem 1rem 1rem;
+	-webkit-overflow-scrolling: touch;
+}
+
+.wc-gpd-studio-panel-section[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-studio-canvas-area {
+	grid-area: canvas;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	padding: 1rem 1.25rem;
+}
+
+/* Footer */
+.wc-gpd-studio-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 1rem;
+	min-height: var(--wc-gpd-studio-footer-h);
+	padding: 0.65rem 1.25rem;
+	background: var(--wc-gpd-studio-surface);
+	border-top: 1px solid var(--wc-gpd-studio-border);
+	flex: 0 0 auto;
+}
+
+.wc-gpd-studio-footer__price {
+	margin-right: auto;
+	font-size: 1.125rem;
+	font-weight: 700;
+	color: var(--wc-gpd-studio-text);
+}
+
+.wc-gpd-studio-footer__atc {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 0 1.75rem;
+	border: none;
+	border-radius: 999px;
+	background: var(--wc-gpd-studio-accent);
+	color: #fff;
+	font-size: 0.9375rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.wc-gpd-studio-footer__atc:hover {
+	background: var(--wc-gpd-studio-accent-hover);
+}
+
+.wc-gpd-studio-footer__atc.wc-gpd-submitting {
+	opacity: 0.7;
+	pointer-events: none;
+}
+
+/* View tabs — pill style */
+.wc-gpd-modern-studio-root .wc-gpd-view-switcher,
+.wc-gpd-modern-studio-root .wc-gpd-template-view-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	justify-content: center;
+}
+
+.wc-gpd-modern-studio-root .wc-gpd-view-tab,
+.wc-gpd-modern-studio-root .wc-gpd-template-view-tab {
+	border: 1px solid var(--wc-gpd-studio-border);
+	background: var(--wc-gpd-studio-surface);
+	border-radius: 999px;
+	padding: 0.35rem 0.9rem;
+	cursor: pointer;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--wc-gpd-studio-muted);
+}
+
+.wc-gpd-modern-studio-root .wc-gpd-view-tab.is-active,
+.wc-gpd-modern-studio-root .wc-gpd-template-view-tab.is-active {
+	background: #dbeafe;
+	border-color: #93c5fd;
+	color: #1d4ed8;
+}
+
+/* Admin: modernize existing accordion into drawer panels */
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root > .wc-gpd-modern-studio.wc-gpd-tpl-layout {
+	display: grid;
+	grid-template-columns: var(--wc-gpd-studio-nav-w) var(--wc-gpd-studio-drawer-w) minmax( 0, 1fr );
+	grid-template-areas: "nav drawer canvas";
+	gap: 0;
+	align-items: stretch;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-accordion {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-section {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	border: none;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-section:not(.is-open) {
+	display: none;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-toggle {
+	display: none;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-body {
+	display: block !important;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 0;
+	border: none;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-canvas-col {
+	grid-area: canvas;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	padding: 0.75rem 1rem 1rem;
+	background: var(--wc-gpd-studio-bg);
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root {
+	display: flex;
+	flex-direction: column;
+	min-height: 560px;
+	border: 1px solid var(--wc-gpd-studio-border);
+	border-radius: 10px;
+	overflow: hidden;
+	background: var(--wc-gpd-studio-bg);
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-studio-chrome {
+	border-radius: 0;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio {
+	min-height: 480px;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-header {
+	display: contents;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-header-actions {
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-header > .wc-gpd-template-view-tabs {
+	grid-area: unset;
+}
+
+@media ( max-width: 900px ) {
+	.wc-gpd-modern-studio {
+		grid-template-columns: var(--wc-gpd-studio-nav-w) minmax( 0, 1fr );
+		grid-template-areas:
+			"nav canvas"
+			"drawer drawer";
+	}
+
+	.wc-gpd-studio-drawer {
+		max-height: 38vh;
+		border-right: none;
+		border-top: 1px solid var(--wc-gpd-studio-border);
+	}
+}

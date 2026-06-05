@@ -71,8 +71,6 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 		$product_id  = $post ? absint( $post->ID ) : 0;
 		$enabled     = get_post_meta( $product_id, WC_GPD_Product_Meta::META_ENABLED, true );
 		$template_ref = absint( get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_REF, true ) );
-		$replace_gallery = 'yes' === get_post_meta( $product_id, WC_GPD_Product_Meta::META_REPLACE_GALLERY, true );
-
 		if ( ! $template_ref && $product_id ) {
 			$legacy_json = get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_JSON, true );
 			if ( is_string( $legacy_json ) && '' !== trim( $legacy_json ) ) {
@@ -148,16 +146,7 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 				<?php else : ?>
 					<p class="description"><?php esc_html_e( 'Select a template or create one in Template Designer.', 'wc-generic-product-designer' ); ?></p>
 				<?php endif; ?>
-				<?php
-				woocommerce_wp_checkbox(
-					array(
-						'id'          => 'wc_gpd_replace_gallery',
-						'label'       => __( 'Replace product gallery with designer', 'wc-generic-product-designer' ),
-						'description' => __( 'Listing thumbnails stay the same. On the product page the designer appears where photos normally show.', 'wc-generic-product-designer' ),
-						'value'       => $replace_gallery ? 'yes' : 'no',
-					)
-				);
-				?>
+				<p class="description"><?php esc_html_e( 'Customers customize via the Start designing button, which opens the full-screen designer while keeping product photos visible.', 'wc-generic-product-designer' ); ?></p>
 			</div>
 		</div>
 		<?php
@@ -185,9 +174,6 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 			$template_ref = 0;
 		}
 		update_post_meta( $post_id, WC_GPD_Product_Meta::META_TEMPLATE_REF, $template_ref );
-
-		$replace = isset( $_POST['wc_gpd_replace_gallery'] ) ? 'yes' : 'no';
-		update_post_meta( $post_id, WC_GPD_Product_Meta::META_REPLACE_GALLERY, $replace );
 
 		WC_GPD_Logger::info(
 			'Product designer settings saved',

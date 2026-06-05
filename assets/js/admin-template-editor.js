@@ -429,10 +429,35 @@
 		}
 	}
 
+	const adminStudioNav = document.getElementById( 'wc-gpd-admin-studio-nav' );
+	const adminDrawerTitle = document.getElementById( 'wc-gpd-admin-drawer-title' );
+	const adminSectionTitles = {
+		layers: 'Layers',
+		text: 'Text',
+		fonts: 'Fonts',
+		images: 'Images',
+		size: 'Size',
+		colors: 'Colors',
+		guides: 'Guides',
+		shapes: 'Shapes',
+	};
+
+	function syncAdminStudioNav( sectionName ) {
+		if ( adminStudioNav ) {
+			adminStudioNav.querySelectorAll( '.wc-gpd-studio-nav__btn' ).forEach( ( btn ) => {
+				btn.classList.toggle( 'is-active', btn.dataset.section === sectionName );
+			} );
+		}
+		if ( adminDrawerTitle && adminSectionTitles[ sectionName ] ) {
+			adminDrawerTitle.textContent = adminSectionTitles[ sectionName ];
+		}
+	}
+
 	function openAccordionSection( sectionName, exclusive ) {
 		if ( ! accordionEl || ! sectionName ) {
 			return;
 		}
+		syncAdminStudioNav( sectionName );
 		const onlyOne = exclusive !== false;
 		accordionEl.querySelectorAll( '.wc-gpd-accordion-section' ).forEach( ( section ) => {
 			const isTarget = section.dataset.section === sectionName;
@@ -777,6 +802,17 @@
 		if ( lockBox ) {
 			obj.wcGpdLockMove = lockBox.checked;
 		}
+	}
+
+	function initAdminStudioNav() {
+		if ( ! adminStudioNav ) {
+			return;
+		}
+		adminStudioNav.querySelectorAll( '.wc-gpd-studio-nav__btn' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				openAccordionSection( btn.dataset.section || 'layers' );
+			} );
+		} );
 	}
 
 	function initAccordion() {
@@ -2397,6 +2433,7 @@
 	window.addEventListener( 'resize', applyResponsiveScale );
 
 	initFontSelect();
+	initAdminStudioNav();
 	initAccordion();
 	updateUnitSuffixes();
 	loadPalettesFromInput();

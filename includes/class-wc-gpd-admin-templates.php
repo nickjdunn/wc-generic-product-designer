@@ -96,9 +96,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			WC_GPD_VERSION
 		);
 		wp_enqueue_style(
+			'wc-gpd-studio-shell',
+			WC_GPD_PLUGIN_URL . 'assets/css/studio-shell.css',
+			array(),
+			WC_GPD_VERSION
+		);
+		wp_enqueue_style(
 			'wc-gpd-admin-product',
 			WC_GPD_PLUGIN_URL . 'assets/css/admin-product.css',
-			array( 'wc-gpd-admin-templates' ),
+			array( 'wc-gpd-admin-templates', 'wc-gpd-studio-shell' ),
 			WC_GPD_VERSION
 		);
 		wp_enqueue_script(
@@ -334,7 +340,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 		$template_palettes_json = wp_json_encode( ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data() );
 		$font_options           = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
 		?>
-		<div class="wc-gpd-template-editor-wrap" id="wc-gpd-template-editor-root">
+		<div class="wc-gpd-template-editor-wrap wc-gpd-modern-studio-root" id="wc-gpd-template-editor-root">
 			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
 			<textarea id="wc_gpd_template_fonts" name="wc_gpd_template_fonts" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_fonts_json ? $template_fonts_json : '[]' ); ?></textarea>
 			<textarea id="wc_gpd_template_palettes" name="wc_gpd_template_palettes" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_palettes_json ? $template_palettes_json : '{}' ); ?></textarea>
@@ -346,23 +352,43 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<input type="hidden" id="wc_gpd_tpl_default_bbox_color" value="<?php echo esc_attr( $ps['bbox_stroke_color'] ); ?>" />
 			<input type="hidden" id="wc_gpd_tpl_default_bbox_width" value="<?php echo esc_attr( (string) $ps['bbox_stroke_width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_tpl_canvas_bg" value="<?php echo esc_attr( $ps['canvas_bg_color'] ); ?>" />
-			<div class="wc-gpd-tpl-header">
-				<div class="wc-gpd-template-view-tabs" id="wc-gpd-template-view-tabs" role="tablist"></div>
-				<div class="wc-gpd-tpl-canvas-size-inline" title="<?php esc_attr_e( 'Production canvas size in pixels', 'wc-generic-product-designer' ); ?>">
-					<span class="wc-gpd-tpl-canvas-size-label"><?php esc_html_e( 'Canvas', 'wc-generic-product-designer' ); ?></span>
-					<input type="number" id="wc_gpd_canvas_width" name="wc_gpd_canvas_width" class="wc-gpd-tpl-size-input" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" aria-label="<?php esc_attr_e( 'Canvas width in pixels', 'wc-generic-product-designer' ); ?>" />
-					<span class="wc-gpd-tpl-size-sep" aria-hidden="true">×</span>
-					<input type="number" id="wc_gpd_canvas_height" name="wc_gpd_canvas_height" class="wc-gpd-tpl-size-input" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" aria-label="<?php esc_attr_e( 'Canvas height in pixels', 'wc-generic-product-designer' ); ?>" />
-					<span class="wc-gpd-tpl-size-unit">px</span>
+			<header class="wc-gpd-studio-chrome wc-gpd-tpl-studio-chrome">
+				<div class="wc-gpd-studio-chrome__left">
+					<span class="wc-gpd-studio-chrome__product"><?php esc_html_e( 'Template designer', 'wc-generic-product-designer' ); ?></span>
 				</div>
-				<div class="wc-gpd-tpl-header-actions">
+				<div class="wc-gpd-studio-chrome__center">
+					<div class="wc-gpd-template-view-tabs" id="wc-gpd-template-view-tabs" role="tablist"></div>
+				</div>
+				<div class="wc-gpd-studio-chrome__right wc-gpd-tpl-header-actions">
+					<div class="wc-gpd-tpl-canvas-size-inline" title="<?php esc_attr_e( 'Production canvas size in pixels', 'wc-generic-product-designer' ); ?>">
+						<span class="wc-gpd-tpl-canvas-size-label"><?php esc_html_e( 'Canvas', 'wc-generic-product-designer' ); ?></span>
+						<input type="number" id="wc_gpd_canvas_width" name="wc_gpd_canvas_width" class="wc-gpd-tpl-size-input" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" aria-label="<?php esc_attr_e( 'Canvas width in pixels', 'wc-generic-product-designer' ); ?>" />
+						<span class="wc-gpd-tpl-size-sep" aria-hidden="true">×</span>
+						<input type="number" id="wc_gpd_canvas_height" name="wc_gpd_canvas_height" class="wc-gpd-tpl-size-input" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" aria-label="<?php esc_attr_e( 'Canvas height in pixels', 'wc-generic-product-designer' ); ?>" />
+						<span class="wc-gpd-tpl-size-unit">px</span>
+					</div>
 					<button type="button" class="button button-small" id="wc-gpd-template-add-view"><?php esc_html_e( 'Add area', 'wc-generic-product-designer' ); ?></button>
 					<button type="button" class="button button-small" id="wc-gpd-template-rename-view"><?php esc_html_e( 'Rename', 'wc-generic-product-designer' ); ?></button>
 					<button type="button" class="button button-small" id="wc-gpd-template-delete-view" title="<?php esc_attr_e( 'Remove this design area', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Delete area', 'wc-generic-product-designer' ); ?></button>
 					<button type="button" class="button button-small wc-gpd-popout-trigger" id="wc-gpd-template-popout"><?php esc_html_e( 'Expand', 'wc-generic-product-designer' ); ?></button>
 				</div>
-			</div>
-			<div class="wc-gpd-tpl-layout">
+			</header>
+			<div class="wc-gpd-modern-studio wc-gpd-tpl-layout">
+				<nav class="wc-gpd-studio-nav" id="wc-gpd-admin-studio-nav" aria-label="<?php esc_attr_e( 'Template tools', 'wc-generic-product-designer' ); ?>">
+					<button type="button" class="wc-gpd-studio-nav__btn is-active" data-section="layers"><span class="wc-gpd-studio-nav__icon">☰</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="text"><span class="wc-gpd-studio-nav__icon">T</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="fonts"><span class="wc-gpd-studio-nav__icon">A</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Fonts', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="images"><span class="wc-gpd-studio-nav__icon">🖼</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Images', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="size"><span class="wc-gpd-studio-nav__icon">↔</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="colors"><span class="wc-gpd-studio-nav__icon">◉</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Colors', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="guides"><span class="wc-gpd-studio-nav__icon">#</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Guides', 'wc-generic-product-designer' ); ?></span></button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="shapes"><span class="wc-gpd-studio-nav__icon">◇</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></span></button>
+				</nav>
+				<aside class="wc-gpd-studio-drawer">
+					<div class="wc-gpd-studio-drawer__head">
+						<h2 class="wc-gpd-studio-drawer__title" id="wc-gpd-admin-drawer-title"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></h2>
+					</div>
+					<div class="wc-gpd-studio-drawer__body">
 				<aside class="wc-gpd-tpl-accordion" id="wc-gpd-tpl-accordion">
 					<div class="wc-gpd-accordion-section is-open" data-section="layers" data-layer-title="0">
 						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true" data-base-title="<?php esc_attr_e( 'Layers', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></button>
@@ -592,6 +618,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						</div>
 					</div>
 				</aside>
+					</div>
+				</aside>
 				<div class="wc-gpd-tpl-canvas-col" id="wc-gpd-tpl-canvas-col">
 					<div class="wc-gpd-tpl-canvas-frame" id="wc-gpd-tpl-canvas-frame">
 						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--top" id="wc-gpd-tpl-ruler-top" hidden></div>
@@ -672,19 +700,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</div>
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Designer', 'wc-generic-product-designer' ); ?></h4>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_enable_popout" value="1" <?php checked( $ps['enable_popout'] ); ?> /> <?php esc_html_e( 'Pop-out / expand mode', 'wc-generic-product-designer' ); ?></label></p>
-				<p>
-					<label><?php esc_html_e( 'Customer tools panel position', 'wc-generic-product-designer' ); ?>
-						<select name="wc_gpd_ps_customer_panel_position" id="wc_gpd_ps_customer_panel_position">
-							<option value="auto" <?php selected( $ps['customer_panel_position'] ?? 'auto', 'auto' ); ?>><?php esc_html_e( 'Auto (gallery: bottom, summary: right)', 'wc-generic-product-designer' ); ?></option>
-							<option value="bottom" <?php selected( $ps['customer_panel_position'] ?? '', 'bottom' ); ?>><?php esc_html_e( 'Below canvas', 'wc-generic-product-designer' ); ?></option>
-							<option value="top" <?php selected( $ps['customer_panel_position'] ?? '', 'top' ); ?>><?php esc_html_e( 'Above canvas', 'wc-generic-product-designer' ); ?></option>
-							<option value="left" <?php selected( $ps['customer_panel_position'] ?? '', 'left' ); ?>><?php esc_html_e( 'Left of canvas', 'wc-generic-product-designer' ); ?></option>
-							<option value="right" <?php selected( $ps['customer_panel_position'] ?? '', 'right' ); ?>><?php esc_html_e( 'Right of canvas', 'wc-generic-product-designer' ); ?></option>
-						</select>
-					</label>
-				</p>
-				<p class="description"><?php esc_html_e( 'Store managers can also preview positions live on the product page using the layout tester.', 'wc-generic-product-designer' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Customers open a full-screen designer from the Start designing button on the product page.', 'wc-generic-product-designer' ); ?></p>
 				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Canvas background', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_canvas_bg_color" value="<?php echo esc_attr( $ps['canvas_bg_color'] ); ?>" /></label></p>
 			</div>
 			<div class="wc-gpd-settings-card">
