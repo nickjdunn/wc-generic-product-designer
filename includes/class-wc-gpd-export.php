@@ -29,8 +29,11 @@ class WC_GPD_Export {
 			return new WP_Error( 'wc_gpd_missing_product', __( 'Product not found for this line item.', 'wc-generic-product-designer' ) );
 		}
 
-		$settings = WC_GPD_Product_Meta::get_settings( $product_id );
-		$options  = self::normalize_options( $options );
+		$settings         = WC_GPD_Product_Meta::get_settings( $product_id );
+		$product_settings = ! empty( $settings['product_settings'] ) && is_array( $settings['product_settings'] )
+			? $settings['product_settings']
+			: WC_GPD_Product_Settings::get( $product_id );
+		$options          = self::normalize_options( $options );
 
 		$design_svg  = WC_GPD_SVG_Sanitizer::sanitize( $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_SVG, true ) );
 		$design_json = $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true );
@@ -41,7 +44,8 @@ class WC_GPD_Export {
 			$design_svg,
 			$design_json,
 			$template_json,
-			$options
+			$options,
+			$product_settings
 		);
 
 		if ( ! $document ) {
@@ -49,7 +53,7 @@ class WC_GPD_Export {
 		}
 
 		if ( ! empty( $options['rasterize'] ) ) {
-			$png = self::rasterize_svg( $document );
+			$png = self::rasterize_svg( $document, ! empty( $options['transparent_raster'] ) );
 			if ( is_wp_error( $png ) ) {
 				return $png;
 			}
@@ -84,6 +88,7 @@ class WC_GPD_Export {
 			'include_outlines'   => ! empty( $merged['include_outlines'] ),
 			'include_shapes'     => ! empty( $merged['include_shapes'] ),
 			'rasterize'          => ! empty( $merged['rasterize'] ),
+			'transparent_raster' => ! empty( $merged['transparent_raster'] ),
 			'preset'             => isset( $merged['preset'] ) ? sanitize_key( (string) $merged['preset'] ) : 'custom',
 		);
 	}
@@ -101,6 +106,7 @@ class WC_GPD_Export {
 			'include_outlines'   => self::request_flag( $source, 'wc_gpd_inc_outlines' ),
 			'include_shapes'     => self::request_flag( $source, 'wc_gpd_inc_shapes' ),
 			'rasterize'          => self::request_flag( $source, 'wc_gpd_rasterize' ),
+			'transparent_raster' => self::request_flag( $source, 'wc_gpd_transparent_raster' ),
 			'preset'             => isset( $source['wc_gpd_preset'] ) ? sanitize_key( (string) $source['wc_gpd_preset'] ) : 'custom',
 		);
 	}
@@ -125,7 +131,7 @@ class WC_GPD_Export {
 	 * @param array  $options       Export options.
 	 * @return string
 	 */
-	public static function build_svg_document( $settings, $design_svg, $design_json, $template_json, array $options ) {
+	public static function build_svg_document( $settings, $design_svg, $design_json, $template_json, array $options, array $product_settings = array() ) {
 		$width  = isset( $settings['width'] ) ? absint( $settings['width'] ) : WC_GPD_Product_Meta::DEFAULT_WIDTH;
 		$height = isset( $settings['height'] ) ? absint( $settings['height'] ) : WC_GPD_Product_Meta::DEFAULT_HEIGHT;
 
@@ -163,6 +169,9 @@ class WC_GPD_Export {
 
 			if ( ! empty( $options['include_outlines'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
 				$outline_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'outline' );
+				if ( ! empty( $product_settings ) ) {
+					$outline_objects = WC_GPD_Fabric_Svg::apply_export_outline_style( $outline_objects, $product_settings );
+				}
 				$outline_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $outline_objects );
 				if ( $outline_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="outlines">' . $outline_markup . '</g>';
@@ -216,7 +225,7 @@ class WC_GPD_Export {
 	 * @param string $svg SVG document.
 	 * @return string|WP_Error
 	 */
-	private static function rasterize_svg( $svg ) {
+	private static function rasterize_svg( $svg, $transparent = true ) {
 		if ( ! class_exists( 'Imagick' ) ) {
 			return new WP_Error(
 				'wc_gpd_no_imagick',
@@ -226,7 +235,7 @@ class WC_GPD_Export {
 
 		try {
 			$imagick = new Imagick();
-			$imagick->setBackgroundColor( new ImagickPixel( 'transparent' ) );
+			$imagick->setBackgroundColor( new ImagickPixel( $transparent ? 'transparent' : 'white' ) );
 			$imagick->readImageBlob( $svg );
 			$imagick->setImageFormat( 'png32' );
 			$binary = $imagick->getImageBlob();

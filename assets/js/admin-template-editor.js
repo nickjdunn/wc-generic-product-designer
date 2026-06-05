@@ -12,8 +12,15 @@
 	const defaultImageInput = document.getElementById( 'wc_gpd_template_default_image_id' );
 	const viewTabsEl = document.getElementById( 'wc-gpd-template-view-tabs' );
 	const viewImageInput = document.getElementById( 'wc_gpd_template_view_image_id' );
+	const viewImagePreview = document.getElementById( 'wc-gpd-template-view-image-preview' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
 	const bboxToggle = document.getElementById( 'wc_gpd_template_is_bbox' );
+	const strokeColorInput = document.getElementById( 'wc_gpd_template_stroke_color' );
+	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
+	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
+	const shapePropsHint = document.getElementById( 'wc-gpd-shape-props-hint' );
+	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
+	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
 
 	if ( ! canvasEl || typeof fabric === 'undefined' ) {
 		return;
@@ -22,6 +29,43 @@
 	const width = parseInt( widthInput ? widthInput.value : '800', 10 ) || 800;
 	const height = parseInt( heightInput ? heightInput.value : '600', 10 ) || 600;
 	const maxViews = parseInt( maxViewsInput ? maxViewsInput.value : '1', 10 ) || 1;
+
+	function readDefault( id, fallback ) {
+		const el = document.getElementById( id );
+		return el && el.value ? el.value : fallback;
+	}
+
+	function defaultOutlineColor() {
+		const settingsField = document.getElementById( 'wc_gpd_ps_outline_color' );
+		if ( settingsField && settingsField.value ) {
+			return settingsField.value;
+		}
+		return readDefault( 'wc_gpd_tpl_default_outline_color', '#ff0000' );
+	}
+
+	function defaultOutlineWidth() {
+		const settingsField = document.getElementById( 'wc_gpd_ps_outline_stroke_width' );
+		if ( settingsField && settingsField.value ) {
+			return parseFloat( settingsField.value ) || 1;
+		}
+		return parseFloat( readDefault( 'wc_gpd_tpl_default_outline_width', '1' ) ) || 1;
+	}
+
+	function defaultBboxColor() {
+		const settingsField = document.getElementById( 'wc_gpd_ps_bbox_stroke_color' );
+		if ( settingsField && settingsField.value ) {
+			return settingsField.value;
+		}
+		return readDefault( 'wc_gpd_tpl_default_bbox_color', '#ff0000' );
+	}
+
+	function defaultBboxWidth() {
+		const settingsField = document.getElementById( 'wc_gpd_ps_bbox_stroke_width' );
+		if ( settingsField && settingsField.value ) {
+			return parseFloat( settingsField.value ) || 1;
+		}
+		return parseFloat( readDefault( 'wc_gpd_tpl_default_bbox_width', '1' ) ) || 1;
+	}
 
 	const canvas = new fabric.Canvas( 'wc-gpd-template-canvas', {
 		selection: true,
@@ -67,6 +111,28 @@
 		}
 	}
 
+	function isShape( obj ) {
+		return obj && ( obj.type === 'rect' || obj.type === 'circle' || obj.type === 'ellipse' );
+	}
+
+	function applyStrokeToObject( obj, isBbox ) {
+		if ( ! obj ) {
+			return;
+		}
+		const color = isBbox ? defaultBboxColor() : ( strokeColorInput ? strokeColorInput.value : defaultOutlineColor() );
+		const strokeWidth = isBbox ? defaultBboxWidth() : ( strokeWidthInput ? parseFloat( strokeWidthInput.value ) : defaultOutlineWidth() );
+		obj.set( {
+			stroke: color,
+			strokeWidth: strokeWidth || 1,
+			fill: 'transparent',
+		} );
+		if ( isBbox ) {
+			obj.strokeDashArray = [ 6, 4 ];
+		} else {
+			obj.strokeDashArray = null;
+		}
+	}
+
 	function persistCanvasToActiveView() {
 		const view = getActiveView();
 		if ( ! view ) {
@@ -78,6 +144,7 @@
 			'wcGpdBoundingBox',
 			'wcGpdLayerType',
 			'wcGpdTemplateLayer',
+			'strokeDashArray',
 		] ) );
 		view.bounding_box_uid = '';
 		view.objects.forEach( ( obj ) => {
@@ -110,30 +177,49 @@
 			canvas.getObjects().forEach( ( other ) => {
 				if ( other !== obj ) {
 					other.wcGpdBoundingBox = false;
+					if ( other.wcGpdOutlineLayer ) {
+						applyStrokeToObject( other, false );
+					}
 				}
 			} );
 			obj.wcGpdBoundingBox = true;
+			applyStrokeToObject( obj, true );
 			const view = getActiveView();
 			if ( view ) {
 				view.bounding_box_uid = obj.wcGpdUid;
 			}
 		} else if ( bboxToggle ) {
 			obj.wcGpdBoundingBox = false;
+			applyStrokeToObject( obj, false );
 		}
 		updateBboxToggleState();
 	}
 
 	function updateBboxToggleState() {
 		const active = canvas.getActiveObject();
-		const shapeSelected = active && ( active.type === 'rect' || active.type === 'circle' || active.type === 'ellipse' );
+		const shapeSelected = isShape( active );
+
+		if ( shapePropsFields ) {
+			shapePropsFields.hidden = ! shapeSelected;
+		}
+		if ( shapePropsHint ) {
+			shapePropsHint.hidden = shapeSelected;
+		}
+
 		if ( bboxToggle ) {
-			bboxToggle.disabled = ! shapeSelected || ! ( outlineToggle && outlineToggle.checked );
-			if ( active && shapeSelected ) {
+			bboxToggle.disabled = ! shapeSelected;
+			if ( shapeSelected ) {
 				bboxToggle.checked = !! active.wcGpdBoundingBox;
 			}
 		}
-		if ( outlineToggle && active ) {
+		if ( outlineToggle && shapeSelected ) {
 			outlineToggle.checked = !! active.wcGpdOutlineLayer;
+		}
+		if ( shapeSelected && strokeColorInput ) {
+			strokeColorInput.value = active.stroke || defaultOutlineColor();
+		}
+		if ( shapeSelected && strokeWidthInput ) {
+			strokeWidthInput.value = String( active.strokeWidth || defaultOutlineWidth() );
 		}
 	}
 
@@ -143,8 +229,29 @@
 		canvas.requestRenderAll();
 	}
 
+	function updateViewImagePreview( imageId ) {
+		if ( ! viewImagePreview ) {
+			return;
+		}
+		viewImagePreview.innerHTML = '';
+		if ( ! imageId || ! window.wp || ! wp.media ) {
+			return;
+		}
+		wp.media.attachment( imageId ).fetch().then( () => {
+			const attachment = wp.media.attachment( imageId );
+			const url = attachment.get( 'url' );
+			if ( url ) {
+				const img = document.createElement( 'img' );
+				img.src = url;
+				img.alt = '';
+				viewImagePreview.appendChild( img );
+			}
+		} );
+	}
+
 	function loadBackgroundForView( view ) {
 		const imageId = view.template_image_id || parseInt( defaultImageInput ? defaultImageInput.value : '0', 10 ) || 0;
+		updateViewImagePreview( imageId );
 		canvas.backgroundImage = null;
 		canvas.backgroundColor = '#f8f8f8';
 		if ( ! imageId || ! window.wp || ! wp.media ) {
@@ -238,14 +345,15 @@
 			width: size,
 			height: square ? size : 90,
 			fill: 'transparent',
-			stroke: '#111111',
-			strokeWidth: 2,
+			stroke: defaultOutlineColor(),
+			strokeWidth: defaultOutlineWidth(),
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( rect );
 		canvas.add( rect );
 		canvas.setActiveObject( rect );
 		canvas.requestRenderAll();
+		updateBboxToggleState();
 	}
 
 	function addCircle() {
@@ -256,14 +364,15 @@
 			originY: 'center',
 			radius: 60,
 			fill: 'transparent',
-			stroke: '#111111',
-			strokeWidth: 2,
+			stroke: defaultOutlineColor(),
+			strokeWidth: defaultOutlineWidth(),
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( circle );
 		canvas.add( circle );
 		canvas.setActiveObject( circle );
 		canvas.requestRenderAll();
+		updateBboxToggleState();
 	}
 
 	function addView() {
@@ -324,6 +433,24 @@
 		loadView( documentData.views[ 0 ].id );
 	}
 
+	function applyResponsiveScale() {
+		const wrap = editorRoot || canvasEl.parentElement;
+		if ( ! wrap ) {
+			return;
+		}
+		const isPopout = editorRoot && editorRoot.classList.contains( 'wc-gpd-is-popout' );
+		const maxWidth = isPopout ? Math.min( window.innerWidth - 80, 1100 ) : Math.max( 1, wrap.clientWidth );
+		const scale = Math.min( 1, maxWidth / width );
+		const displayW = Math.max( 1, Math.floor( width * scale ) );
+		const displayH = Math.max( 1, Math.floor( height * scale ) );
+		canvas.setDimensions( { width, height } );
+		if ( typeof canvas.setDimensions === 'function' ) {
+			canvas.setDimensions( { width: displayW, height: displayH }, { cssOnly: true } );
+		}
+		canvas.calcOffset();
+		canvas.requestRenderAll();
+	}
+
 	canvas.on( 'selection:created', updateBboxToggleState );
 	canvas.on( 'selection:updated', updateBboxToggleState );
 	canvas.on( 'selection:cleared', updateBboxToggleState );
@@ -332,7 +459,6 @@
 		outlineToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
 			if ( ! active ) {
-				updateBboxToggleState();
 				return;
 			}
 			active.wcGpdOutlineLayer = outlineToggle.checked;
@@ -343,6 +469,7 @@
 					bboxToggle.checked = false;
 				}
 			}
+			applyStrokeToObject( active, active.wcGpdBoundingBox );
 			canvas.requestRenderAll();
 			updateBboxToggleState();
 		} );
@@ -358,11 +485,34 @@
 				syncShapeFlags( active );
 			} else {
 				active.wcGpdBoundingBox = false;
+				applyStrokeToObject( active, false );
 				const view = getActiveView();
 				if ( view ) {
 					view.bounding_box_uid = '';
 				}
 			}
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( strokeColorInput ) {
+		strokeColorInput.addEventListener( 'input', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || active.wcGpdBoundingBox ) {
+				return;
+			}
+			active.set( 'stroke', strokeColorInput.value );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( strokeWidthInput ) {
+		strokeWidthInput.addEventListener( 'input', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || active.wcGpdBoundingBox ) {
+				return;
+			}
+			active.set( 'strokeWidth', parseFloat( strokeWidthInput.value ) || 1 );
 			canvas.requestRenderAll();
 		} );
 	}
@@ -379,12 +529,19 @@
 		renderTabs();
 	} );
 
+	if ( popoutBtn && editorRoot && window.WcGpdPopout ) {
+		popoutBtn.addEventListener( 'click', () => {
+			window.WcGpdPopout.toggle( editorRoot, applyResponsiveScale );
+		} );
+		editorRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
+	}
+
 	if ( window.wp && wp.media ) {
 		$( '#wc-gpd-template-view-image-select' ).on( 'click', ( event ) => {
 			event.preventDefault();
 			const frame = wp.media( {
-				title: 'Select area background',
-				button: { text: 'Use image' },
+				title: 'Select area background photo',
+				button: { text: 'Use photo' },
 				multiple: false,
 			} );
 			frame.on( 'select', () => {
@@ -416,5 +573,8 @@
 	$( '#post' ).on( 'submit', saveJson );
 	$( document ).on( 'click', '#publish, #save-post', saveJson );
 
+	window.addEventListener( 'resize', applyResponsiveScale );
+
 	loadJson();
+	applyResponsiveScale();
 }( jQuery ) );

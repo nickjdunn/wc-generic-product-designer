@@ -64,6 +64,42 @@ class WC_GPD_Fabric_Svg {
 	}
 
 	/**
+	 * Apply production outline stroke from per-product export settings.
+	 *
+	 * @param array $objects          Outline Fabric objects.
+	 * @param array $product_settings Product designer settings.
+	 * @return array
+	 */
+	public static function apply_export_outline_style( $objects, $product_settings ) {
+		if ( ! is_array( $objects ) || ! is_array( $product_settings ) ) {
+			return is_array( $objects ) ? $objects : array();
+		}
+
+		$color = ! empty( $product_settings['export_outline_color'] )
+			? sanitize_hex_color( (string) $product_settings['export_outline_color'] )
+			: '#ff0000';
+		$width = isset( $product_settings['export_outline_width'] )
+			? (float) $product_settings['export_outline_width']
+			: 0.25;
+
+		if ( ! $color ) {
+			$color = '#ff0000';
+		}
+
+		foreach ( $objects as &$object ) {
+			if ( ! is_array( $object ) ) {
+				continue;
+			}
+			$object['stroke']      = $color;
+			$object['strokeWidth'] = max( 0.1, $width );
+			$object['fill']        = 'transparent';
+		}
+		unset( $object );
+
+		return $objects;
+	}
+
+	/**
 	 * Resolve layer type from Fabric object flags.
 	 *
 	 * @param array $object Fabric object.

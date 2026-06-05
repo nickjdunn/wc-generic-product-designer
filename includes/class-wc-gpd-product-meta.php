@@ -91,14 +91,15 @@ class WC_GPD_Product_Meta {
 		$template_views = WC_GPD_Template_Json::parse( $template_json );
 
 		return array(
-			'enabled'        => self::is_enabled( $product_id ),
-			'width'          => $width,
-			'height'         => $height,
-			'template_id'    => $image_id,
-			'template_url'   => $template_url ? $template_url : '',
-			'template_json'  => $template_json,
-			'template_views' => $template_views,
-			'max_views'      => $max_views,
+			'enabled'          => self::is_enabled( $product_id ),
+			'width'            => $width,
+			'height'           => $height,
+			'template_id'      => $image_id,
+			'template_url'     => $template_url ? $template_url : '',
+			'template_json'    => $template_json,
+			'template_views'   => $template_views,
+			'max_views'        => $max_views,
+			'product_settings' => WC_GPD_Product_Settings::get( $product_id ),
 		);
 	}
 

@@ -1,0 +1,126 @@
+<?php
+/**
+ * Per-product designer settings (saved on product meta).
+ *
+ * @package WC_Generic_Product_Designer
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Product-level designer configuration.
+ */
+class WC_GPD_Product_Settings {
+
+	const META_KEY = '_wc_gpd_product_settings';
+
+	const DEFAULTS = array(
+		'enable_popout'           => true,
+		'allow_text_color'        => true,
+		'single_color_only'       => false,
+		'forced_text_color'       => '#000000',
+		'allow_bold'              => true,
+		'allow_italic'            => true,
+		'allow_font_family'       => true,
+		'allow_font_size'         => true,
+		'allow_text_align'        => true,
+		'outline_color'           => '#ff0000',
+		'outline_stroke_width'    => 1,
+		'bbox_stroke_color'       => '#ff0000',
+		'bbox_stroke_width'       => 1,
+		'export_outline_color'    => '#ff0000',
+		'export_outline_width'    => 0.25,
+		'export_hairline_outline' => true,
+	);
+
+	/**
+	 * @param int $product_id Product ID.
+	 * @return array
+	 */
+	public static function get( $product_id ) {
+		$stored = get_post_meta( absint( $product_id ), self::META_KEY, true );
+		if ( ! is_array( $stored ) ) {
+			$stored = array();
+		}
+
+		$merged = wp_parse_args( $stored, self::DEFAULTS );
+		$merged['forced_text_color']    = self::sanitize_color( $merged['forced_text_color'], '#000000' );
+		$merged['outline_color']        = self::sanitize_color( $merged['outline_color'], '#ff0000' );
+		$merged['bbox_stroke_color']    = self::sanitize_color( $merged['bbox_stroke_color'], '#ff0000' );
+		$merged['export_outline_color'] = self::sanitize_color( $merged['export_outline_color'], '#ff0000' );
+		$merged['outline_stroke_width'] = max( 0.1, min( 20, (float) $merged['outline_stroke_width'] ) );
+		$merged['bbox_stroke_width']    = max( 0.1, min( 20, (float) $merged['bbox_stroke_width'] ) );
+		$merged['export_outline_width'] = max( 0.1, min( 20, (float) $merged['export_outline_width'] ) );
+
+		return $merged;
+	}
+
+	/**
+	 * @param int   $product_id Product ID.
+	 * @param array $settings   Settings.
+	 */
+	public static function save( $product_id, array $settings ) {
+		$product_id = absint( $product_id );
+		if ( ! $product_id ) {
+			return;
+		}
+
+		$clean = array(
+			'enable_popout'           => ! empty( $settings['enable_popout'] ),
+			'allow_text_color'        => ! empty( $settings['allow_text_color'] ),
+			'single_color_only'       => ! empty( $settings['single_color_only'] ),
+			'forced_text_color'       => self::sanitize_color( $settings['forced_text_color'] ?? '', '#000000' ),
+			'allow_bold'              => ! empty( $settings['allow_bold'] ),
+			'allow_italic'            => ! empty( $settings['allow_italic'] ),
+			'allow_font_family'       => ! empty( $settings['allow_font_family'] ),
+			'allow_font_size'         => ! empty( $settings['allow_font_size'] ),
+			'allow_text_align'        => ! empty( $settings['allow_text_align'] ),
+			'outline_color'           => self::sanitize_color( $settings['outline_color'] ?? '', '#ff0000' ),
+			'outline_stroke_width'    => isset( $settings['outline_stroke_width'] ) ? (float) $settings['outline_stroke_width'] : 1,
+			'bbox_stroke_color'       => self::sanitize_color( $settings['bbox_stroke_color'] ?? '', '#ff0000' ),
+			'bbox_stroke_width'       => isset( $settings['bbox_stroke_width'] ) ? (float) $settings['bbox_stroke_width'] : 1,
+			'export_outline_color'    => self::sanitize_color( $settings['export_outline_color'] ?? '', '#ff0000' ),
+			'export_outline_width'    => isset( $settings['export_outline_width'] ) ? (float) $settings['export_outline_width'] : 0.25,
+			'export_hairline_outline' => ! empty( $settings['export_hairline_outline'] ),
+		);
+
+		update_post_meta( $product_id, self::META_KEY, $clean );
+	}
+
+	/**
+	 * Parse POST fields into settings array.
+	 *
+	 * @param array $post $_POST subset.
+	 * @return array
+	 */
+	public static function from_post( array $post ) {
+		return array(
+			'enable_popout'           => ! empty( $post['wc_gpd_ps_enable_popout'] ),
+			'allow_text_color'        => ! empty( $post['wc_gpd_ps_allow_text_color'] ),
+			'single_color_only'       => ! empty( $post['wc_gpd_ps_single_color_only'] ),
+			'forced_text_color'       => $post['wc_gpd_ps_forced_text_color'] ?? '#000000',
+			'allow_bold'              => ! empty( $post['wc_gpd_ps_allow_bold'] ),
+			'allow_italic'            => ! empty( $post['wc_gpd_ps_allow_italic'] ),
+			'allow_font_family'       => ! empty( $post['wc_gpd_ps_allow_font_family'] ),
+			'allow_font_size'         => ! empty( $post['wc_gpd_ps_allow_font_size'] ),
+			'allow_text_align'        => ! empty( $post['wc_gpd_ps_allow_text_align'] ),
+			'outline_color'           => $post['wc_gpd_ps_outline_color'] ?? '#ff0000',
+			'outline_stroke_width'    => $post['wc_gpd_ps_outline_stroke_width'] ?? 1,
+			'bbox_stroke_color'       => $post['wc_gpd_ps_bbox_stroke_color'] ?? '#ff0000',
+			'bbox_stroke_width'       => $post['wc_gpd_ps_bbox_stroke_width'] ?? 1,
+			'export_outline_color'    => $post['wc_gpd_ps_export_outline_color'] ?? '#ff0000',
+			'export_outline_width'    => $post['wc_gpd_ps_export_outline_width'] ?? 0.25,
+			'export_hairline_outline' => ! empty( $post['wc_gpd_ps_export_hairline_outline'] ),
+		);
+	}
+
+	/**
+	 * @param mixed  $value    Color value.
+	 * @param string $fallback Fallback hex.
+	 * @return string
+	 */
+	private static function sanitize_color( $value, $fallback ) {
+		$color = sanitize_hex_color( (string) $value );
+		return $color ? $color : $fallback;
+	}
+}

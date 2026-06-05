@@ -1,0 +1,101 @@
+/**
+ * WooCommerce product editor — Product Designer sub-tabs and template editor.
+ */
+
+.wc-gpd-product-subtabs-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0;
+	margin: 0 0 1rem;
+	padding: 0 12px;
+	border-bottom: 1px solid #c3c4c7;
+}
+
+.wc-gpd-product-subtab-link {
+	display: inline-block;
+	padding: 10px 16px;
+	margin: 0 0 -1px;
+	text-decoration: none;
+	color: #50575e;
+	border: 1px solid transparent;
+	border-bottom: none;
+	background: transparent;
+}
+
+.wc-gpd-product-subtab-link.is-active {
+	color: #1d2327;
+	background: #fff;
+	border-color: #c3c4c7;
+	border-bottom-color: #fff;
+	font-weight: 600;
+}
+
+.wc-gpd-template-area-photo {
+	margin: 0.75rem 0;
+	padding: 0.75rem;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.wc-gpd-template-view-image-preview img {
+	display: block;
+	max-width: 160px;
+	height: auto;
+	margin: 0.5rem 0;
+	border: 1px solid #c3c4c7;
+}
+
+.wc-gpd-template-shape-props {
+	margin: 0.75rem 0;
+	padding: 0.75rem 1rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+}
+
+.wc-gpd-template-shape-props legend {
+	font-weight: 600;
+	padding: 0 0.25rem;
+}
+
+.wc-gpd-shape-props-fields {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.25rem;
+	align-items: center;
+}
+
+.wc-gpd-shape-props-fields label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-is-popout {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	background: #fff;
+	overflow: auto;
+	padding: 1rem 1.5rem 2rem;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-is-popout #wc-gpd-template-canvas {
+	max-width: min( 100%, 1100px );
+}
+
+.wc-gpd-popout-close {
+	margin-bottom: 0.75rem;
+}
+
+.wc-gpd-popout-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	background: rgba( 0, 0, 0, 0.45 );
+}
+
+body.wc-gpd-popout-open {
+	overflow: hidden;
+}

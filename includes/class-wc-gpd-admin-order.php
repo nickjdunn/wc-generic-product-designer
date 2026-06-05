@@ -171,7 +171,8 @@ class WC_GPD_Admin_Order implements WC_GPD_Module {
 						<label><input type="checkbox" name="wc_gpd_inc_text" value="1" checked="checked" /> <?php esc_html_e( 'Customer text', 'wc-generic-product-designer' ); ?></label>
 						<label><input type="checkbox" name="wc_gpd_inc_outlines" value="1" checked="checked" /> <?php esc_html_e( 'Template outline lines', 'wc-generic-product-designer' ); ?></label>
 						<label><input type="checkbox" name="wc_gpd_inc_shapes" value="1" checked="checked" /> <?php esc_html_e( 'Customer shapes', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_rasterize" value="1" /> <?php esc_html_e( 'Rasterize (PNG)', 'wc-generic-product-designer' ); ?></label>
+						<label><input type="checkbox" name="wc_gpd_rasterize" value="1" id="wc_gpd_rasterize_<?php echo esc_attr( (string) $item_id ); ?>" /> <?php esc_html_e( 'Rasterize (PNG)', 'wc-generic-product-designer' ); ?></label>
+						<label><input type="checkbox" name="wc_gpd_transparent_raster" value="1" checked="checked" /> <?php esc_html_e( 'Transparent PNG background (when rasterizing)', 'wc-generic-product-designer' ); ?></label>
 					</div>
 					<button type="submit" class="button"><?php esc_html_e( 'Download custom file', 'wc-generic-product-designer' ); ?></button>
 				</form>

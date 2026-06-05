@@ -329,3 +329,53 @@
 	opacity: 0.65;
 	pointer-events: none;
 }
+
+.wc-gpd-designer__canvas-header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.wc-gpd-designer.wc-gpd-is-popout {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	background: #fff;
+	overflow: auto;
+	padding: 1rem 1.25rem 2rem;
+	max-width: none;
+	margin: 0;
+	border-radius: 0;
+}
+
+.wc-gpd-designer.wc-gpd-is-popout .wc-gpd-designer__layout {
+	flex-direction: row;
+	max-width: none;
+}
+
+.wc-gpd-designer.wc-gpd-is-popout .wc-gpd-designer__canvas-wrap {
+	max-width: min( 100%, 1200px );
+}
+
+.wc-gpd-popout-close {
+	margin-bottom: 0.75rem;
+}
+
+.wc-gpd-popout-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 99999;
+	background: rgba( 0, 0, 0, 0.45 );
+}
+
+body.wc-gpd-popout-open {
+	overflow: hidden;
+}
+
+.wc-gpd-designer__controls label[hidden],
+.wc-gpd-designer__controls .wc-gpd-control-align[hidden] {
+	display: none !important;
+}

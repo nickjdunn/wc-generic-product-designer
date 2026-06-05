@@ -9,6 +9,8 @@
 		return;
 	}
 
+	const productSettings = config.productSettings || {};
+
 	const log = window.wcGpdDebug || { setEnabled() {}, debug() {}, info() {}, warn() {}, error() {} };
 	log.setEnabled( !! config.debug );
 	log.info( 'Designer initializing', { width: config.canvasWidth, height: config.canvasHeight } );
@@ -93,12 +95,65 @@
 		fontSize: document.getElementById( 'wc-gpd-font-size' ),
 		bold: document.getElementById( 'wc-gpd-bold' ),
 		italic: document.getElementById( 'wc-gpd-italic' ),
+		textColor: document.getElementById( 'wc-gpd-text-color' ),
+		textColorWrap: document.getElementById( 'wc-gpd-text-color-wrap' ),
+		underline: document.getElementById( 'wc-gpd-underline' ),
+		lineHeight: document.getElementById( 'wc-gpd-line-height' ),
+		letterSpacing: document.getElementById( 'wc-gpd-letter-spacing' ),
+		alignRow: designerRoot.querySelector( '.wc-gpd-control-align' ),
 		alignButtons: designerRoot.querySelectorAll( '.wc-gpd-align' ),
 		layersList: document.getElementById( 'wc-gpd-layers-list' ),
 		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
 		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
 		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
+		popoutBtn: document.getElementById( 'wc-gpd-popout-btn' ),
 	};
+
+	function defaultTextColor() {
+		return productSettings.forced_text_color || '#000000';
+	}
+
+	function enforceSingleColor( obj ) {
+		if ( ! obj || ! productSettings.single_color_only ) {
+			return;
+		}
+		obj.set( 'fill', defaultTextColor() );
+	}
+
+	function textColorAllowed() {
+		return productSettings.allow_text_color !== false && ! productSettings.single_color_only;
+	}
+
+	/**
+	 * Show/hide customer tools based on per-product settings.
+	 */
+	function applyProductToolSettings() {
+		const showColor = textColorAllowed();
+		if ( ui.textColorWrap ) {
+			ui.textColorWrap.hidden = ! showColor;
+		}
+		if ( ui.fontFamily && ui.fontFamily.closest( 'label' ) ) {
+			ui.fontFamily.closest( 'label' ).hidden = productSettings.allow_font_family === false;
+		}
+		if ( ui.fontSize && ui.fontSize.closest( 'label' ) ) {
+			ui.fontSize.closest( 'label' ).hidden = productSettings.allow_font_size === false;
+		}
+		if ( ui.bold && ui.bold.closest( 'label' ) ) {
+			ui.bold.closest( 'label' ).hidden = productSettings.allow_bold === false;
+		}
+		if ( ui.italic && ui.italic.closest( 'label' ) ) {
+			ui.italic.closest( 'label' ).hidden = productSettings.allow_italic === false;
+		}
+		if ( ui.alignRow ) {
+			ui.alignRow.hidden = productSettings.allow_text_align === false;
+		}
+		if ( ui.popoutBtn ) {
+			ui.popoutBtn.hidden = productSettings.enable_popout === false;
+		}
+		if ( ui.textColor ) {
+			ui.textColor.value = defaultTextColor();
+		}
+	}
 
 	const canvas = new fabric.Canvas( 'wc-gpd-canvas', {
 		selection: true,
@@ -150,7 +205,10 @@
 			return;
 		}
 
-		const maxWidth = Math.max( 1, wrap.clientWidth );
+		const isPopout = designerRoot.classList.contains( 'wc-gpd-is-popout' );
+		const maxWidth = isPopout
+			? Math.min( window.innerWidth - 320, 1200 )
+			: Math.max( 1, wrap.clientWidth );
 		displayScale = Math.min( 1, maxWidth / PROD_WIDTH );
 		const displayW = Math.max( 1, Math.floor( PROD_WIDTH * displayScale ) );
 		const displayH = Math.max( 1, Math.floor( PROD_HEIGHT * displayScale ) );
@@ -364,6 +422,7 @@
 						( objects ) => {
 							objects.forEach( ( obj ) => {
 								obj.wcGpdTextLayer = obj.wcGpdTextLayer || isTextLayer( obj );
+								enforceSingleColor( obj );
 								canvas.add( obj );
 								obj.setCoords();
 							} );
@@ -672,6 +731,18 @@
 		if ( ui.italic ) {
 			ui.italic.checked = obj.fontStyle === 'italic';
 		}
+		if ( ui.textColor ) {
+			ui.textColor.value = obj.fill || defaultTextColor();
+		}
+		if ( ui.underline ) {
+			ui.underline.checked = !! obj.underline;
+		}
+		if ( ui.lineHeight ) {
+			ui.lineHeight.value = String( obj.lineHeight || 1.16 );
+		}
+		if ( ui.letterSpacing ) {
+			ui.letterSpacing.value = String( obj.charSpacing || 0 );
+		}
 
 		const align = obj.textAlign || 'left';
 		ui.alignButtons.forEach( ( btn ) => {
@@ -679,6 +750,8 @@
 			btn.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
 			btn.classList.toggle( 'is-active', isActive );
 		} );
+
+		enforceSingleColor( obj );
 	}
 
 	/**
@@ -693,7 +766,9 @@
 			originY: 'center',
 			fontFamily: config.fonts[ 0 ],
 			fontSize: 32,
-			fill: '#000000',
+			fill: defaultTextColor(),
+			lineHeight: 1.16,
+			charSpacing: 0,
 			wcGpdTextLayer: true,
 			wcGpdLayerType: 'text',
 		} );
@@ -1126,6 +1201,57 @@
 		} );
 	} );
 
+	if ( ui.textColor ) {
+		ui.textColor.addEventListener( 'input', () => {
+			if ( ! activeText || ! textColorAllowed() ) {
+				return;
+			}
+			activeText.set( 'fill', ui.textColor.value );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.underline ) {
+		ui.underline.addEventListener( 'change', () => {
+			if ( ! activeText ) {
+				return;
+			}
+			activeText.set( 'underline', ui.underline.checked );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.lineHeight ) {
+		ui.lineHeight.addEventListener( 'input', () => {
+			if ( ! activeText ) {
+				return;
+			}
+			const value = Math.min( 3, Math.max( 0.5, parseFloat( ui.lineHeight.value ) || 1.16 ) );
+			activeText.set( 'lineHeight', value );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.letterSpacing ) {
+		ui.letterSpacing.addEventListener( 'input', () => {
+			if ( ! activeText ) {
+				return;
+			}
+			const value = Math.min( 200, Math.max( -50, parseInt( ui.letterSpacing.value, 10 ) || 0 ) );
+			activeText.set( 'charSpacing', value );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.popoutBtn && window.WcGpdPopout && productSettings.enable_popout !== false ) {
+		ui.popoutBtn.addEventListener( 'click', () => {
+			window.WcGpdPopout.toggle( designerRoot, applyResponsiveScale );
+		} );
+		designerRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
+	} else if ( ui.popoutBtn ) {
+		ui.popoutBtn.hidden = true;
+	}
+
 	if ( ui.layerForward ) {
 		ui.layerForward.addEventListener( 'click', () => {
 			const obj = canvas.getActiveObject();
@@ -1216,6 +1342,7 @@
 	}
 
 	initFontSelect();
+	applyProductToolSettings();
 	bindAddToCart();
 
 	if ( config.isEditing && config.i18n.updateCart ) {
