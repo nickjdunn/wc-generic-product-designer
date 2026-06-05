@@ -673,6 +673,18 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Designer', 'wc-generic-product-designer' ); ?></h4>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_enable_popout" value="1" <?php checked( $ps['enable_popout'] ); ?> /> <?php esc_html_e( 'Pop-out / expand mode', 'wc-generic-product-designer' ); ?></label></p>
+				<p>
+					<label><?php esc_html_e( 'Customer tools panel position', 'wc-generic-product-designer' ); ?>
+						<select name="wc_gpd_ps_customer_panel_position" id="wc_gpd_ps_customer_panel_position">
+							<option value="auto" <?php selected( $ps['customer_panel_position'] ?? 'auto', 'auto' ); ?>><?php esc_html_e( 'Auto (gallery: bottom, summary: right)', 'wc-generic-product-designer' ); ?></option>
+							<option value="bottom" <?php selected( $ps['customer_panel_position'] ?? '', 'bottom' ); ?>><?php esc_html_e( 'Below canvas', 'wc-generic-product-designer' ); ?></option>
+							<option value="top" <?php selected( $ps['customer_panel_position'] ?? '', 'top' ); ?>><?php esc_html_e( 'Above canvas', 'wc-generic-product-designer' ); ?></option>
+							<option value="left" <?php selected( $ps['customer_panel_position'] ?? '', 'left' ); ?>><?php esc_html_e( 'Left of canvas', 'wc-generic-product-designer' ); ?></option>
+							<option value="right" <?php selected( $ps['customer_panel_position'] ?? '', 'right' ); ?>><?php esc_html_e( 'Right of canvas', 'wc-generic-product-designer' ); ?></option>
+						</select>
+					</label>
+				</p>
+				<p class="description"><?php esc_html_e( 'Store managers can also preview positions live on the product page using the layout tester.', 'wc-generic-product-designer' ); ?></p>
 				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Canvas background', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_canvas_bg_color" value="<?php echo esc_attr( $ps['canvas_bg_color'] ); ?>" /></label></p>
 			</div>
 			<div class="wc-gpd-settings-card">

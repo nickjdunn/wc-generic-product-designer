@@ -115,19 +115,20 @@
 		alignRow: designerRoot.querySelector( '.wc-gpd-control-align' ),
 		alignButtons: designerRoot.querySelectorAll( '.wc-gpd-align' ),
 		layersList: document.getElementById( 'wc-gpd-layers-list' ),
-		layersToggle: document.getElementById( 'wc-gpd-layers-toggle' ),
-		layersPanel: document.getElementById( 'wc-gpd-layers-panel' ),
 		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
 		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
 		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
 		popoutBtn: document.getElementById( 'wc-gpd-popout-btn' ),
-		fieldsToggle: document.getElementById( 'wc-gpd-fields-toggle' ),
+		studio: document.getElementById( 'wc-gpd-studio' ),
+		studioPanel: document.getElementById( 'wc-gpd-studio-panel' ),
+		sectionDetails: document.getElementById( 'wc-gpd-section-details' ),
+		customerAccordion: document.getElementById( 'wc-gpd-cust-accordion' ),
+		panelPositionSelect: document.getElementById( 'wc-gpd-panel-position-select' ),
 		viewPhotosBtn: document.getElementById( 'wc-gpd-view-photos-btn' ),
 		galleryModal: document.getElementById( 'wc-gpd-gallery-modal' ),
 		galleryScroll: document.getElementById( 'wc-gpd-gallery-scroll' ),
 		galleryClose: document.getElementById( 'wc-gpd-gallery-close' ),
 		galleryBackdrop: document.getElementById( 'wc-gpd-gallery-backdrop' ),
-		customerFields: document.getElementById( 'wc-gpd-customer-fields' ),
 		placeholderFields: document.getElementById( 'wc-gpd-placeholder-fields' ),
 		graphicPickers: document.getElementById( 'wc-gpd-graphic-pickers' ),
 	};
@@ -182,6 +183,122 @@
 		if ( el ) {
 			el.hidden = ! visible;
 		}
+	}
+
+	const PANEL_POSITIONS = [ 'left', 'right', 'top', 'bottom' ];
+	const PANEL_STORAGE_KEY = 'wc_gpd_panel_position_preview';
+
+	function isGalleryPlacement() {
+		return designerRoot.classList.contains( 'wc-gpd-designer--replaces-gallery' )
+			|| designerRoot.classList.contains( 'wc-gpd-designer--gallery' );
+	}
+
+	function resolvePanelPosition() {
+		const urlParam = new URLSearchParams( window.location.search ).get( 'wc_gpd_panel' );
+		if ( urlParam && ( PANEL_POSITIONS.includes( urlParam ) || urlParam === 'auto' ) ) {
+			return urlParam;
+		}
+		try {
+			const stored = localStorage.getItem( PANEL_STORAGE_KEY );
+			if ( stored && ( PANEL_POSITIONS.includes( stored ) || stored === 'auto' ) ) {
+				return stored;
+			}
+		} catch ( e ) {
+			// Ignore storage errors.
+		}
+		return config.panelPosition || productSettings.customer_panel_position || 'auto';
+	}
+
+	function getEffectivePanelPosition( raw ) {
+		if ( raw && raw !== 'auto' && PANEL_POSITIONS.includes( raw ) ) {
+			return raw;
+		}
+		return isGalleryPlacement() ? 'bottom' : 'right';
+	}
+
+	function applyStudioPanelPosition( position ) {
+		if ( ! ui.studio ) {
+			return;
+		}
+		const raw = position || resolvePanelPosition();
+		const pos = getEffectivePanelPosition( raw );
+		PANEL_POSITIONS.forEach( ( key ) => {
+			ui.studio.classList.remove( 'wc-gpd-studio--pos-' + key );
+		} );
+		ui.studio.classList.add( 'wc-gpd-studio--pos-' + pos );
+		ui.studio.dataset.activePosition = pos;
+		applyResponsiveScale();
+	}
+
+	function openCustomerSection( sectionName, exclusive ) {
+		if ( ! ui.customerAccordion || ! sectionName ) {
+			return;
+		}
+		const onlyOne = exclusive !== false;
+		ui.customerAccordion.querySelectorAll( '.wc-gpd-cust-section' ).forEach( ( section ) => {
+			const isTarget = section.dataset.section === sectionName;
+			const toggle = section.querySelector( '.wc-gpd-cust-toggle' );
+			const body = section.querySelector( '.wc-gpd-cust-body' );
+			if ( onlyOne && ! isTarget ) {
+				section.classList.remove( 'is-open' );
+				if ( toggle ) {
+					toggle.setAttribute( 'aria-expanded', 'false' );
+				}
+				if ( body ) {
+					body.hidden = true;
+				}
+			}
+			if ( isTarget ) {
+				section.classList.add( 'is-open' );
+				if ( toggle ) {
+					toggle.setAttribute( 'aria-expanded', 'true' );
+				}
+				if ( body ) {
+					body.hidden = false;
+				}
+			}
+		} );
+	}
+
+	function initCustomerAccordion() {
+		if ( ! ui.customerAccordion ) {
+			return;
+		}
+		ui.customerAccordion.querySelectorAll( '.wc-gpd-cust-toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const section = toggle.closest( '.wc-gpd-cust-section' );
+				if ( ! section || section.hidden ) {
+					return;
+				}
+				if ( section.classList.contains( 'is-open' ) ) {
+					section.classList.remove( 'is-open' );
+					toggle.setAttribute( 'aria-expanded', 'false' );
+					const body = section.querySelector( '.wc-gpd-cust-body' );
+					if ( body ) {
+						body.hidden = true;
+					}
+				} else {
+					openCustomerSection( section.dataset.section || '' );
+				}
+			} );
+		} );
+	}
+
+	function initStudioLayout() {
+		if ( ui.panelPositionSelect ) {
+			ui.panelPositionSelect.value = resolvePanelPosition();
+			ui.panelPositionSelect.addEventListener( 'change', () => {
+				const value = ui.panelPositionSelect.value || 'auto';
+				try {
+					localStorage.setItem( PANEL_STORAGE_KEY, value );
+				} catch ( e ) {
+					// Ignore.
+				}
+				applyStudioPanelPosition( value );
+			} );
+		}
+		applyStudioPanelPosition( resolvePanelPosition() );
+		initCustomerAccordion();
 	}
 
 	function applyProductToolSettings() {
@@ -407,28 +524,10 @@
 		const slots = view ? getGraphicSlotsFromView( view ) : [];
 		const showFields = placeholders.length > 0 || ( slots.length > 0 && graphicLibrary.length && productSettings.allow_customer_graphics !== false );
 
-		const layout = designerRoot.querySelector( '.wc-gpd-designer__layout--compact' );
-		const isMobile = window.matchMedia( '(max-width: 767px)' ).matches;
-
-		if ( layout ) {
-			layout.classList.toggle( 'wc-gpd-has-fields', showFields );
-			if ( ! showFields ) {
-				layout.classList.remove( 'wc-gpd-fields-open' );
-			}
-		}
-
-		if ( ui.customerFields ) {
-			if ( showFields && ! isMobile ) {
-				ui.customerFields.hidden = false;
-			} else if ( ! showFields ) {
-				ui.customerFields.hidden = true;
-			}
-		}
-
-		if ( ui.fieldsToggle ) {
-			ui.fieldsToggle.hidden = ! showFields || ! isMobile;
-			if ( showFields && isMobile ) {
-				ui.customerFields.hidden = ! layout.classList.contains( 'wc-gpd-fields-open' );
+		if ( ui.sectionDetails ) {
+			ui.sectionDetails.hidden = ! showFields;
+			if ( showFields ) {
+				openCustomerSection( 'details', false );
 			}
 		}
 
@@ -1178,6 +1277,8 @@
 			return;
 		}
 
+		openCustomerSection( 'text' );
+
 		if ( ui.fontFamily ) {
 			ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
 		}
@@ -1646,7 +1747,7 @@
 			return;
 		}
 		btn.addEventListener( 'click', () => {
-			if ( ! activeText || ui.dock?.classList.contains( 'is-disabled' ) ) {
+			if ( ! activeText || ui.toolsPanel?.classList.contains( 'is-disabled' ) ) {
 				return;
 			}
 			checkbox.checked = ! checkbox.checked;
@@ -1729,34 +1830,8 @@
 		ui.popoutBtn.hidden = true;
 	}
 
-	if ( ui.layersToggle && ui.layersPanel ) {
-		ui.layersToggle.addEventListener( 'click', () => {
-			const open = ui.layersPanel.hidden;
-			ui.layersPanel.hidden = ! open;
-			ui.layersToggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
-		} );
-	}
-
-	if ( ui.fieldsToggle ) {
-		ui.fieldsToggle.addEventListener( 'click', () => {
-			const layout = designerRoot.querySelector( '.wc-gpd-designer__layout--compact' );
-			if ( ! layout ) {
-				return;
-			}
-			const open = ! layout.classList.contains( 'wc-gpd-fields-open' );
-			layout.classList.toggle( 'wc-gpd-fields-open', open );
-			if ( ui.customerFields ) {
-				ui.customerFields.hidden = ! open;
-			}
-			ui.fieldsToggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
-			ui.fieldsToggle.textContent = open
-				? ( config.i18n.hideFields || 'Hide fields' )
-				: ( config.i18n.showFields || 'Show fields' );
-		} );
-	}
-
 	window.addEventListener( 'resize', () => {
-		buildCustomerFields();
+		applyResponsiveScale();
 	} );
 
 	if ( ui.layerForward ) {
@@ -1888,6 +1963,7 @@
 	}
 
 	initFontSelect();
+	initStudioLayout();
 	applyProductToolSettings();
 	bindGalleryModal();
 	bindAddToCart();

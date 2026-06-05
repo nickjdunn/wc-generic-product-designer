@@ -31,6 +31,7 @@ class WC_GPD_Product_Settings {
 		'allow_text_align'        => true,
 		'allow_free_text'         => true,
 		'allow_customer_graphics' => true,
+		'customer_panel_position' => 'auto',
 		'use_same_colors_entire_template' => false,
 		'outline_color'           => '#ff0000',
 		'outline_stroke_width'    => 1,
@@ -60,6 +61,7 @@ class WC_GPD_Product_Settings {
 		$merged['outline_stroke_width'] = max( 0.1, min( 20, (float) $merged['outline_stroke_width'] ) );
 		$merged['bbox_stroke_width']    = max( 0.1, min( 20, (float) $merged['bbox_stroke_width'] ) );
 		$merged['export_outline_width'] = max( 0.1, min( 20, (float) $merged['export_outline_width'] ) );
+		$merged['customer_panel_position'] = self::sanitize_panel_position( $merged['customer_panel_position'] ?? 'auto' );
 
 		return $merged;
 	}
@@ -91,6 +93,7 @@ class WC_GPD_Product_Settings {
 			'allow_text_align'        => ! empty( $settings['allow_text_align'] ),
 			'allow_free_text'         => ! empty( $settings['allow_free_text'] ),
 			'allow_customer_graphics' => ! empty( $settings['allow_customer_graphics'] ),
+			'customer_panel_position' => self::sanitize_panel_position( $settings['customer_panel_position'] ?? 'auto' ),
 			'use_same_colors_entire_template' => ! empty( $settings['use_same_colors_entire_template'] ),
 			'outline_color'           => self::sanitize_color( $settings['outline_color'] ?? '', '#ff0000' ),
 			'outline_stroke_width'    => isset( $settings['outline_stroke_width'] ) ? (float) $settings['outline_stroke_width'] : 1,
@@ -128,6 +131,7 @@ class WC_GPD_Product_Settings {
 			'allow_text_align'        => ! empty( $post['wc_gpd_ps_allow_text_align'] ),
 			'allow_free_text'         => ! empty( $post['wc_gpd_ps_allow_free_text'] ),
 			'allow_customer_graphics' => ! empty( $post['wc_gpd_ps_allow_customer_graphics'] ),
+			'customer_panel_position' => self::sanitize_panel_position( $post['wc_gpd_ps_customer_panel_position'] ?? 'auto' ),
 			'use_same_colors_entire_template' => ! empty( $post['wc_gpd_ps_use_same_colors'] ),
 			'outline_color'           => $post['wc_gpd_ps_outline_color'] ?? '#ff0000',
 			'outline_stroke_width'    => $post['wc_gpd_ps_outline_stroke_width'] ?? 1,
@@ -137,6 +141,16 @@ class WC_GPD_Product_Settings {
 			'export_outline_width'    => $post['wc_gpd_ps_export_outline_width'] ?? 0.25,
 			'export_hairline_outline' => ! empty( $post['wc_gpd_ps_export_hairline_outline'] ),
 		);
+	}
+
+	/**
+	 * @param mixed $value Panel position key.
+	 * @return string
+	 */
+	public static function sanitize_panel_position( $value ) {
+		$allowed = array( 'auto', 'left', 'right', 'top', 'bottom' );
+		$value   = sanitize_key( (string) $value );
+		return in_array( $value, $allowed, true ) ? $value : 'auto';
 	}
 
 	/**
