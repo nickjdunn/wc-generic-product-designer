@@ -41,49 +41,60 @@
 		return document.querySelector( 'form.cart, form.variations_form, .cart form' );
 	}
 
-	const form = resolveCartForm();
+	let form = resolveCartForm();
 
-	if ( ! canvasEl || ! designerRoot || ! svgInput || ! form ) {
+	if ( ! canvasEl || ! designerRoot || ! svgInput ) {
 		if ( log.error ) {
 			log.error( 'Designer markup missing required elements', {
 				canvas: !! canvasEl,
 				root: !! designerRoot,
 				svgInput: !! svgInput,
-				form: !! form,
 			} );
 		}
 		return;
+	}
+
+	function getCartForm() {
+		if ( form && document.body.contains( form ) ) {
+			return form;
+		}
+		form = resolveCartForm();
+		return form;
 	}
 
 	/**
 	 * Ensure hidden SVG field and nonce live inside the cart form.
 	 */
 	function ensureFieldsInForm() {
-		if ( form.contains( svgInput ) ) {
+		const cartForm = getCartForm();
+		if ( ! cartForm ) {
 			return;
 		}
-		form.appendChild( svgInput );
+		if ( cartForm.contains( svgInput ) ) {
+			return;
+		}
+		cartForm.appendChild( svgInput );
 		log.debug( 'Moved SVG input into cart form' );
 
 		const nonce = designerRoot.querySelector( 'input[name="wc_gpd_add_to_cart_nonce"]' );
-		if ( nonce && ! form.contains( nonce ) ) {
-			form.appendChild( nonce );
+		if ( nonce && ! cartForm.contains( nonce ) ) {
+			cartForm.appendChild( nonce );
 			log.debug( 'Moved nonce into cart form' );
 		}
 
 		const editKey = document.getElementById( 'wc-gpd-edit-cart-key' );
-		if ( editKey && ! form.contains( editKey ) ) {
-			form.appendChild( editKey );
+		if ( editKey && ! cartForm.contains( editKey ) ) {
+			cartForm.appendChild( editKey );
 			log.debug( 'Moved edit cart key into cart form' );
 		}
 
-		if ( jsonInput && ! form.contains( jsonInput ) ) {
-			form.appendChild( jsonInput );
+		if ( jsonInput && ! cartForm.contains( jsonInput ) ) {
+			cartForm.appendChild( jsonInput );
 			log.debug( 'Moved design JSON into cart form' );
 		}
 
-		if ( previewInput && ! form.contains( previewInput ) ) {
-			form.appendChild( previewInput );
+		if ( previewInput && ! cartForm.contains( previewInput ) ) {
+			cartForm.appendChild( previewInput );
 			log.debug( 'Moved preview image into cart form' );
 		}
 	}
@@ -1552,8 +1563,17 @@
 	 * @returns {HTMLElement|null}
 	 */
 	function getAddToCartButton() {
-		return form.querySelector(
-			'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"], .single_add_to_cart_button'
+		const cartForm = getCartForm();
+		if ( cartForm ) {
+			const inForm = cartForm.querySelector(
+				'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"], .single_add_to_cart_button'
+			);
+			if ( inForm ) {
+				return inForm;
+			}
+		}
+		return document.querySelector(
+			'.single-product form.cart button.single_add_to_cart_button, .single-product form.cart .single_add_to_cart_button'
 		);
 	}
 
@@ -1561,6 +1581,11 @@
 	 * POST the cart form after SVG is ready.
 	 */
 	function submitCartForm() {
+		const cartForm = getCartForm();
+		if ( ! cartForm ) {
+			window.alert( config.i18n?.exportError || 'Could not add to cart.' );
+			return;
+		}
 		submitApproved = true;
 		const btn = getAddToCartButton();
 
@@ -1573,8 +1598,8 @@
 
 		log.info( 'Submitting add to cart with design SVG' );
 
-		if ( typeof form.requestSubmit === 'function' ) {
-			form.requestSubmit( btn || undefined );
+		if ( typeof cartForm.requestSubmit === 'function' ) {
+			cartForm.requestSubmit( btn || undefined );
 			return;
 		}
 
@@ -1583,7 +1608,7 @@
 		fallback.type = 'submit';
 		fallback.hidden = true;
 		fallback.setAttribute( 'aria-hidden', 'true' );
-		form.appendChild( fallback );
+		cartForm.appendChild( fallback );
 		fallback.click();
 		fallback.remove();
 	}
@@ -1614,17 +1639,20 @@
 			ui.designerAtc.addEventListener( 'click', onCartIntent );
 		}
 
-		form.addEventListener( 'submit', ( event ) => {
-			if ( submitApproved ) {
-				return;
-			}
-			if ( isStartDesigningMode && ! isDesignerOpen() ) {
-				event.preventDefault();
-				openDesigner();
-				return;
-			}
-			onCartIntent( event );
-		} );
+		const cartForm = getCartForm();
+		if ( cartForm ) {
+			cartForm.addEventListener( 'submit', ( event ) => {
+				if ( submitApproved ) {
+					return;
+				}
+				if ( isStartDesigningMode && ! isDesignerOpen() ) {
+					event.preventDefault();
+					openDesigner();
+					return;
+				}
+				onCartIntent( event );
+			} );
+		}
 
 		document.addEventListener(
 			'click',
@@ -1633,9 +1661,15 @@
 					return;
 				}
 				const btn = event.target.closest(
-					'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"]'
+					'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"], .wc-gpd-fallback-start'
 				);
-				if ( ! btn || ! form.contains( btn ) || btn.id === 'wc-gpd-designer-atc' ) {
+				if ( ! btn || btn.id === 'wc-gpd-designer-atc' ) {
+					return;
+				}
+				const activeForm = getCartForm();
+				const inCartForm = activeForm && activeForm.contains( btn );
+				const isFallback = btn.classList.contains( 'wc-gpd-fallback-start' );
+				if ( ! inCartForm && ! isFallback ) {
 					return;
 				}
 				if ( isStartDesigningMode && ! isDesignerOpen() ) {
@@ -1651,6 +1685,25 @@
 			},
 			true
 		);
+	}
+
+	function applyCtaLabel() {
+		const label = config.startDesigningLabel || config.i18n?.startDesigning || 'Start designing';
+		const btn = getAddToCartButton();
+		if ( btn && isStartDesigningMode && ! config.isEditing && ! config.orderEdit ) {
+			btn.textContent = label;
+		}
+	}
+
+	function initFallbackCta() {
+		const wrap = document.getElementById( 'wc-gpd-fallback-cta' );
+		const fallback = document.getElementById( 'wc-gpd-fallback-start' );
+		if ( ! wrap || ! fallback ) {
+			return;
+		}
+		if ( ! getAddToCartButton() ) {
+			wrap.hidden = false;
+		}
 	}
 
 	// Events
@@ -1898,9 +1951,12 @@
 	bindAddToCart();
 	openCustomerSection( 'text' );
 
-	if ( config.isEditing || config.orderEdit ) {
+	if ( config.isEditing || config.orderEdit || config.autoOpenDesigner ) {
 		setTimeout( () => openDesigner(), 120 );
 	}
+
+	applyCtaLabel();
+	initFallbackCta();
 
 	function bindOrderSave() {
 		const btn = document.getElementById( 'wc-gpd-save-order-design' );

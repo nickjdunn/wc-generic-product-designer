@@ -27,20 +27,8 @@
 	box-sizing: border-box;
 }
 
-/* Product page — Start designing CTA */
-.single-product.wc-gpd-product .single_add_to_cart_button {
-	border-radius: 999px !important;
-	min-height: 48px;
-	padding-left: 1.5rem !important;
-	padding-right: 1.5rem !important;
-	font-weight: 700 !important;
-	background: var(--wc-gpd-accent) !important;
-	border-color: var(--wc-gpd-accent) !important;
-}
-
-.single-product.wc-gpd-product .single_add_to_cart_button:hover {
-	background: var(--wc-gpd-accent-hover) !important;
-	border-color: var(--wc-gpd-accent-hover) !important;
+.wc-gpd-fallback-cta {
+	margin-top: 0.75rem;
 }
 
 .wc-gpd-designer__notice--inline {

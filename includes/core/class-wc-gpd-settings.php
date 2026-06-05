@@ -23,6 +23,8 @@ class WC_GPD_Settings {
 		'export_include_outlines'       => true,
 		'export_include_shapes'         => true,
 		'export_rasterize'              => false,
+		'start_designing_label'         => '',
+		'cta_button_custom_css'         => '',
 	);
 
 	/**
@@ -143,6 +145,45 @@ class WC_GPD_Settings {
 	 *
 	 * @return array
 	 */
+	/**
+	 * Storefront CTA label for designer products.
+	 *
+	 * @return string
+	 */
+	public static function start_designing_label() {
+		$label = trim( (string) self::get( 'start_designing_label', '' ) );
+		if ( '' !== $label ) {
+			return $label;
+		}
+		return __( 'Start designing', 'wc-generic-product-designer' );
+	}
+
+	/**
+	 * Scoped CSS for add-to-cart / start-designing buttons on designer products.
+	 *
+	 * @return string
+	 */
+	public static function cta_button_css_block() {
+		$rules = trim( (string) self::get( 'cta_button_custom_css', '' ) );
+		if ( '' === $rules ) {
+			return '';
+		}
+
+		$selectors = implode(
+			",\n",
+			array(
+				'.wc-gpd-product .single_add_to_cart_button',
+				'.wc-gpd-product .add_to_cart_button',
+				'.wc-gpd-product a.wc-gpd-start-designing-link',
+				'.wc-gpd-product .wc-gpd-fallback-start',
+				'.product.wc-gpd-has-designer .add_to_cart_button',
+				'.product.wc-gpd-has-designer a.wc-gpd-start-designing-link',
+			)
+		);
+
+		return $selectors . ' { ' . $rules . ' }';
+	}
+
 	public static function proof_export_defaults() {
 		return array(
 			'include_background' => true,

@@ -47,30 +47,144 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 */
 	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_storefront_cta_assets' ) );
 		add_action( 'wp_footer', array( $this, 'render_deferred_designer' ), 5 );
+		add_action( 'woocommerce_single_product_summary', array( $this, 'render_fallback_start_button' ), 31 );
 		add_filter( 'body_class', array( $this, 'add_body_class' ) );
 		add_filter( 'woocommerce_product_supports', array( $this, 'disable_ajax_add_to_cart' ), 10, 3 );
 		add_filter( 'woocommerce_product_single_add_to_cart_text', array( $this, 'filter_add_to_cart_text' ), 10, 2 );
+		add_filter( 'woocommerce_product_add_to_cart_text', array( $this, 'filter_add_to_cart_text' ), 10, 2 );
+		add_filter( 'woocommerce_loop_add_to_cart_link', array( $this, 'filter_loop_add_to_cart_link' ), 10, 3 );
+		add_filter( 'post_class', array( $this, 'add_designer_product_post_class' ), 10, 3 );
 	}
 
 	/**
-	 * Change add-to-cart label to "Start designing" on designer products.
+	 * Mark designer products in loops so optional CTA CSS can target them.
+	 *
+	 * @param array      $classes Post classes.
+	 * @param string|array $class   Extra class.
+	 * @param int        $post_id Post ID.
+	 * @return array
+	 */
+	public function add_designer_product_post_class( $classes, $class, $post_id ) {
+		if ( $post_id && 'product' === get_post_type( $post_id ) && WC_GPD_Product_Meta::is_enabled( $post_id ) ) {
+			$classes[] = 'wc-gpd-has-designer';
+		}
+		return $classes;
+	}
+
+	/**
+	 * Label for the storefront designer CTA.
+	 *
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	private function get_cta_label( $product ) {
+		if ( ! $product ) {
+			return WC_GPD_Settings::start_designing_label();
+		}
+		if ( $this->get_edit_order_context( $product->get_id() ) ) {
+			return __( 'Add to cart', 'woocommerce' );
+		}
+		if ( $this->get_edit_cart_context( $product->get_id() ) ) {
+			return __( 'Update cart with design', 'wc-generic-product-designer' );
+		}
+		return WC_GPD_Settings::start_designing_label();
+	}
+
+	/**
+	 * Whether the product should use the start-designing CTA.
+	 *
+	 * @param WC_Product $product Product.
+	 * @return bool
+	 */
+	private function product_uses_designer_cta( $product ) {
+		return $product && WC_GPD_Product_Meta::is_enabled( $product->get_id() )
+			&& ! $this->get_edit_order_context( $product->get_id() );
+	}
+
+	/**
+	 * Change add-to-cart label on single product and shop loops.
 	 *
 	 * @param string     $text    Button text.
 	 * @param WC_Product $product Product.
 	 * @return string
 	 */
 	public function filter_add_to_cart_text( $text, $product ) {
-		if ( ! $product || ! WC_GPD_Product_Meta::is_enabled( $product->get_id() ) ) {
+		if ( ! $this->product_uses_designer_cta( $product ) ) {
 			return $text;
 		}
-		if ( $this->get_edit_order_context( $product->get_id() ) ) {
-			return $text;
+		return $this->get_cta_label( $product );
+	}
+
+	/**
+	 * Shop/category: link to product page and auto-open the designer.
+	 *
+	 * @param string     $html    Add to cart anchor HTML.
+	 * @param WC_Product $product Product.
+	 * @param array      $args    Link args.
+	 * @return string
+	 */
+	public function filter_loop_add_to_cart_link( $html, $product, $args ) {
+		if ( ! $this->product_uses_designer_cta( $product ) ) {
+			return $html;
 		}
-		if ( $this->get_edit_cart_context( $product->get_id() ) ) {
-			return __( 'Update cart with design', 'wc-generic-product-designer' );
+
+		$url = add_query_arg( 'wc_gpd_design', '1', $product->get_permalink() );
+		$classes = isset( $args['class'] ) ? $args['class'] : 'button';
+		$classes .= ' wc-gpd-start-designing-link';
+
+		return sprintf(
+			'<a href="%s" class="%s" aria-label="%s">%s</a>',
+			esc_url( $url ),
+			esc_attr( $classes ),
+			esc_attr( $this->get_cta_label( $product ) ),
+			esc_html( $this->get_cta_label( $product ) )
+		);
+	}
+
+	/**
+	 * Enqueue optional CTA CSS on any page that may show designer product buttons.
+	 */
+	public function enqueue_storefront_cta_assets() {
+		if ( is_admin() ) {
+			return;
 		}
-		return __( 'Start designing', 'wc-generic-product-designer' );
+
+		$css_block = WC_GPD_Settings::cta_button_css_block();
+		if ( '' === $css_block ) {
+			return;
+		}
+
+		wp_register_style( 'wc-gpd-storefront-cta', false, array(), WC_GPD_VERSION );
+		wp_enqueue_style( 'wc-gpd-storefront-cta' );
+		wp_add_inline_style( 'wc-gpd-storefront-cta', $css_block );
+	}
+
+	/**
+	 * Fallback CTA when the theme does not output a standard add-to-cart button.
+	 */
+	public function render_fallback_start_button() {
+		if ( ! $this->is_designer_context() ) {
+			return;
+		}
+
+		global $product;
+		if ( ! $product || ! $this->product_uses_designer_cta( $product ) ) {
+			return;
+		}
+
+		$auto_open = isset( $_GET['wc_gpd_design'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		?>
+		<p class="wc-gpd-fallback-cta" id="wc-gpd-fallback-cta" hidden>
+			<button type="button" class="button alt wc-gpd-fallback-start" id="wc-gpd-fallback-start">
+				<?php echo esc_html( $this->get_cta_label( $product ) ); ?>
+			</button>
+		</p>
+		<?php if ( $auto_open ) : ?>
+			<span id="wc-gpd-auto-open-flag" hidden aria-hidden="true"></span>
+		<?php endif; ?>
+		<?php
 	}
 
 	/**
@@ -194,6 +308,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'productSettings'    => ! empty( $settings['product_settings'] ) ? $settings['product_settings'] : WC_GPD_Product_Settings::get( $product_id ),
 				'templatePalettes'   => ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data(),
 				'launchMode'         => 'start_designing',
+				'autoOpenDesigner'   => isset( $_GET['wc_gpd_design'] ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				'startDesigningLabel' => WC_GPD_Settings::start_designing_label(),
 				'productName'        => get_the_title( $product_id ),
 				'productPrice'       => wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price_html() : '',
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
@@ -242,7 +358,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'underline'       => __( 'Underline', 'wc-generic-product-designer' ),
 					'lineHeight'      => __( 'Line height', 'wc-generic-product-designer' ),
 					'letterSpacing'   => __( 'Letter spacing', 'wc-generic-product-designer' ),
-					'startDesigning'  => __( 'Start designing', 'wc-generic-product-designer' ),
+					'startDesigning'  => WC_GPD_Settings::start_designing_label(),
 					'addToCart'       => __( 'Add to cart', 'wc-generic-product-designer' ),
 					'designYourProduct' => __( 'Design your product', 'wc-generic-product-designer' ),
 					'closeDesigner'   => __( 'Close designer', 'wc-generic-product-designer' ),
