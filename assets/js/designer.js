@@ -17,6 +17,7 @@
 	const designerRoot = document.getElementById( 'wc-gpd-designer' );
 	let svgInput = document.getElementById( 'wc-gpd-design-svg' );
 	let jsonInput = document.getElementById( 'wc-gpd-design-json' );
+	let previewInput = document.getElementById( 'wc-gpd-preview-image' );
 
 	/**
 	 * Find the add-to-cart form (theme-safe).
@@ -73,6 +74,11 @@
 			form.appendChild( jsonInput );
 			log.debug( 'Moved design JSON into cart form' );
 		}
+
+		if ( previewInput && ! form.contains( previewInput ) ) {
+			form.appendChild( previewInput );
+			log.debug( 'Moved preview image into cart form' );
+		}
 	}
 
 	ensureFieldsInForm();
@@ -88,6 +94,10 @@
 		bold: document.getElementById( 'wc-gpd-bold' ),
 		italic: document.getElementById( 'wc-gpd-italic' ),
 		alignButtons: designerRoot.querySelectorAll( '.wc-gpd-align' ),
+		layersList: document.getElementById( 'wc-gpd-layers-list' ),
+		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
+		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
+		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
 	};
 
 	const canvas = new fabric.Canvas( 'wc-gpd-canvas', {
@@ -160,17 +170,6 @@
 	function refreshObjectCoords() {
 		canvas.getObjects().forEach( ( obj ) => {
 			obj.setCoords();
-		} );
-	}
-
-	/**
-	 * Remove editable text layers from the canvas.
-	 */
-	function clearTextLayers() {
-		canvas.getObjects().slice().forEach( ( obj ) => {
-			if ( isTextLayer( obj ) ) {
-				canvas.remove( obj );
-			}
 		} );
 	}
 
@@ -304,10 +303,123 @@
 	}
 
 	/**
+	 * Real, visible text layers only (excludes phantom SVG/group artifacts).
+	 *
+	 * @param {fabric.Object} obj Fabric object.
+	 * @returns {boolean}
+	 */
+	function isUsableTextLayer( obj ) {
+		if ( ! isTextLayer( obj ) || obj.type === 'group' ) {
+			return false;
+		}
+
+		const text = typeof obj.text === 'string' ? obj.text.trim() : '';
+		if ( ( obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox' ) && ! text ) {
+			return false;
+		}
+
+		obj.setCoords();
+		const rect = obj.getBoundingRect( true );
+		return rect.width >= 2 && rect.height >= 2;
+	}
+
+	/**
+	 * Remove empty or broken layers left from SVG import.
+	 */
+	function purgePhantomLayers() {
+		canvas.getObjects().slice().forEach( ( obj ) => {
+			if ( isTextLayer( obj ) && ! isUsableTextLayer( obj ) ) {
+				canvas.remove( obj );
+			}
+		} );
+	}
+
+	/**
+	 * Clear selection and refresh UI.
+	 */
+	function discardSelection() {
+		canvas.discardActiveObject();
+		activeText = null;
+		syncToolbar( null );
+		syncLayersList();
+		canvas.requestRenderAll();
+	}
+
+	/**
+	 * @returns {fabric.Object[]}
+	 */
+	function getUsableTextLayers() {
+		return canvas.getObjects().filter( ( o ) => isUsableTextLayer( o ) );
+	}
+
+	/**
 	 * @returns {boolean}
 	 */
 	function hasTextLayer() {
-		return canvas.getObjects().some( ( o ) => isTextLayer( o ) );
+		return getUsableTextLayers().length > 0;
+	}
+
+	/**
+	 * Render clickable layer list (top layer first).
+	 */
+	function syncLayersList() {
+		if ( ! ui.layersList ) {
+			return;
+		}
+
+		const layers = getUsableTextLayers();
+		ui.layersList.innerHTML = '';
+
+		if ( ! layers.length ) {
+			const empty = document.createElement( 'li' );
+			empty.className = 'wc-gpd-layers-list__empty';
+			empty.textContent = config.i18n.noLayers || 'No layers yet.';
+			ui.layersList.appendChild( empty );
+			return;
+		}
+
+		const ordered = layers.slice().reverse();
+		ordered.forEach( ( obj, index ) => {
+			const label = ( obj.text && String( obj.text ).trim() )
+				? String( obj.text ).trim().slice( 0, 40 )
+				: ( config.i18n.layerText || 'Text layer' ) + ' ' + ( index + 1 );
+
+			const li = document.createElement( 'li' );
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-layer-item';
+			btn.textContent = label;
+			btn.setAttribute( 'data-layer-index', String( canvas.getObjects().indexOf( obj ) ) );
+
+			if ( canvas.getActiveObject() === obj ) {
+				btn.classList.add( 'is-active' );
+				btn.setAttribute( 'aria-pressed', 'true' );
+			} else {
+				btn.setAttribute( 'aria-pressed', 'false' );
+			}
+
+			btn.addEventListener( 'click', () => {
+				canvas.setActiveObject( obj );
+				syncToolbar( obj );
+				syncLayersList();
+				canvas.requestRenderAll();
+			} );
+
+			li.appendChild( btn );
+			ui.layersList.appendChild( li );
+		} );
+	}
+
+	/**
+	 * Remove editable text layers from the canvas.
+	 */
+	function clearTextLayers() {
+		canvas.getObjects().slice().forEach( ( obj ) => {
+			if ( isTextLayer( obj ) ) {
+				canvas.remove( obj );
+			}
+		} );
+		discardSelection();
 	}
 
 	/**
@@ -367,6 +479,7 @@
 		canvas.setActiveObject( text );
 		canvas.requestRenderAll();
 		syncToolbar( text );
+		syncLayersList();
 		log.debug( 'Text layer added' );
 	}
 
@@ -433,14 +546,34 @@
 	 * @returns {string}
 	 */
 	function exportDesignJson() {
-		const objects = canvas.getObjects()
-			.filter( ( obj ) => isTextLayer( obj ) )
-			.map( ( obj ) => obj.toObject( [ 'wcGpdTextLayer' ] ) );
+		const objects = getUsableTextLayers().map( ( obj ) => obj.toObject( [ 'wcGpdTextLayer' ] ) );
 
 		return JSON.stringify( {
 			version: fabric.version,
 			objects,
 		} );
+	}
+
+	/**
+	 * PNG preview for cart thumbnails (saved server-side).
+	 *
+	 * @returns {string}
+	 */
+	function exportPreviewPng() {
+		const multiplier = Math.min( 0.45, 360 / PROD_WIDTH );
+		canvas.setZoom( 1 );
+		canvas.viewportTransform = [ 1, 0, 0, 1, 0, 0 ];
+		canvas.setDimensions( { width: PROD_WIDTH, height: PROD_HEIGHT } );
+		canvas.renderAll();
+
+		const dataUrl = canvas.toDataURL( {
+			format: 'png',
+			multiplier,
+			quality: 0.85,
+		} );
+
+		applyResponsiveScale();
+		return dataUrl;
 	}
 
 	/**
@@ -467,6 +600,15 @@
 
 		if ( jsonInput ) {
 			jsonInput.value = exportDesignJson();
+		}
+
+		if ( previewInput ) {
+			try {
+				previewInput.value = exportPreviewPng();
+			} catch ( error ) {
+				log.warn( 'Preview PNG export failed', error );
+				previewInput.value = '';
+			}
 		}
 
 		return true;
@@ -509,14 +651,18 @@
 						obj.setCoords();
 					} );
 
+					purgePhantomLayers();
+					discardSelection();
 					applyResponsiveScale();
-					const first = objects[ 0 ];
-					if ( first ) {
-						canvas.setActiveObject( first );
-						syncToolbar( first );
+
+					const usable = getUsableTextLayers();
+					if ( usable.length ) {
+						canvas.setActiveObject( usable[ 0 ] );
+						syncToolbar( usable[ 0 ] );
 					}
 
-					log.info( 'Loaded design from JSON', { layers: objects.length } );
+					syncLayersList();
+					log.info( 'Loaded design from JSON', { layers: usable.length } );
 					resolve();
 				},
 				'fabric'
@@ -546,14 +692,20 @@
 					obj.setCoords();
 				} );
 
+				purgePhantomLayers();
+				discardSelection();
 				applyResponsiveScale();
-				const first = objects[ 0 ];
-				if ( first ) {
-					canvas.setActiveObject( first );
-					syncToolbar( first );
+
+				const usable = getUsableTextLayers();
+				if ( ! usable.length ) {
+					reject( new Error( 'empty' ) );
+					return;
 				}
 
-				log.info( 'Loaded design from cart', { layers: objects.length } );
+				canvas.setActiveObject( usable[ 0 ] );
+				syncToolbar( usable[ 0 ] );
+				syncLayersList();
+				log.info( 'Loaded design from SVG', { layers: usable.length } );
 				resolve();
 			} );
 		} );
@@ -648,26 +800,38 @@
 	// Events
 	canvas.on( 'selection:created', ( e ) => {
 		const target = e.selected?.[ 0 ] || e.target;
-		if ( target?.wcGpdTextLayer ) {
+		if ( isUsableTextLayer( target ) ) {
 			syncToolbar( target );
+			syncLayersList();
+		} else {
+			discardSelection();
 		}
 	} );
 
 	canvas.on( 'selection:updated', ( e ) => {
 		const target = e.selected?.[ 0 ] || e.target;
-		if ( target?.wcGpdTextLayer ) {
+		if ( isUsableTextLayer( target ) ) {
 			syncToolbar( target );
+			syncLayersList();
+		} else {
+			discardSelection();
 		}
 	} );
 
-	canvas.on( 'selection:cleared', () => syncToolbar( null ) );
+	canvas.on( 'selection:cleared', () => discardSelection() );
+
+	canvas.on( 'object:added', syncLayersList );
+	canvas.on( 'object:removed', syncLayersList );
 
 	canvas.on( 'object:moving', ( e ) => constrainToCanvas( e.target ) );
 	canvas.on( 'object:scaling', ( e ) => {
 		constrainScale( e.target );
 		constrainToCanvas( e.target );
 	} );
-	canvas.on( 'object:modified', ( e ) => constrainToCanvas( e.target ) );
+	canvas.on( 'object:modified', ( e ) => {
+		constrainToCanvas( e.target );
+		syncLayersList();
+	} );
 
 	if ( ui.addText ) {
 		ui.addText.addEventListener( 'click', addTextLayer );
@@ -731,6 +895,41 @@
 		} );
 	} );
 
+	if ( ui.layerForward ) {
+		ui.layerForward.addEventListener( 'click', () => {
+			const obj = canvas.getActiveObject();
+			if ( ! isUsableTextLayer( obj ) ) {
+				return;
+			}
+			canvas.bringForward( obj );
+			syncLayersList();
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.layerBackward ) {
+		ui.layerBackward.addEventListener( 'click', () => {
+			const obj = canvas.getActiveObject();
+			if ( ! isUsableTextLayer( obj ) ) {
+				return;
+			}
+			canvas.sendBackwards( obj );
+			syncLayersList();
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.layerDelete ) {
+		ui.layerDelete.addEventListener( 'click', () => {
+			const obj = canvas.getActiveObject();
+			if ( ! isUsableTextLayer( obj ) ) {
+				return;
+			}
+			canvas.remove( obj );
+			discardSelection();
+		} );
+	}
+
 	let resizeTimer;
 	const canvasWrap = designerRoot.querySelector( '.wc-gpd-designer__canvas-wrap' );
 	if ( canvasWrap && typeof ResizeObserver !== 'undefined' ) {
@@ -753,12 +952,12 @@
 
 	function loadExistingDesign() {
 		if ( config.existingDesignJson ) {
-			return loadDesignFromJson( config.existingDesignJson ).catch( () => {
-				if ( config.existingDesignSvg ) {
-					return loadDesignFromSvg( config.existingDesignSvg );
-				}
-				throw new Error( 'json-failed' );
-			} );
+			return loadDesignFromJson( config.existingDesignJson );
+		}
+
+		// Editing from cart: JSON only — SVG fallback creates phantom duplicate layers.
+		if ( config.isEditing ) {
+			return Promise.reject( new Error( 'no-json' ) );
 		}
 
 		if ( config.existingDesignSvg ) {

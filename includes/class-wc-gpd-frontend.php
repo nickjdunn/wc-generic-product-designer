@@ -165,6 +165,12 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'editingNotice' => __( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ),
 					'updateCart'    => __( 'Update cart with design', 'wc-generic-product-designer' ),
 					'loadDesignError' => __( 'Could not load your saved design. Please create a new one.', 'wc-generic-product-designer' ),
+					'layersTitle'   => __( 'Layers', 'wc-generic-product-designer' ),
+					'layerText'     => __( 'Text layer', 'wc-generic-product-designer' ),
+					'bringForward'  => __( 'Bring forward', 'wc-generic-product-designer' ),
+					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
+					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
+					'noLayers'      => __( 'No layers yet. Add a text layer to begin.', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => array(
 					'Arial, Helvetica, sans-serif',
@@ -228,6 +234,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</p>
 			<?php endif; ?>
 			<div class="wc-gpd-designer__layout">
+				<div class="wc-gpd-designer__sidebar">
 				<div class="wc-gpd-designer__toolbar" aria-label="<?php esc_attr_e( 'Design tools', 'wc-generic-product-designer' ); ?>">
 					<div class="wc-gpd-designer__toolbar-row">
 						<button type="button" class="button wc-gpd-btn-add-text" id="wc-gpd-add-text">
@@ -264,12 +271,23 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 						</div>
 					</fieldset>
 				</div>
+				<div class="wc-gpd-designer__layers" aria-label="<?php esc_attr_e( 'Design layers', 'wc-generic-product-designer' ); ?>">
+					<h3 class="wc-gpd-designer__layers-title"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></h3>
+					<ul class="wc-gpd-layers-list" id="wc-gpd-layers-list"></ul>
+					<div class="wc-gpd-layers-actions">
+						<button type="button" class="button button-small" id="wc-gpd-layer-forward"><?php esc_html_e( 'Bring forward', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button button-small" id="wc-gpd-layer-backward"><?php esc_html_e( 'Send backward', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button button-small" id="wc-gpd-layer-delete"><?php esc_html_e( 'Delete layer', 'wc-generic-product-designer' ); ?></button>
+					</div>
+				</div>
+				</div>
 				<div class="wc-gpd-designer__canvas-wrap">
 					<canvas id="wc-gpd-canvas" aria-label="<?php esc_attr_e( 'Design canvas', 'wc-generic-product-designer' ); ?>"></canvas>
 				</div>
 			</div>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
 			<input type="hidden" name="wc_gpd_design_json" id="wc-gpd-design-json" value="" />
+			<input type="hidden" name="wc_gpd_preview_image" id="wc-gpd-preview-image" value="" />
 			<?php if ( $edit_context ) : ?>
 				<input type="hidden" name="wc_gpd_edit_cart_key" id="wc-gpd-edit-cart-key" value="<?php echo esc_attr( $edit_context['cart_item_key'] ); ?>" />
 			<?php endif; ?>

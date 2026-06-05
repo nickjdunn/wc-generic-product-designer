@@ -3,7 +3,7 @@
  * Plugin Name:       WC Generic Product Designer
  * Plugin URI:        https://github.com/nickjdunn/wc-generic-product-designer
  * Description:       Let customers design products with text layers on a canvas; export production-ready SVG on order.
- * Version:           1.3.1
+ * Version:           1.4.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            WC Generic Product Designer
@@ -21,7 +21,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WC_GPD_VERSION', '1.3.1' );
+define( 'WC_GPD_VERSION', '1.4.0' );
 define( 'WC_GPD_PLUGIN_FILE', __FILE__ );
 define( 'WC_GPD_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WC_GPD_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

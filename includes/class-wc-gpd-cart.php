@@ -44,6 +44,7 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		add_filter( 'woocommerce_get_item_data', array( $this, 'display_cart_item_data' ), 10, 2 );
 		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
 		add_filter( 'woocommerce_widget_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
+		add_filter( 'woocommerce_store_api_cart_item_images', array( $this, 'store_api_cart_item_images' ), 99, 3 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'save_order_line_item_meta' ), 10, 4 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_cart_styles' ) );
 	}
@@ -123,6 +124,12 @@ class WC_GPD_Cart implements WC_GPD_Module {
 			}
 
 			$cart_item_data['unique_key'] = md5( $svg . ( $json ? $json : '' ) );
+
+			$raw_preview = isset( $_POST['wc_gpd_preview_image'] ) ? wp_unslash( $_POST['wc_gpd_preview_image'] ) : '';
+			$preview_url = WC_GPD_Preview_Storage::save_from_data_url( is_string( $raw_preview ) ? $raw_preview : '' );
+			if ( $preview_url ) {
+				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] = $preview_url;
+			}
 		}
 
 		return $cart_item_data;
@@ -171,22 +178,61 @@ class WC_GPD_Cart implements WC_GPD_Module {
 			return $thumbnail;
 		}
 
+		$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+		$product    = $product_id ? wc_get_product( $product_id ) : null;
+		$alt        = $product ? $product->get_name() : __( 'Custom design', 'wc-generic-product-designer' );
+
+		if ( ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
+			$url = esc_url( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] );
+			if ( $url ) {
+				return sprintf(
+					'<img src="%1$s" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail wc-gpd-cart-thumb-img" width="300" height="225" alt="%2$s" loading="lazy" decoding="async" />',
+					$url,
+					esc_attr( $alt )
+				);
+			}
+		}
+
 		$svg = WC_GPD_SVG_Sanitizer::sanitize( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] );
 		if ( ! $svg ) {
 			return $thumbnail;
 		}
 
-		$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
-		$settings   = WC_GPD_Product_Meta::get_settings( $product_id );
-		$product    = $product_id ? wc_get_product( $product_id ) : null;
-		$alt        = $product ? $product->get_name() : __( 'Custom design', 'wc-generic-product-designer' );
+		$settings = WC_GPD_Product_Meta::get_settings( $product_id );
+		$preview  = WC_GPD_Preview::cart_thumbnail_html( $svg, $settings, $alt );
 
-		$preview = WC_GPD_Preview::cart_thumbnail_html( $svg, $settings, $alt );
-		if ( ! $preview ) {
-			return $thumbnail;
+		return $preview ? $preview : $thumbnail;
+	}
+
+	/**
+	 * Block / Store API cart images (mini-cart drawer).
+	 *
+	 * @param array  $product_images Image payloads.
+	 * @param array  $cart_item      Cart item.
+	 * @param string $cart_item_key  Cart item key.
+	 * @return array
+	 */
+	public function store_api_cart_item_images( $product_images, $cart_item, $cart_item_key ) {
+		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
+			return $product_images;
 		}
 
-		return $preview;
+		$url = esc_url( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] );
+		if ( ! $url ) {
+			return $product_images;
+		}
+
+		return array(
+			array(
+				'id'        => 0,
+				'src'       => $url,
+				'thumbnail' => $url,
+				'srcset'    => '',
+				'sizes'     => '',
+				'name'      => '',
+				'alt'       => __( 'Custom design', 'wc-generic-product-designer' ),
+			),
+		);
 	}
 
 	/**
@@ -286,7 +332,7 @@ class WC_GPD_Cart implements WC_GPD_Module {
 	 * Cart/checkout thumbnail styles.
 	 */
 	public function enqueue_cart_styles() {
-		if ( ! is_cart() && ! is_checkout() ) {
+		if ( ! class_exists( 'WooCommerce' ) ) {
 			return;
 		}
 

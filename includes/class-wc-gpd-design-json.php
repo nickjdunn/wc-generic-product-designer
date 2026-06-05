@@ -23,7 +23,6 @@ class WC_GPD_Design_Json {
 		'i-text',
 		'text',
 		'textbox',
-		'group',
 	);
 
 	/**
@@ -55,6 +54,13 @@ class WC_GPD_Design_Json {
 			$type = strtolower( (string) $object['type'] );
 			if ( ! in_array( $type, self::$allowed_types, true ) ) {
 				return false;
+			}
+
+			if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
+				$text = isset( $object['text'] ) ? trim( (string) $object['text'] ) : '';
+				if ( '' === $text ) {
+					continue;
+				}
 			}
 
 			$objects[] = $object;
