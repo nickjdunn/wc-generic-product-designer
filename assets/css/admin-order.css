@@ -13,7 +13,7 @@
 }
 
 .wc-gpd-order-design__preview {
-	max-width: 320px;
+	max-width: 420px;
 	max-height: 240px;
 	overflow: hidden;
 	border: 1px solid #c3c4c7;
@@ -36,6 +36,18 @@
 	align-items: center;
 }
 
-.wc-gpd-download-svg {
-	margin-top: 0 !important;
+.wc-gpd-order-download-form {
+	margin: 1rem 0;
+	padding: 0.85rem 0 0;
+	border-top: 1px solid #dcdcde;
+}
+
+.wc-gpd-download-options label {
+	display: block;
+	margin: 0.25rem 0;
+}
+
+.wc-gpd-order-download-form--proof {
+	border-top: none;
+	padding-top: 0.5rem;
 }

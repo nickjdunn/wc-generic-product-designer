@@ -31,3 +31,23 @@
 	display: inline-block;
 	margin-top: 0.35rem;
 }
+
+.wc-gpd-order-item-preview-wrap {
+	margin-top: 0.75rem;
+}
+
+.wc-gpd-order-item-preview-label {
+	margin: 0 0 0.35rem;
+}
+
+.wc-gpd-order-design-preview {
+	max-width: 180px;
+	height: auto;
+	border-radius: 4px;
+	background: #f4f4f4;
+}
+
+.woocommerce-order-details .wc-gpd-order-item-preview-wrap .wc-gpd-order-design-preview,
+.woocommerce-thankyou-order-details .wc-gpd-order-design-preview {
+	max-width: 220px;
+}

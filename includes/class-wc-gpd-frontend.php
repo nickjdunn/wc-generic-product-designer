@@ -101,9 +101,13 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return;
 		}
 
-		$product_id = get_queried_object_id();
+		$product_id   = get_queried_object_id();
 		$settings     = WC_GPD_Product_Meta::get_settings( $product_id );
 		$edit_context = $this->get_edit_cart_context( $product_id );
+		$order_edit   = $this->get_edit_order_context( $product_id );
+		if ( $order_edit ) {
+			$edit_context = $order_edit;
+		}
 
 		wp_enqueue_style(
 			'wc-gpd-designer',
@@ -142,14 +146,21 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			array(
 				'canvasWidth'  => $settings['width'],
 				'canvasHeight' => $settings['height'],
-				'templateUrl'  => $settings['template_url'],
-				'debug'          => WC_GPD_Settings::is_js_debug_enabled(),
-				'nonce'        => wp_create_nonce( self::NONCE_ACTION ),
-				'nonceName'    => self::NONCE_NAME,
-				'editCartKey'  => $edit_context ? $edit_context['cart_item_key'] : '',
-				'existingDesignSvg' => $edit_context ? $edit_context['svg'] : '',
+				'templateUrl'        => $settings['template_url'],
+				'templateJson'       => $settings['template_json'],
+				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
+				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
+				'nonceName'          => self::NONCE_NAME,
+				'editCartKey'        => ( $edit_context && ! empty( $edit_context['cart_item_key'] ) ) ? $edit_context['cart_item_key'] : '',
+				'existingDesignSvg'  => $edit_context ? $edit_context['svg'] : '',
 				'existingDesignJson' => $edit_context && ! empty( $edit_context['json'] ) ? $edit_context['json'] : '',
-				'isEditing'    => (bool) $edit_context,
+				'isEditing'          => (bool) $edit_context,
+				'orderEdit'          => (bool) ( $order_edit ?? false ),
+				'orderId'            => $order_edit ? (int) $order_edit['order_id'] : 0,
+				'orderItemId'        => $order_edit ? (int) $order_edit['item_id'] : 0,
+				'orderSaveNonce'     => $order_edit ? wp_create_nonce( WC_GPD_Admin_Order::NONCE_SAVE_ORDER . '_' . $order_edit['order_id'] . '_' . $order_edit['item_id'] ) : '',
+				'orderSaveAction'    => WC_GPD_Admin_Order::SAVE_ORDER_ACTION,
+				'adminPostUrl'       => admin_url( 'admin-post.php' ),
 				'i18n'         => array(
 					'addText'       => __( 'Add text layer', 'wc-generic-product-designer' ),
 					'selectLayer'   => __( 'Select a text layer on the canvas to edit it.', 'wc-generic-product-designer' ),
@@ -170,7 +181,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'bringForward'  => __( 'Bring forward', 'wc-generic-product-designer' ),
 					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
 					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
-					'noLayers'      => __( 'No layers yet. Add a text layer to begin.', 'wc-generic-product-designer' ),
+					'noLayers'        => __( 'No layers yet. Add a text layer to begin.', 'wc-generic-product-designer' ),
+					'orderEditNotice' => __( 'You are editing this order design. Save when finished, then return to the order to download.', 'wc-generic-product-designer' ),
+					'saveOrderDesign' => __( 'Save design to order', 'wc-generic-product-designer' ),
+					'orderSaved'      => __( 'Design saved to order.', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => array(
 					'Arial, Helvetica, sans-serif',
@@ -205,8 +219,12 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return;
 		}
 
-		$settings = WC_GPD_Product_Meta::get_settings( $product->get_id() );
+		$settings     = WC_GPD_Product_Meta::get_settings( $product->get_id() );
 		$edit_context = $this->get_edit_cart_context( $product->get_id() );
+		$order_edit   = $this->get_edit_order_context( $product->get_id() );
+		if ( $order_edit ) {
+			$edit_context = $order_edit;
+		}
 		$this->designer_rendered = true;
 
 		WC_GPD_Logger::debug(
@@ -228,7 +246,16 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			role="region"
 			aria-label="<?php esc_attr_e( 'Product designer', 'wc-generic-product-designer' ); ?>"
 		>
-			<?php if ( $edit_context ) : ?>
+			<?php if ( $order_edit ) : ?>
+				<p class="wc-gpd-designer__notice" role="status">
+					<?php esc_html_e( 'You are editing this order design. Save when finished, then return to the order to download.', 'wc-generic-product-designer' ); ?>
+				</p>
+				<?php if ( isset( $_GET['wc_gpd_order_saved'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+					<p class="wc-gpd-designer__notice wc-gpd-designer__notice--success" role="status">
+						<?php esc_html_e( 'Design saved to order.', 'wc-generic-product-designer' ); ?>
+					</p>
+				<?php endif; ?>
+			<?php elseif ( $edit_context ) : ?>
 				<p class="wc-gpd-designer__notice" role="status">
 					<?php esc_html_e( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ); ?>
 				</p>
@@ -288,8 +315,15 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
 			<input type="hidden" name="wc_gpd_design_json" id="wc-gpd-design-json" value="" />
 			<input type="hidden" name="wc_gpd_preview_image" id="wc-gpd-preview-image" value="" />
-			<?php if ( $edit_context ) : ?>
+			<?php if ( $edit_context && ! empty( $edit_context['cart_item_key'] ) ) : ?>
 				<input type="hidden" name="wc_gpd_edit_cart_key" id="wc-gpd-edit-cart-key" value="<?php echo esc_attr( $edit_context['cart_item_key'] ); ?>" />
+			<?php endif; ?>
+			<?php if ( $order_edit ) : ?>
+				<p class="wc-gpd-designer__order-save">
+					<button type="button" class="button button-primary" id="wc-gpd-save-order-design">
+						<?php esc_html_e( 'Save design to order', 'wc-generic-product-designer' ); ?>
+					</button>
+				</p>
 			<?php endif; ?>
 			<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 		</div>
@@ -336,6 +370,46 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			'json'          => ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] )
 				? $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ]
 				: '',
+		);
+	}
+
+	/**
+	 * Load order line design for admin editing.
+	 *
+	 * @param int $product_id Product ID.
+	 * @return array{order_id:int,item_id:int,svg:string,json:string}|null
+	 */
+	private function get_edit_order_context( $product_id ) {
+		if ( ! $product_id || ! isset( $_GET['wc_gpd_edit_order'], $_GET['wc_gpd_edit_item'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return null;
+		}
+
+		if ( ! current_user_can( 'edit_shop_orders' ) && ! current_user_can( 'manage_woocommerce' ) ) {
+			return null;
+		}
+
+		$order_id = absint( $_GET['wc_gpd_edit_order'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$item_id  = absint( $_GET['wc_gpd_edit_item'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! $order_id || ! $item_id ) {
+			return null;
+		}
+
+		$order = wc_get_order( $order_id );
+		$item  = $order ? $order->get_item( $item_id ) : null;
+		if ( ! $item instanceof WC_Order_Item_Product || (int) $item->get_product_id() !== (int) $product_id ) {
+			return null;
+		}
+
+		$svg = WC_GPD_SVG_Sanitizer::sanitize( $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_SVG, true ) );
+		if ( ! $svg ) {
+			return null;
+		}
+
+		return array(
+			'order_id' => $order_id,
+			'item_id'  => $item_id,
+			'svg'      => $svg,
+			'json'     => $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true ),
 		);
 	}
 }

@@ -23,6 +23,9 @@ class WC_GPD_Design_Json {
 		'i-text',
 		'text',
 		'textbox',
+		'rect',
+		'circle',
+		'ellipse',
 	);
 
 	/**
@@ -53,7 +56,11 @@ class WC_GPD_Design_Json {
 
 			$type = strtolower( (string) $object['type'] );
 			if ( ! in_array( $type, self::$allowed_types, true ) ) {
-				return false;
+				continue;
+			}
+
+			if ( ! empty( $object['wcGpdTemplateLayer'] ) || ! empty( $object['wcGpdOutlineLayer'] ) ) {
+				continue;
 			}
 
 			if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
@@ -61,6 +68,10 @@ class WC_GPD_Design_Json {
 				if ( '' === $text ) {
 					continue;
 				}
+				$object['wcGpdLayerType']  = 'text';
+				$object['wcGpdTextLayer']   = true;
+			} else {
+				$object['wcGpdLayerType'] = 'shape';
 			}
 
 			$objects[] = $object;

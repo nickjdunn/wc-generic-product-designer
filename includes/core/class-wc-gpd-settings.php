@@ -15,9 +15,14 @@ class WC_GPD_Settings {
 	const OPTION_KEY = 'wc_gpd_settings';
 
 	const DEFAULTS = array(
-		'debug_enabled' => false,
-		'log_level'     => 'debug',
-		'js_debug'      => false,
+		'debug_enabled'                 => false,
+		'log_level'                     => 'debug',
+		'js_debug'                      => false,
+		'export_include_background'     => false,
+		'export_include_text'           => true,
+		'export_include_outlines'       => true,
+		'export_include_shapes'         => true,
+		'export_rasterize'              => false,
 	);
 
 	/**
@@ -115,5 +120,37 @@ class WC_GPD_Settings {
 	 */
 	public static function flush_cache() {
 		self::$cache = null;
+	}
+
+	/**
+	 * Default export options for production downloads.
+	 *
+	 * @return array
+	 */
+	public static function export_defaults() {
+		return array(
+			'include_background' => (bool) self::get( 'export_include_background', false ),
+			'include_text'       => (bool) self::get( 'export_include_text', true ),
+			'include_outlines'   => (bool) self::get( 'export_include_outlines', true ),
+			'include_shapes'     => (bool) self::get( 'export_include_shapes', true ),
+			'rasterize'          => (bool) self::get( 'export_rasterize', false ),
+			'preset'             => 'production',
+		);
+	}
+
+	/**
+	 * Preset for customer proof exports.
+	 *
+	 * @return array
+	 */
+	public static function proof_export_defaults() {
+		return array(
+			'include_background' => true,
+			'include_text'       => true,
+			'include_outlines'   => false,
+			'include_shapes'     => true,
+			'rasterize'          => false,
+			'preset'             => 'proof',
+		);
 	}
 }

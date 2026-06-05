@@ -229,6 +229,40 @@
 	width: 100%;
 }
 
+.wc-gpd-designer__notice--success {
+	background: #edfaef;
+	border-color: #68de7c;
+}
+
+.wc-gpd-designer__order-save {
+	margin-top: 0.75rem;
+}
+
+.wc-gpd-template-editor-wrap {
+	padding: 12px 16px 16px;
+	border-top: 1px solid #eee;
+}
+
+.wc-gpd-template-editor-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 0.75rem;
+}
+
+.wc-gpd-template-outline-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+#wc-gpd-template-canvas {
+	max-width: 100%;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
 /* PoC: canvas replaces product photo on designer products */
 .single-product.wc-gpd-product .woocommerce-product-gallery {
 	display: none;

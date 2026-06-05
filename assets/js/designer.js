@@ -227,7 +227,7 @@
 	 * @param {fabric.Object} obj Fabric object.
 	 */
 	function constrainToCanvas( obj ) {
-		if ( ! obj || obj.wcGpdBackground ) {
+		if ( ! obj || obj.wcGpdBackground || isTemplateLayer( obj ) ) {
 			return;
 		}
 
@@ -262,7 +262,7 @@
 	 * @param {fabric.Object} obj Fabric object.
 	 */
 	function constrainScale( obj ) {
-		if ( ! obj || obj.wcGpdBackground ) {
+		if ( ! obj || obj.wcGpdBackground || isTemplateLayer( obj ) ) {
 			return;
 		}
 
@@ -294,12 +294,27 @@
 	 * @param {fabric.Object} obj Fabric object.
 	 * @returns {boolean}
 	 */
+	function isTemplateLayer( obj ) {
+		return !! obj && ( obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer );
+	}
+
 	function isTextLayer( obj ) {
-		if ( ! obj || obj.wcGpdBackground ) {
+		if ( ! obj || obj.wcGpdBackground || isTemplateLayer( obj ) ) {
 			return false;
 		}
 		const type = obj.type || '';
 		return !! obj.wcGpdTextLayer || type === 'i-text' || type === 'text' || type === 'textbox';
+	}
+
+	function isDesignLayer( obj ) {
+		if ( ! obj || obj.wcGpdBackground || isTemplateLayer( obj ) ) {
+			return false;
+		}
+		if ( isUsableTextLayer( obj ) ) {
+			return true;
+		}
+		const type = obj.type || '';
+		return ( type === 'rect' || type === 'circle' || type === 'ellipse' ) && obj.wcGpdLayerType === 'shape';
 	}
 
 	/**
@@ -415,11 +430,59 @@
 	 */
 	function clearTextLayers() {
 		canvas.getObjects().slice().forEach( ( obj ) => {
-			if ( isTextLayer( obj ) ) {
+			if ( isDesignLayer( obj ) || isTextLayer( obj ) ) {
 				canvas.remove( obj );
 			}
 		} );
 		discardSelection();
+	}
+
+	/**
+	 * Load locked template outline layers from product settings.
+	 *
+	 * @returns {Promise<void>}
+	 */
+	function loadTemplateOutlines() {
+		if ( ! config.templateJson ) {
+			return Promise.resolve();
+		}
+
+		return new Promise( ( resolve ) => {
+			let data;
+			try {
+				data = JSON.parse( config.templateJson );
+			} catch ( error ) {
+				resolve();
+				return;
+			}
+
+			if ( ! data.objects || ! data.objects.length ) {
+				resolve();
+				return;
+			}
+
+			fabric.util.enlivenObjects(
+				data.objects,
+				( objects ) => {
+					if ( objects && objects.length ) {
+						objects.forEach( ( obj ) => {
+							obj.wcGpdTemplateLayer = true;
+							obj.wcGpdOutlineLayer = !! obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline';
+							obj.wcGpdLayerType = obj.wcGpdOutlineLayer ? 'outline' : 'shape';
+							obj.selectable = false;
+							obj.evented = false;
+							obj.hasControls = false;
+							obj.hasBorders = false;
+							canvas.add( obj );
+							canvas.sendToBack( obj );
+						} );
+						canvas.requestRenderAll();
+					}
+					resolve();
+				},
+				'fabric'
+			);
+		} );
 	}
 
 	/**
@@ -504,7 +567,7 @@
 
 		canvas.getObjects().forEach( ( o ) => {
 			o._wcGpdWasVisible = o.visible;
-			o.visible = isTextLayer( o );
+			o.visible = isDesignLayer( o );
 		} );
 
 		canvas.renderAll();
@@ -546,7 +609,18 @@
 	 * @returns {string}
 	 */
 	function exportDesignJson() {
-		const objects = getUsableTextLayers().map( ( obj ) => obj.toObject( [ 'wcGpdTextLayer' ] ) );
+		const objects = canvas.getObjects()
+			.filter( ( obj ) => isDesignLayer( obj ) )
+			.map( ( obj ) => {
+				const data = obj.toObject( [ 'wcGpdTextLayer', 'wcGpdLayerType' ] );
+				if ( isUsableTextLayer( obj ) ) {
+					data.wcGpdLayerType = 'text';
+					data.wcGpdTextLayer = true;
+				} else {
+					data.wcGpdLayerType = 'shape';
+				}
+				return data;
+			} );
 
 		return JSON.stringify( {
 			version: fabric.version,
@@ -978,23 +1052,66 @@
 		}
 	}
 
+	function bindOrderSave() {
+		const btn = document.getElementById( 'wc-gpd-save-order-design' );
+		if ( ! btn || ! config.orderEdit ) {
+			return;
+		}
+
+		btn.addEventListener( 'click', () => {
+			if ( ! prepareDesignForCart() ) {
+				return;
+			}
+
+			const saveForm = document.createElement( 'form' );
+			saveForm.method = 'POST';
+			saveForm.action = config.adminPostUrl;
+			saveForm.style.display = 'none';
+
+			const fields = {
+				action: config.orderSaveAction,
+				order_id: String( config.orderId ),
+				item_id: String( config.orderItemId ),
+				_wc_gpd_save_order_nonce: config.orderSaveNonce,
+				wc_gpd_design_svg: svgInput.value,
+				wc_gpd_design_json: jsonInput ? jsonInput.value : '',
+			};
+
+			Object.keys( fields ).forEach( ( name ) => {
+				const input = document.createElement( 'input' );
+				input.type = 'hidden';
+				input.name = name;
+				input.value = fields[ name ];
+				saveForm.appendChild( input );
+			} );
+
+			document.body.appendChild( saveForm );
+			saveForm.submit();
+		} );
+	}
+
 	const bootDesigner = () => {
 		requestAnimationFrame( () => {
 			applyResponsiveScale();
 
-			if ( config.isEditing || config.existingDesignJson || config.existingDesignSvg ) {
-				loadExistingDesign().catch( () => {
-					log.warn( 'Failed to load cart design; starting fresh' );
-					if ( config.isEditing ) {
-						window.alert( config.i18n.loadDesignError );
-					}
+			loadTemplateOutlines().then( () => {
+				if ( config.isEditing || config.existingDesignJson || config.existingDesignSvg ) {
+					loadExistingDesign().catch( () => {
+						log.warn( 'Failed to load saved design; starting fresh' );
+						if ( config.isEditing && ! config.orderEdit ) {
+							window.alert( config.i18n.loadDesignError );
+						}
+						if ( ! config.orderEdit ) {
+							startWithNewTextLayer();
+						}
+					} );
+				} else if ( ! config.orderEdit ) {
 					startWithNewTextLayer();
-				} );
-			} else {
-				startWithNewTextLayer();
-			}
+				}
 
-			log.info( 'Designer ready' );
+				bindOrderSave();
+				log.info( 'Designer ready' );
+			} );
 		} );
 	};
 

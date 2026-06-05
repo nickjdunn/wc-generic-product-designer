@@ -57,7 +57,7 @@ class WC_GPD_Preview {
 
 		$width  = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
 		$height = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
-		$inner  = self::extract_svg_inner( $svg );
+		$inner  = self::extract_svg_inner_public( $svg );
 
 		$document  = '<?xml version="1.0" encoding="UTF-8"?>';
 		$document .= '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
@@ -98,11 +98,25 @@ class WC_GPD_Preview {
 	 * @param string $svg SVG document.
 	 * @return string
 	 */
-	private static function extract_svg_inner( $svg ) {
+	public static function extract_svg_inner_public( $svg ) {
 		if ( preg_match( '/<svg[^>]*>(.*)<\/svg>/is', $svg, $matches ) ) {
 			return trim( $matches[1] );
 		}
 		return '';
+	}
+
+	/**
+	 * Template image href for SVG export (URL or data URI).
+	 *
+	 * @param int $attachment_id Attachment ID.
+	 * @return string
+	 */
+	public static function template_href_for_export( $attachment_id ) {
+		$url = wp_get_attachment_url( $attachment_id );
+		if ( $url ) {
+			return esc_url( $url );
+		}
+		return self::template_data_uri( $attachment_id );
 	}
 
 	/**
@@ -155,7 +169,22 @@ class WC_GPD_Preview {
 			return '';
 		}
 
-		return self::build_composite_svg_document( $svg, WC_GPD_Product_Meta::get_settings( $product_id ) );
+		$settings = WC_GPD_Product_Meta::get_settings( $product_id );
+		$json     = $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true );
+
+		$document = WC_GPD_Export::build_svg_document(
+			$settings,
+			$svg,
+			is_string( $json ) ? $json : '',
+			$settings['template_json'],
+			WC_GPD_Settings::proof_export_defaults()
+		);
+
+		if ( $document ) {
+			return $document;
+		}
+
+		return self::build_composite_svg_document( $svg, $settings );
 	}
 
 	/**

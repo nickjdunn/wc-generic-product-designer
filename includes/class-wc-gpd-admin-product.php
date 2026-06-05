@@ -74,7 +74,11 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 		$width        = get_post_meta( $product_id, WC_GPD_Product_Meta::META_CANVAS_WIDTH, true );
 		$height       = get_post_meta( $product_id, WC_GPD_Product_Meta::META_CANVAS_HEIGHT, true );
 		$template_id  = absint( get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_ID, true ) );
-		$template_url = $template_id ? wp_get_attachment_image_url( $template_id, 'thumbnail' ) : '';
+		$template_url  = $template_id ? wp_get_attachment_image_url( $template_id, 'thumbnail' ) : '';
+		$template_json = get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_JSON, true );
+		if ( ! is_string( $template_json ) ) {
+			$template_json = '';
+		}
 
 		if ( '' === $width ) {
 			$width = WC_GPD_Product_Meta::DEFAULT_WIDTH;
@@ -141,6 +145,25 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 					<button type="button" class="button wc_gpd_remove_template" <?php echo $template_id ? '' : 'style="display:none;"'; ?>><?php esc_html_e( 'Remove', 'wc-generic-product-designer' ); ?></button>
 					<span class="description"><?php esc_html_e( 'Base product image shown behind text layers (non-editable background).', 'wc-generic-product-designer' ); ?></span>
 				</p>
+				<div class="wc-gpd-template-editor-wrap">
+					<h3><?php esc_html_e( 'Template outlines & shapes', 'wc-generic-product-designer' ); ?></h3>
+					<p class="description">
+						<?php esc_html_e( 'Draw rectangles, squares, and circles on the template. Mark shapes as “Template outline” for production cut/engrave lines.', 'wc-generic-product-designer' ); ?>
+					</p>
+					<input type="hidden" id="wc_gpd_template_json" name="wc_gpd_template_json" value="<?php echo esc_attr( $template_json ); ?>" />
+					<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) absint( $width ) ); ?>" />
+					<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) absint( $height ) ); ?>" />
+					<div class="wc-gpd-template-editor-toolbar">
+						<button type="button" class="button wc-gpd-add-template-rect"><?php esc_html_e( 'Add rectangle', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button wc-gpd-add-template-square"><?php esc_html_e( 'Add square', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button wc-gpd-add-template-circle"><?php esc_html_e( 'Add circle', 'wc-generic-product-designer' ); ?></button>
+						<label class="wc-gpd-template-outline-toggle">
+							<input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" />
+							<?php esc_html_e( 'Selected shape is a template outline', 'wc-generic-product-designer' ); ?>
+						</label>
+					</div>
+					<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) absint( $width ) ); ?>" height="<?php echo esc_attr( (string) absint( $height ) ); ?>"></canvas>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -178,6 +201,12 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 		}
 		update_post_meta( $post_id, WC_GPD_Product_Meta::META_TEMPLATE_ID, $template_id );
 
+		$raw_template_json = isset( $_POST['wc_gpd_template_json'] ) ? wp_unslash( $_POST['wc_gpd_template_json'] ) : '';
+		$template_json     = WC_GPD_Template_Json::sanitize( is_string( $raw_template_json ) ? $raw_template_json : '' );
+		if ( false !== $template_json ) {
+			update_post_meta( $post_id, WC_GPD_Product_Meta::META_TEMPLATE_JSON, $template_json );
+		}
+
 		WC_GPD_Logger::info(
 			'Product designer settings saved',
 			array(
@@ -206,9 +235,23 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 
 		wp_enqueue_media();
 		wp_enqueue_script(
+			'fabric-js',
+			'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
+			array(),
+			'5.3.1',
+			true
+		);
+		wp_enqueue_script(
 			'wc-gpd-admin-product',
 			WC_GPD_PLUGIN_URL . 'assets/js/admin-product.js',
 			array( 'jquery' ),
+			WC_GPD_VERSION,
+			true
+		);
+		wp_enqueue_script(
+			'wc-gpd-admin-template-editor',
+			WC_GPD_PLUGIN_URL . 'assets/js/admin-template-editor.js',
+			array( 'jquery', 'fabric-js' ),
 			WC_GPD_VERSION,
 			true
 		);

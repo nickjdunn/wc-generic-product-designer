@@ -16,6 +16,7 @@ class WC_GPD_Product_Meta {
 	const META_CANVAS_WIDTH  = '_wc_gpd_canvas_width';
 	const META_CANVAS_HEIGHT = '_wc_gpd_canvas_height';
 	const META_TEMPLATE_ID   = '_wc_gpd_template_image_id';
+	const META_TEMPLATE_JSON = '_wc_gpd_template_json';
 
 	const CART_KEY_DESIGN_SVG  = 'wc_gpd_design_svg';
 	const CART_KEY_DESIGN_JSON = 'wc_gpd_design_json';
@@ -23,6 +24,7 @@ class WC_GPD_Product_Meta {
 	const CART_KEY_PREVIEW_ID  = 'wc_gpd_preview_id';
 
 	const ORDER_META_DESIGN_SVG   = '_wc_gpd_design_svg';
+	const ORDER_META_DESIGN_JSON  = '_wc_gpd_design_json';
 	const ORDER_META_PREVIEW_URL  = '_wc_gpd_preview_url';
 
 	const DEFAULT_WIDTH  = 800;
@@ -49,7 +51,7 @@ class WC_GPD_Product_Meta {
 	 * Get designer settings for a product.
 	 *
 	 * @param int $product_id Product ID.
-	 * @return array{width:int,height:int,template_url:string,template_id:int}
+	 * @return array{width:int,height:int,template_url:string,template_id:int,template_json:string}
 	 */
 	public static function get_settings( $product_id ) {
 		$product_id = absint( $product_id );
@@ -72,12 +74,18 @@ class WC_GPD_Product_Meta {
 			}
 		}
 
+		$template_json = get_post_meta( $product_id, self::META_TEMPLATE_JSON, true );
+		if ( ! is_string( $template_json ) ) {
+			$template_json = '';
+		}
+
 		return array(
-			'enabled'      => self::is_enabled( $product_id ),
-			'width'        => $width,
-			'height'       => $height,
-			'template_id'  => $image_id,
-			'template_url' => $template_url ? $template_url : '',
+			'enabled'       => self::is_enabled( $product_id ),
+			'width'         => $width,
+			'height'        => $height,
+			'template_id'   => $image_id,
+			'template_url'  => $template_url ? $template_url : '',
+			'template_json' => $template_json,
 		);
 	}
 
