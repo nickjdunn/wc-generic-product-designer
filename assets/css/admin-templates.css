@@ -1142,69 +1142,199 @@
 	box-shadow: 0 0 0 1px #2271b1;
 }
 
-/* Customer tools mockup */
+/* Customer tools mockup — mini studio preview */
 .wc-gpd-customer-tools-layout {
 	display: grid;
-	grid-template-columns: minmax( 280px, 1fr ) minmax( 260px, 1fr );
+	grid-template-columns: minmax( 420px, 1.35fr ) minmax( 260px, 1fr );
 	gap: 16px;
 	align-items: start;
 }
 
-.wc-gpd-customer-mockup {
-	border: 1px solid #dcdcde;
-	border-radius: 4px;
-	background: #fff;
-	overflow: hidden;
+.wc-gpd-customer-mockup-wrap {
+	min-width: 0;
 }
 
-.wc-gpd-mockup-toolbar {
+.wc-gpd-mockup-studio {
+	--wc-gpd-studio-nav-w: 52px;
+	--wc-gpd-studio-drawer-w: 200px;
+	border: none;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--wc-gpd-studio-bg, #f4f5f7);
+}
+
+.wc-gpd-mockup-studio__shell {
+	display: grid;
+	grid-template-columns: var(--wc-gpd-studio-nav-w) var(--wc-gpd-studio-drawer-w) minmax( 0, 1fr );
+	grid-template-areas: "nav drawer canvas";
+	min-height: 280px;
+	align-items: stretch;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-mockup-nav {
+	grid-area: nav;
+	padding: 0.35rem 0.25rem;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-mockup-nav .wc-gpd-studio-nav__btn {
+	padding: 0.35rem 0.2rem;
+	font-size: 0.5625rem;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-mockup-nav .wc-gpd-studio-nav__icon {
+	width: 20px;
+	height: 20px;
+	font-size: 0.75rem;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-mockup-drawer {
+	grid-area: drawer;
+	min-width: 0;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-studio-drawer__head {
+	padding: 0.5rem 0.65rem 0.35rem;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-studio-drawer__title {
+	font-size: 0.8125rem;
+}
+
+.wc-gpd-mockup-studio .wc-gpd-studio-drawer__body {
+	padding: 0.5rem 0.65rem 0.65rem;
+	font-size: 0.75rem;
+}
+
+.wc-gpd-mockup-panel[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-mockup-panel .wc-gpd-tpl-panel-desc {
+	margin: 0 0 0.5rem;
+	font-size: 0.6875rem;
+	color: var(--wc-gpd-studio-muted, #6b7280);
+}
+
+.wc-gpd-mockup-control {
+	width: 100%;
+	text-align: left;
+}
+
+.wc-gpd-mockup-layers {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wc-gpd-mockup-layers li {
+	padding: 0.35rem 0.5rem;
+	background: #eff6ff;
+	border-radius: 4px;
+	font-size: 0.6875rem;
+}
+
+.wc-gpd-mockup-field label {
+	display: block;
+	margin-bottom: 0.2rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+}
+
+.wc-gpd-mockup-field input {
+	width: 100%;
+	font-size: 0.6875rem;
+}
+
+.wc-gpd-mockup-field[hidden],
+.wc-gpd-mockup-graphics[hidden],
+.wc-gpd-mockup-pill[hidden],
+.wc-gpd-mockup-swatch[hidden],
+.wc-gpd-studio-nav__btn[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-mockup-graphics {
+	display: flex;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+}
+
+.wc-gpd-mockup-graphic-thumb {
+	display: block;
+	width: 36px;
+	height: 36px;
+	border-radius: 4px;
+	background: #e5e7eb;
+	border: 1px solid #d1d5db;
+}
+
+.wc-gpd-mockup-tools {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.wc-gpd-mockup-tools-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 4px;
-	padding: 8px;
-	background: #f6f7f7;
-	border-bottom: 1px solid #dcdcde;
-	min-height: 36px;
+	gap: 0.25rem;
+	align-items: center;
 }
 
-.wc-gpd-mockup-chip {
-	display: inline-block;
-	padding: 2px 8px;
-	font-size: 11px;
+.wc-gpd-mockup-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.2rem 0.45rem;
+	font-size: 0.625rem;
 	background: #fff;
-	border: 1px solid #c3c4c7;
-	border-radius: 12px;
+	border: 1px solid var(--wc-gpd-studio-border, #e8eaed);
+	border-radius: 4px;
+	color: var(--wc-gpd-studio-text, #1a1d21);
 }
 
-.wc-gpd-mockup-chip[hidden] {
-	display: none;
+.wc-gpd-mockup-pill--mini {
+	font-size: 0.5625rem;
 }
 
-.wc-gpd-mockup-canvas {
-	display: grid;
-	grid-template-columns: 100px 1fr;
-	min-height: 140px;
+.wc-gpd-mockup-swatch {
+	display: inline-block;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: #111827;
+	border: 1px solid var(--wc-gpd-studio-border, #e8eaed);
 }
 
-.wc-gpd-mockup-placeholder-fields {
-	padding: 8px;
-	font-size: 11px;
-	color: #646970;
-	background: #f0f6fc;
-	border-right: 1px solid #dcdcde;
+.wc-gpd-mockup-canvas-area {
+	grid-area: canvas;
+	display: flex;
+	min-width: 0;
+	padding: 0.5rem;
+	background: var(--wc-gpd-studio-bg, #f4f5f7);
 }
 
-.wc-gpd-mockup-placeholder-fields[hidden] {
-	display: none;
+.wc-gpd-mockup-canvas-stage {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+	width: 100%;
 }
 
 .wc-gpd-mockup-canvas-inner {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 12px;
-	color: #646970;
-	background: repeating-conic-gradient( #f6f7f7 0% 25%, #fff 0% 50% ) 50% / 16px 16px;
+	width: 100%;
+	min-height: 200px;
+	background: #f0f0f0;
+	border-radius: 4px;
+}
+
+.wc-gpd-mockup-sample-text {
+	font-size: 0.875rem;
+	color: #374151;
 }
 
 @media ( max-width: 1100px ) {

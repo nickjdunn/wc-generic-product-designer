@@ -234,6 +234,26 @@
 		}
 	}
 
+	function initAddMenuCollapsible() {
+		document.querySelectorAll( '.wc-gpd-add-menu--collapsible .wc-gpd-add-menu__toggle' ).forEach( ( toggle ) => {
+			if ( toggle.dataset.gpdBound ) {
+				return;
+			}
+			toggle.dataset.gpdBound = '1';
+			toggle.addEventListener( 'click', () => {
+				const group = toggle.closest( '.wc-gpd-add-menu__group' );
+				const body = group ? group.querySelector( '.wc-gpd-add-menu__body' ) : null;
+				if ( ! group || ! body ) {
+					return;
+				}
+				const open = ! group.classList.contains( 'is-open' );
+				group.classList.toggle( 'is-open', open );
+				toggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+				body.hidden = ! open;
+			} );
+		} );
+	}
+
 	function initStudioNav() {
 		if ( ! ui.studioNav ) {
 			return;
@@ -1978,6 +1998,7 @@
 	}
 
 	initFontSelect();
+	initAddMenuCollapsible();
 	initStudioNav();
 	applyProductToolSettings();
 	bindAddToCart();

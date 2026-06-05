@@ -778,20 +778,125 @@
 		} );
 	}
 
-	function syncCustomerMockup() {
-		Object.keys( MOCKUP_CHECKBOX_MAP ).forEach( ( key ) => {
-			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
-			const chip = document.querySelector( `.wc-gpd-mockup-chip[data-mockup="${ key }"]` );
-			if ( chip ) {
-				chip.hidden = checkbox ? ! checkbox.checked : true;
+	const MOCKUP_PANEL_TITLES = {
+		add: 'Add',
+		layers: 'Layers',
+		details: 'Your details',
+		context: 'Edit',
+	};
+
+	const MOCKUP_EDIT_KEYS = [ 'font', 'size', 'color', 'bold', 'italic', 'underline', 'line_height', 'letter_spacing', 'align' ];
+
+	function initAddMenuCollapsible( root ) {
+		const scope = root || document;
+		scope.querySelectorAll( '.wc-gpd-add-menu--collapsible .wc-gpd-add-menu__toggle' ).forEach( ( toggle ) => {
+			if ( toggle.dataset.gpdBound ) {
+				return;
+			}
+			toggle.dataset.gpdBound = '1';
+			toggle.addEventListener( 'click', () => {
+				const group = toggle.closest( '.wc-gpd-add-menu__group' );
+				const body = group ? group.querySelector( '.wc-gpd-add-menu__body' ) : null;
+				if ( ! group || ! body ) {
+					return;
+				}
+				const open = ! group.classList.contains( 'is-open' );
+				group.classList.toggle( 'is-open', open );
+				toggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+				body.hidden = ! open;
+			} );
+		} );
+	}
+
+	function expandAddMenuGroup( match ) {
+		const needle = String( match || '' ).toLowerCase();
+		document.querySelectorAll( '.wc-gpd-add-menu--collapsible .wc-gpd-add-menu__group' ).forEach( ( group ) => {
+			const toggle = group.querySelector( '.wc-gpd-add-menu__toggle' );
+			const body = group.querySelector( '.wc-gpd-add-menu__body' );
+			if ( ! toggle || ! body ) {
+				return;
+			}
+			if ( toggle.textContent.trim().toLowerCase().includes( needle ) ) {
+				group.classList.add( 'is-open' );
+				toggle.setAttribute( 'aria-expanded', 'true' );
+				body.hidden = false;
 			}
 		} );
+	}
+
+	function openMockupPanel( panelName ) {
+		const mockup = document.getElementById( 'wc-gpd-customer-mockup' );
+		if ( ! mockup ) {
+			return;
+		}
+		mockup.querySelectorAll( '[data-mockup-panel]' ).forEach( ( panel ) => {
+			const isTarget = panel.dataset.mockupPanel === panelName;
+			panel.hidden = ! isTarget;
+			panel.classList.toggle( 'is-active', isTarget );
+		} );
+		mockup.querySelectorAll( '[data-mockup-nav]' ).forEach( ( btn ) => {
+			btn.classList.toggle( 'is-active', btn.dataset.mockupNav === panelName );
+		} );
+		const titleEl = document.getElementById( 'wc-gpd-mockup-drawer-title' );
+		if ( titleEl && MOCKUP_PANEL_TITLES[ panelName ] ) {
+			titleEl.textContent = MOCKUP_PANEL_TITLES[ panelName ];
+		}
+	}
+
+	function initMockupStudioNav() {
+		const nav = document.getElementById( 'wc-gpd-mockup-nav' );
+		if ( ! nav || nav.dataset.gpdBound ) {
+			return;
+		}
+		nav.dataset.gpdBound = '1';
+		nav.querySelectorAll( '[data-mockup-nav]' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				if ( btn.hidden ) {
+					return;
+				}
+				openMockupPanel( btn.dataset.mockupNav || 'add' );
+			} );
+		} );
+	}
+
+	function syncCustomerMockup() {
+		const mockupRoot = '#wc-gpd-customer-mockup';
+		Object.keys( MOCKUP_CHECKBOX_MAP ).forEach( ( key ) => {
+			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
+			const on = checkbox ? checkbox.checked : false;
+			document.querySelectorAll( `${ mockupRoot } [data-mockup="${ key }"]` ).forEach( ( el ) => {
+				el.hidden = ! on;
+			} );
+		} );
+
+		const anyEdit = MOCKUP_EDIT_KEYS.some( ( key ) => {
+			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
+			return checkbox && checkbox.checked;
+		} );
+		document.querySelectorAll( `${ mockupRoot } [data-mockup-edit-nav]` ).forEach( ( el ) => {
+			el.hidden = ! anyEdit;
+		} );
+
+		const hasPlaceholders = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) );
+		const detailsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_details_panel"]' );
+		const graphicsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_customer_graphics"]' );
+		const detailsOn = detailsCheckbox && detailsCheckbox.checked;
+		const graphicsOn = graphicsCheckbox && graphicsCheckbox.checked;
+		const showDetailsNav = detailsOn && ( hasPlaceholders || graphicsOn );
+
+		const detailsNavBtn = document.querySelector( '#wc-gpd-mockup-nav [data-mockup-nav="details"]' );
+		if ( detailsNavBtn ) {
+			detailsNavBtn.hidden = ! showDetailsNav;
+		}
+
 		const fieldsEl = document.getElementById( 'wc-gpd-mockup-fields' );
 		if ( fieldsEl ) {
-			const hasSidebarFields = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) );
-			const detailsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_details_panel"]' );
-			const detailsOn = ! detailsCheckbox || detailsCheckbox.checked;
-			fieldsEl.hidden = ! hasSidebarFields || ! detailsOn;
+			fieldsEl.hidden = ! hasPlaceholders || ! detailsOn;
+		}
+
+		const graphicsEl = document.querySelector( `${ mockupRoot } .wc-gpd-mockup-graphics` );
+		if ( graphicsEl ) {
+			graphicsEl.hidden = ! graphicsOn || ! detailsOn;
 		}
 	}
 
@@ -1675,6 +1780,7 @@
 			freeformHint.hidden = false;
 		}
 		openAccordionSection( 'add' );
+		expandAddMenuGroup( 'shape' );
 	}
 
 	function cancelFreeformMode() {
@@ -2487,6 +2593,8 @@
 	window.addEventListener( 'resize', applyResponsiveScale );
 
 	initFontSelect();
+	initAddMenuCollapsible();
+	initMockupStudioNav();
 	initAdminStudioNav();
 	initAccordion();
 	updateUnitSuffixes();

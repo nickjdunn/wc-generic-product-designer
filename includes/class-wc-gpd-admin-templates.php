@@ -390,39 +390,49 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true"><?php esc_html_e( 'Add to design', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body">
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Choose what to add to the current design area.', 'wc-generic-product-designer' ); ?></p>
-							<div class="wc-gpd-add-menu">
+							<div class="wc-gpd-add-menu wc-gpd-add-menu--collapsible">
 								<div class="wc-gpd-add-menu__group">
-									<h5 class="wc-gpd-add-menu__title"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></h5>
-									<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-text"><?php esc_html_e( 'Text field', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-text"><?php esc_html_e( 'Text field', 'wc-generic-product-designer' ); ?></button>
+									</div>
 								</div>
 								<div class="wc-gpd-add-menu__group">
-									<h5 class="wc-gpd-add-menu__title"><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></h5>
-									<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-image"><?php esc_html_e( 'Image from library', 'wc-generic-product-designer' ); ?></button>
-									<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-image"><?php esc_html_e( 'Image from library', 'wc-generic-product-designer' ); ?></button>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?></button>
+									</div>
 								</div>
 								<div class="wc-gpd-add-menu__group">
-									<h5 class="wc-gpd-add-menu__title"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></h5>
-									<div class="wc-gpd-tpl-btn-row">
-										<button type="button" class="button button-small wc-gpd-add-template-rect"><?php esc_html_e( 'Rectangle', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-square"><?php esc_html_e( 'Square', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-circle"><?php esc_html_e( 'Circle', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-hexagon"><?php esc_html_e( 'Hexagon', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-octagon"><?php esc_html_e( 'Octagon', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-heart"><?php esc_html_e( 'Heart', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-template-freeform" id="wc-gpd-add-template-freeform"><?php esc_html_e( 'Freeform', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<div class="wc-gpd-tpl-btn-row">
+											<button type="button" class="button button-small wc-gpd-add-template-rect"><?php esc_html_e( 'Rectangle', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-square"><?php esc_html_e( 'Square', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-circle"><?php esc_html_e( 'Circle', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-hexagon"><?php esc_html_e( 'Hexagon', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-octagon"><?php esc_html_e( 'Octagon', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-heart"><?php esc_html_e( 'Heart', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-template-freeform" id="wc-gpd-add-template-freeform"><?php esc_html_e( 'Freeform', 'wc-generic-product-designer' ); ?></button>
+										</div>
+										<p class="wc-gpd-tpl-hint wc-gpd-freeform-hint" id="wc-gpd-freeform-hint" hidden><?php esc_html_e( 'Click to place points. Click the first point again (or double-click) to close the shape.', 'wc-generic-product-designer' ); ?></p>
 									</div>
-									<p class="wc-gpd-tpl-hint wc-gpd-freeform-hint" id="wc-gpd-freeform-hint" hidden><?php esc_html_e( 'Click to place points. Click the first point again (or double-click) to close the shape.', 'wc-generic-product-designer' ); ?></p>
-									<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Icons', 'wc-generic-product-designer' ); ?></h5>
-									<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-featured" id="wc-gpd-bootstrap-icon-featured"></div>
-									<div class="wc-gpd-bootstrap-icons-toolbar">
-										<input type="search" id="wc-gpd-bootstrap-icon-search" class="regular-text" placeholder="<?php esc_attr_e( 'Search icons…', 'wc-generic-product-designer' ); ?>" />
-										<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
+								</div>
+								<div class="wc-gpd-add-menu__group">
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Icons', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-featured" id="wc-gpd-bootstrap-icon-featured"></div>
+										<div class="wc-gpd-bootstrap-icons-toolbar">
+											<input type="search" id="wc-gpd-bootstrap-icon-search" class="regular-text" placeholder="<?php esc_attr_e( 'Search icons…', 'wc-generic-product-designer' ); ?>" />
+											<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
+										</div>
+										<p class="description" id="wc-gpd-bootstrap-icon-status" hidden></p>
+										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-bootstrap-icon-results"></div>
+										<p class="wc-gpd-bootstrap-icon-load-more" id="wc-gpd-bootstrap-icon-load-more-wrap" hidden>
+											<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
+										</p>
 									</div>
-									<p class="description" id="wc-gpd-bootstrap-icon-status" hidden></p>
-									<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-bootstrap-icon-results"></div>
-									<p class="wc-gpd-bootstrap-icon-load-more" id="wc-gpd-bootstrap-icon-load-more-wrap" hidden>
-										<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
-									</p>
 								</div>
 							</div>
 						</div>
@@ -635,25 +645,67 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<div class="wc-gpd-customer-mockup-wrap">
 				<h4><?php esc_html_e( 'Customer preview', 'wc-generic-product-designer' ); ?></h4>
 				<p class="description"><?php esc_html_e( 'Approximate layout shoppers see. Toggle options on the right to preview what appears.', 'wc-generic-product-designer' ); ?></p>
-				<div class="wc-gpd-customer-mockup" id="wc-gpd-customer-mockup">
-					<div class="wc-gpd-mockup-toolbar" id="wc-gpd-mockup-toolbar">
-						<span class="wc-gpd-mockup-chip" data-mockup="free_text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="font"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="size"><?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="color"><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="bold"><?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="italic"><?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="underline"><?php esc_html_e( 'Underline', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="line_height"><?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="letter_spacing"><?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="align"><?php esc_html_e( 'Align', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="details"><?php esc_html_e( 'Details', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="graphics"><?php esc_html_e( 'Graphics', 'wc-generic-product-designer' ); ?></span>
-						<span class="wc-gpd-mockup-chip" data-mockup="layers"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></span>
-					</div>
-					<div class="wc-gpd-mockup-canvas">
-						<div class="wc-gpd-mockup-placeholder-fields" id="wc-gpd-mockup-fields"><?php esc_html_e( 'Variable fields', 'wc-generic-product-designer' ); ?></div>
-						<div class="wc-gpd-mockup-canvas-inner"><?php esc_html_e( 'Design canvas', 'wc-generic-product-designer' ); ?></div>
+				<div class="wc-gpd-customer-mockup wc-gpd-mockup-studio wc-gpd-modern-studio-root" id="wc-gpd-customer-mockup">
+					<div class="wc-gpd-mockup-studio__shell">
+						<nav class="wc-gpd-studio-nav wc-gpd-mockup-nav" id="wc-gpd-mockup-nav" aria-label="<?php esc_attr_e( 'Preview designer tools', 'wc-generic-product-designer' ); ?>">
+							<button type="button" class="wc-gpd-studio-nav__btn wc-gpd-studio-nav__btn--add is-active" data-mockup-nav="add"><span class="wc-gpd-studio-nav__icon">+</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Add', 'wc-generic-product-designer' ); ?></span></button>
+							<button type="button" class="wc-gpd-studio-nav__btn" data-mockup-nav="layers" data-mockup="layers"><span class="wc-gpd-studio-nav__icon">☰</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></span></button>
+							<button type="button" class="wc-gpd-studio-nav__btn" data-mockup-nav="details" data-mockup="details" hidden><span class="wc-gpd-studio-nav__icon">✎</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Details', 'wc-generic-product-designer' ); ?></span></button>
+							<button type="button" class="wc-gpd-studio-nav__btn" data-mockup-nav="context" data-mockup-edit-nav hidden><span class="wc-gpd-studio-nav__icon">✎</span><span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Edit', 'wc-generic-product-designer' ); ?></span></button>
+						</nav>
+						<aside class="wc-gpd-studio-drawer wc-gpd-mockup-drawer">
+							<div class="wc-gpd-studio-drawer__head">
+								<h2 class="wc-gpd-studio-drawer__title" id="wc-gpd-mockup-drawer-title"><?php esc_html_e( 'Add', 'wc-generic-product-designer' ); ?></h2>
+							</div>
+							<div class="wc-gpd-studio-drawer__body">
+								<div class="wc-gpd-mockup-panel is-active" data-mockup-panel="add">
+									<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add elements to your design.', 'wc-generic-product-designer' ); ?></p>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="free_text" disabled><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+								</div>
+								<div class="wc-gpd-mockup-panel" data-mockup-panel="layers" hidden>
+									<ul class="wc-gpd-mockup-layers">
+										<li><?php esc_html_e( 'Your text', 'wc-generic-product-designer' ); ?></li>
+									</ul>
+								</div>
+								<div class="wc-gpd-mockup-panel" data-mockup-panel="details" hidden>
+									<div class="wc-gpd-mockup-field" id="wc-gpd-mockup-fields" data-mockup="details">
+										<label><?php esc_html_e( 'Name', 'wc-generic-product-designer' ); ?></label>
+										<input type="text" class="regular-text" value="<?php esc_attr_e( 'Sample', 'wc-generic-product-designer' ); ?>" disabled />
+									</div>
+									<div class="wc-gpd-mockup-graphics" data-mockup="graphics">
+										<span class="wc-gpd-mockup-graphic-thumb"></span>
+										<span class="wc-gpd-mockup-graphic-thumb"></span>
+									</div>
+								</div>
+								<div class="wc-gpd-mockup-panel" data-mockup-panel="context" hidden>
+									<p class="wc-gpd-context-layer-name"><?php esc_html_e( 'Your text', 'wc-generic-product-designer' ); ?></p>
+									<div class="wc-gpd-mockup-tools">
+										<div class="wc-gpd-mockup-tools-row">
+											<span class="wc-gpd-mockup-pill" data-mockup="font"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></span>
+											<span class="wc-gpd-mockup-pill" data-mockup="size">32</span>
+										</div>
+										<div class="wc-gpd-mockup-tools-row">
+											<span class="wc-gpd-mockup-pill" data-mockup="bold"><strong>B</strong></span>
+											<span class="wc-gpd-mockup-pill" data-mockup="italic"><em>I</em></span>
+											<span class="wc-gpd-mockup-pill" data-mockup="underline"><span class="wc-gpd-u">U</span></span>
+											<span class="wc-gpd-mockup-pill" data-mockup="align">L C R</span>
+											<span class="wc-gpd-mockup-swatch" data-mockup="color"></span>
+										</div>
+										<div class="wc-gpd-mockup-tools-row">
+											<span class="wc-gpd-mockup-pill wc-gpd-mockup-pill--mini" data-mockup="line_height"><?php esc_html_e( 'Line', 'wc-generic-product-designer' ); ?> 1.16</span>
+											<span class="wc-gpd-mockup-pill wc-gpd-mockup-pill--mini" data-mockup="letter_spacing"><?php esc_html_e( 'Space', 'wc-generic-product-designer' ); ?> 0</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</aside>
+						<main class="wc-gpd-mockup-canvas-area">
+							<div class="wc-gpd-mockup-canvas-stage">
+								<div class="wc-gpd-mockup-canvas-inner">
+									<span class="wc-gpd-mockup-sample-text"><?php esc_html_e( 'Your text', 'wc-generic-product-designer' ); ?></span>
+								</div>
+							</div>
+						</main>
 					</div>
 				</div>
 			</div>

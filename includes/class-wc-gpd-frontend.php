@@ -497,10 +497,12 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					<div class="wc-gpd-studio-drawer__body">
 						<div class="wc-gpd-studio-panel-section is-active" data-section="add" id="wc-gpd-section-add">
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add elements to your design.', 'wc-generic-product-designer' ); ?></p>
-							<div class="wc-gpd-add-menu">
-								<div class="wc-gpd-add-menu__group">
-									<h5 class="wc-gpd-add-menu__title"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></h5>
-									<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+							<div class="wc-gpd-add-menu wc-gpd-add-menu--collapsible">
+								<div class="wc-gpd-add-menu__group is-open">
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="true"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body">
+										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+									</div>
 								</div>
 							</div>
 						</div>
