@@ -133,41 +133,70 @@ class WC_GPD_Export {
 		$parts[] = '<?xml version="1.0" encoding="UTF-8"?>';
 		$parts[] = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' . $width . ' ' . $height . '" width="' . $width . '" height="' . $height . '">';
 
-		if ( ! empty( $options['include_background'] ) && ! empty( $settings['template_id'] ) ) {
-			$href = WC_GPD_Preview::template_href_for_export( absint( $settings['template_id'] ) );
-			if ( $href ) {
-				$parts[] = '<image x="0" y="0" width="' . $width . '" height="' . $height . '" preserveAspectRatio="xMidYMid slice" href="' . esc_attr( $href ) . '" />';
-			}
+		$template_doc = WC_GPD_Template_Json::parse( $template_json );
+		$design_doc   = WC_GPD_Design_Json::parse( $design_json );
+		$views        = ! empty( $template_doc['views'] ) && is_array( $template_doc['views'] )
+			? $template_doc['views']
+			: array();
+
+		if ( empty( $views ) ) {
+			$views = array( WC_GPD_Template_Json::empty_view( 'view_front', __( 'Front', 'wc-generic-product-designer' ) ) );
 		}
 
-		if ( ! empty( $options['include_outlines'] ) ) {
-			$template_objects = WC_GPD_Fabric_Svg::decode_objects( $template_json );
-			$outline_objects  = WC_GPD_Fabric_Svg::filter_by_layer_type( $template_objects, 'outline' );
-			$outline_markup   = WC_GPD_Fabric_Svg::objects_to_fragment( $outline_objects );
-			if ( $outline_markup ) {
-				$parts[] = '<g data-wc-gpd-layer="outlines">' . $outline_markup . '</g>';
+		foreach ( $views as $view ) {
+			if ( ! is_array( $view ) || empty( $view['id'] ) ) {
+				continue;
 			}
-		}
 
-		$design_objects = WC_GPD_Fabric_Svg::decode_objects( $design_json );
-		if ( ! empty( $options['include_text'] ) ) {
-			$text_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $design_objects, 'text' );
-			$text_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $text_objects );
-			if ( $text_markup ) {
-				$parts[] = '<g data-wc-gpd-layer="text">' . $text_markup . '</g>';
-			} elseif ( $design_svg ) {
-				$inner = WC_GPD_Preview::extract_svg_inner_public( $design_svg );
-				if ( $inner ) {
-					$parts[] = '<g data-wc-gpd-layer="text">' . $inner . '</g>';
+			$view_id = sanitize_key( (string) $view['id'] );
+			$parts[] = '<g data-wc-gpd-view="' . esc_attr( $view_id ) . '">';
+
+			if ( ! empty( $options['include_background'] ) ) {
+				$image_id = ! empty( $view['template_image_id'] ) ? absint( $view['template_image_id'] ) : absint( $settings['template_id'] );
+				if ( $image_id ) {
+					$href = WC_GPD_Preview::template_href_for_export( $image_id );
+					if ( $href ) {
+						$parts[] = '<image x="0" y="0" width="' . $width . '" height="' . $height . '" preserveAspectRatio="xMidYMid slice" href="' . esc_attr( $href ) . '" />';
+					}
 				}
 			}
+
+			if ( ! empty( $options['include_outlines'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
+				$outline_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'outline' );
+				$outline_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $outline_objects );
+				if ( $outline_markup ) {
+					$parts[] = '<g data-wc-gpd-layer="outlines">' . $outline_markup . '</g>';
+				}
+			}
+
+			$view_design_objects = array();
+			if ( ! empty( $design_doc['views'][ $view_id ]['objects'] ) && is_array( $design_doc['views'][ $view_id ]['objects'] ) ) {
+				$view_design_objects = $design_doc['views'][ $view_id ]['objects'];
+			}
+
+			if ( ! empty( $options['include_text'] ) ) {
+				$text_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'text' );
+				$text_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $text_objects );
+				if ( $text_markup ) {
+					$parts[] = '<g data-wc-gpd-layer="text">' . $text_markup . '</g>';
+				}
+			}
+
+			if ( ! empty( $options['include_shapes'] ) ) {
+				$shape_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'shape' );
+				$shape_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $shape_objects );
+				if ( $shape_markup ) {
+					$parts[] = '<g data-wc-gpd-layer="shapes">' . $shape_markup . '</g>';
+				}
+			}
+
+			$parts[] = '</g>';
 		}
 
-		if ( ! empty( $options['include_shapes'] ) ) {
-			$shape_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $design_objects, 'shape' );
-			$shape_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $shape_objects );
-			if ( $shape_markup ) {
-				$parts[] = '<g data-wc-gpd-layer="shapes">' . $shape_markup . '</g>';
+		if ( ! empty( $options['include_text'] ) && empty( $design_doc['views'] ) && $design_svg ) {
+			$inner = WC_GPD_Preview::extract_svg_inner_public( $design_svg );
+			if ( $inner ) {
+				$parts[] = '<g data-wc-gpd-layer="text">' . $inner . '</g>';
 			}
 		}
 

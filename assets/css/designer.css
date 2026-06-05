@@ -238,6 +238,63 @@
 	margin-top: 0.75rem;
 }
 
+.wc-gpd-designer__canvas-column {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.wc-gpd-view-switcher,
+.wc-gpd-template-view-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.wc-gpd-view-tab,
+.wc-gpd-template-view-tab {
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	border-radius: 999px;
+	padding: 0.35rem 0.85rem;
+	cursor: pointer;
+	font-size: 0.92rem;
+}
+
+.wc-gpd-view-tab.is-active,
+.wc-gpd-template-view-tab.is-active {
+	background: #111;
+	color: #fff;
+	border-color: #111;
+}
+
+.wc-gpd-view-tab.has-design::after {
+	content: '';
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	margin-left: 0.35rem;
+	border-radius: 50%;
+	background: #2b6cb0;
+	vertical-align: middle;
+}
+
+.wc-gpd-template-view-toolbar,
+.wc-gpd-template-editor-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 0.65rem;
+}
+
+.wc-gpd-template-bbox-toggle input:disabled + span,
+.wc-gpd-template-bbox-toggle:has(input:disabled) {
+	opacity: 0.55;
+}
+
 .wc-gpd-template-editor-wrap {
 	padding: 12px 16px 16px;
 	border-top: 1px solid #eee;

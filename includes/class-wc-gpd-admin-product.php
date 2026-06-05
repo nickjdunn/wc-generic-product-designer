@@ -76,8 +76,12 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 		$template_id  = absint( get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_ID, true ) );
 		$template_url  = $template_id ? wp_get_attachment_image_url( $template_id, 'thumbnail' ) : '';
 		$template_json = get_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_JSON, true );
-		if ( ! is_string( $template_json ) ) {
-			$template_json = '';
+		if ( ! is_string( $template_json ) || '' === trim( $template_json ) ) {
+			$template_json = wp_json_encode( WC_GPD_Template_Json::empty_document() );
+		}
+		$max_views = absint( get_post_meta( $product_id, WC_GPD_Product_Meta::META_MAX_DESIGN_VIEWS, true ) );
+		if ( $max_views < WC_GPD_Product_Meta::MIN_VIEWS ) {
+			$max_views = WC_GPD_Product_Meta::MIN_VIEWS;
 		}
 
 		if ( '' === $width ) {
@@ -145,21 +149,55 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 					<button type="button" class="button wc_gpd_remove_template" <?php echo $template_id ? '' : 'style="display:none;"'; ?>><?php esc_html_e( 'Remove', 'wc-generic-product-designer' ); ?></button>
 					<span class="description"><?php esc_html_e( 'Base product image shown behind text layers (non-editable background).', 'wc-generic-product-designer' ); ?></span>
 				</p>
+				<?php
+				woocommerce_wp_text_input(
+					array(
+						'id'                => 'wc_gpd_max_design_views',
+						'label'             => __( 'Maximum design areas', 'wc-generic-product-designer' ),
+						'type'              => 'number',
+						'custom_attributes' => array(
+							'min'  => WC_GPD_Product_Meta::MIN_VIEWS,
+							'max'  => WC_GPD_Product_Meta::MAX_VIEWS,
+							'step' => '1',
+						),
+						'value'             => $max_views,
+						'desc_tip'          => true,
+						'description'       => __( 'How many switchable areas customers can design (e.g. Front, Back, Sleeve = 3).', 'wc-generic-product-designer' ),
+					)
+				);
+				?>
 				<div class="wc-gpd-template-editor-wrap">
-					<h3><?php esc_html_e( 'Template outlines & shapes', 'wc-generic-product-designer' ); ?></h3>
+					<h3><?php esc_html_e( 'Template areas & outlines', 'wc-generic-product-designer' ); ?></h3>
 					<p class="description">
-						<?php esc_html_e( 'Draw rectangles, squares, and circles on the template. Mark shapes as “Template outline” for production cut/engrave lines.', 'wc-generic-product-designer' ); ?>
+						<?php esc_html_e( 'Create one artboard per design area. Use tabs to switch between Front, Back, Sleeve, etc. Mark one outline per area as the bounding box to keep customer text inside that region.', 'wc-generic-product-designer' ); ?>
 					</p>
 					<input type="hidden" id="wc_gpd_template_json" name="wc_gpd_template_json" value="<?php echo esc_attr( $template_json ); ?>" />
 					<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) absint( $width ) ); ?>" />
 					<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) absint( $height ) ); ?>" />
+					<input type="hidden" id="wc_gpd_template_max_views" value="<?php echo esc_attr( (string) $max_views ); ?>" />
+					<input type="hidden" id="wc_gpd_template_default_image_id" value="<?php echo esc_attr( (string) $template_id ); ?>" />
+					<div class="wc-gpd-template-view-tabs" id="wc-gpd-template-view-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Template design areas', 'wc-generic-product-designer' ); ?>"></div>
+					<div class="wc-gpd-template-view-toolbar">
+						<button type="button" class="button" id="wc-gpd-template-add-view"><?php esc_html_e( 'Add design area', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button" id="wc-gpd-template-rename-view"><?php esc_html_e( 'Rename area', 'wc-generic-product-designer' ); ?></button>
+						<label class="wc-gpd-template-view-image">
+							<?php esc_html_e( 'Area background image', 'wc-generic-product-designer' ); ?>
+							<input type="hidden" id="wc_gpd_template_view_image_id" value="0" />
+							<button type="button" class="button" id="wc-gpd-template-view-image-select"><?php esc_html_e( 'Select image', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button" id="wc-gpd-template-view-image-clear"><?php esc_html_e( 'Use product default', 'wc-generic-product-designer' ); ?></button>
+						</label>
+					</div>
 					<div class="wc-gpd-template-editor-toolbar">
 						<button type="button" class="button wc-gpd-add-template-rect"><?php esc_html_e( 'Add rectangle', 'wc-generic-product-designer' ); ?></button>
 						<button type="button" class="button wc-gpd-add-template-square"><?php esc_html_e( 'Add square', 'wc-generic-product-designer' ); ?></button>
 						<button type="button" class="button wc-gpd-add-template-circle"><?php esc_html_e( 'Add circle', 'wc-generic-product-designer' ); ?></button>
 						<label class="wc-gpd-template-outline-toggle">
 							<input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" />
-							<?php esc_html_e( 'Selected shape is a template outline', 'wc-generic-product-designer' ); ?>
+							<?php esc_html_e( 'Template outline (production line)', 'wc-generic-product-designer' ); ?>
+						</label>
+						<label class="wc-gpd-template-bbox-toggle">
+							<input type="checkbox" id="wc_gpd_template_is_bbox" />
+							<?php esc_html_e( 'Bounding box for this area', 'wc-generic-product-designer' ); ?>
 						</label>
 					</div>
 					<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) absint( $width ) ); ?>" height="<?php echo esc_attr( (string) absint( $height ) ); ?>"></canvas>
@@ -200,6 +238,10 @@ class WC_GPD_Admin_Product implements WC_GPD_Module {
 			$template_id = 0;
 		}
 		update_post_meta( $post_id, WC_GPD_Product_Meta::META_TEMPLATE_ID, $template_id );
+
+		$max_views = isset( $_POST['wc_gpd_max_design_views'] ) ? absint( $_POST['wc_gpd_max_design_views'] ) : WC_GPD_Product_Meta::MIN_VIEWS;
+		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
+		update_post_meta( $post_id, WC_GPD_Product_Meta::META_MAX_DESIGN_VIEWS, $max_views );
 
 		$raw_template_json = isset( $_POST['wc_gpd_template_json'] ) ? wp_unslash( $_POST['wc_gpd_template_json'] ) : '';
 		$template_json     = WC_GPD_Template_Json::sanitize( is_string( $raw_template_json ) ? $raw_template_json : '' );

@@ -16,7 +16,11 @@ class WC_GPD_Product_Meta {
 	const META_CANVAS_WIDTH  = '_wc_gpd_canvas_width';
 	const META_CANVAS_HEIGHT = '_wc_gpd_canvas_height';
 	const META_TEMPLATE_ID   = '_wc_gpd_template_image_id';
-	const META_TEMPLATE_JSON = '_wc_gpd_template_json';
+	const META_TEMPLATE_JSON    = '_wc_gpd_template_json';
+	const META_MAX_DESIGN_VIEWS = '_wc_gpd_max_design_views';
+
+	const MIN_VIEWS = 1;
+	const MAX_VIEWS = 6;
 
 	const CART_KEY_DESIGN_SVG  = 'wc_gpd_design_svg';
 	const CART_KEY_DESIGN_JSON = 'wc_gpd_design_json';
@@ -79,13 +83,22 @@ class WC_GPD_Product_Meta {
 			$template_json = '';
 		}
 
+		$max_views = absint( get_post_meta( $product_id, self::META_MAX_DESIGN_VIEWS, true ) );
+		if ( $max_views < self::MIN_VIEWS || $max_views > self::MAX_VIEWS ) {
+			$max_views = self::MIN_VIEWS;
+		}
+
+		$template_views = WC_GPD_Template_Json::parse( $template_json );
+
 		return array(
-			'enabled'       => self::is_enabled( $product_id ),
-			'width'         => $width,
-			'height'        => $height,
-			'template_id'   => $image_id,
-			'template_url'  => $template_url ? $template_url : '',
-			'template_json' => $template_json,
+			'enabled'        => self::is_enabled( $product_id ),
+			'width'          => $width,
+			'height'         => $height,
+			'template_id'    => $image_id,
+			'template_url'   => $template_url ? $template_url : '',
+			'template_json'  => $template_json,
+			'template_views' => $template_views,
+			'max_views'      => $max_views,
 		);
 	}
 

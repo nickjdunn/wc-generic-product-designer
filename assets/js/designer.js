@@ -107,6 +107,21 @@
 		height: PROD_HEIGHT,
 	} );
 
+	const templateViews = Array.isArray( config.templateViews ) && config.templateViews.length
+		? config.templateViews
+		: [
+			{
+				id: 'view_front',
+				label: config.i18n.designArea || 'Front',
+				templateUrl: config.templateUrl || '',
+				boundingBoxUid: '',
+				objects: [],
+			},
+		];
+
+	const viewDesigns = {};
+	const viewSwitcherEl = document.getElementById( 'wc-gpd-view-switcher' );
+	let activeViewId = templateViews[ 0 ].id;
 	let activeText = null;
 	let displayScale = 1;
 	let submitApproved = false;
@@ -174,51 +189,230 @@
 	}
 
 	/**
-	 * Load non-interactive background template.
+	 * @returns {object|null}
 	 */
-	function loadBackground() {
-		if ( ! config.templateUrl ) {
-			canvas.backgroundColor = '#f4f4f4';
-			canvas.requestRenderAll();
-			log.debug( 'Using blank canvas background (no template image)' );
+	function getActiveViewConfig() {
+		return templateViews.find( ( view ) => view.id === activeViewId ) || templateViews[ 0 ] || null;
+	}
+
+	/**
+	 * @returns {{left:number,top:number,width:number,height:number}|null}
+	 */
+	function getBoundingBoxRect() {
+		const bboxObj = canvas.getObjects().find( ( obj ) => obj.wcGpdBoundingBox );
+		if ( ! bboxObj ) {
+			return null;
+		}
+		bboxObj.setCoords();
+		return bboxObj.getBoundingRect( true );
+	}
+
+	/**
+	 * @returns {{left:number,top:number,width:number,height:number}}
+	 */
+	function getConstraintRect() {
+		const bbox = getBoundingBoxRect();
+		if ( bbox ) {
+			return bbox;
+		}
+		return {
+			left: 2,
+			top: 2,
+			width: PROD_WIDTH - 4,
+			height: PROD_HEIGHT - 4,
+		};
+	}
+
+	function clearTemplateLayers() {
+		canvas.getObjects().slice().forEach( ( obj ) => {
+			if ( isTemplateLayer( obj ) ) {
+				canvas.remove( obj );
+			}
+		} );
+	}
+
+	function persistCurrentViewDesign() {
+		viewDesigns[ activeViewId ] = canvas.getObjects()
+			.filter( ( obj ) => isDesignLayer( obj ) )
+			.map( ( obj ) => {
+				const data = obj.toObject( [ 'wcGpdTextLayer', 'wcGpdLayerType' ] );
+				if ( isUsableTextLayer( obj ) ) {
+					data.wcGpdLayerType = 'text';
+					data.wcGpdTextLayer = true;
+				}
+				return data;
+			} );
+	}
+
+	function renderViewSwitcher() {
+		if ( ! viewSwitcherEl ) {
 			return;
 		}
 
-		fabric.Image.fromURL(
-			config.templateUrl,
-			( img ) => {
-				if ( ! img ) {
-					log.warn( 'Template image failed to load; using blank canvas' );
-					canvas.backgroundColor = '#f4f4f4';
+		viewSwitcherEl.innerHTML = '';
+		if ( templateViews.length <= 1 ) {
+			viewSwitcherEl.hidden = true;
+			return;
+		}
+
+		viewSwitcherEl.hidden = false;
+		templateViews.forEach( ( view ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-view-tab' + ( view.id === activeViewId ? ' is-active' : '' );
+			btn.textContent = view.label || view.id;
+			btn.setAttribute( 'role', 'tab' );
+			btn.setAttribute( 'aria-selected', view.id === activeViewId ? 'true' : 'false' );
+			if ( viewDesigns[ view.id ] && viewDesigns[ view.id ].length ) {
+				btn.classList.add( 'has-design' );
+			}
+			btn.addEventListener( 'click', () => {
+				switchDesignView( view.id );
+			} );
+			viewSwitcherEl.appendChild( btn );
+		} );
+	}
+
+	/**
+	 * Load background image for the active design area.
+	 *
+	 * @param {string} templateUrl Image URL.
+	 * @returns {Promise<void>}
+	 */
+	function loadBackground( templateUrl ) {
+		return new Promise( ( resolve ) => {
+			canvas.backgroundImage = null;
+			if ( ! templateUrl ) {
+				canvas.backgroundColor = '#f4f4f4';
+				canvas.requestRenderAll();
+				resolve();
+				return;
+			}
+
+			fabric.Image.fromURL(
+				templateUrl,
+				( img ) => {
+					if ( ! img ) {
+						canvas.backgroundColor = '#f4f4f4';
+						canvas.requestRenderAll();
+						resolve();
+						return;
+					}
+					const scaleX = PROD_WIDTH / img.width;
+					const scaleY = PROD_HEIGHT / img.height;
+					const scale = Math.max( scaleX, scaleY );
+
+					img.set( {
+						originX: 'center',
+						originY: 'center',
+						left: PROD_WIDTH / 2,
+						top: PROD_HEIGHT / 2,
+						scaleX: scale,
+						scaleY: scale,
+						selectable: false,
+						evented: false,
+						hasControls: false,
+						hasBorders: false,
+						lockMovementX: true,
+						lockMovementY: true,
+						wcGpdBackground: true,
+					} );
+
+					canvas.backgroundImage = img;
 					canvas.requestRenderAll();
+					resolve();
+				},
+				{ crossOrigin: 'anonymous' }
+			);
+		} );
+	}
+
+	/**
+	 * Load template outlines and customer layers for a design area.
+	 *
+	 * @param {string} viewId View ID.
+	 * @returns {Promise<void>}
+	 */
+	function loadDesignView( viewId ) {
+		persistCurrentViewDesign();
+		activeViewId = viewId;
+		const view = getActiveViewConfig();
+		clearTextLayers();
+		clearTemplateLayers();
+		discardSelection();
+
+		if ( ! view ) {
+			renderViewSwitcher();
+			return Promise.resolve();
+		}
+
+		return loadBackground( view.templateUrl || config.templateUrl || '' ).then( () => {
+			const templateObjects = Array.isArray( view.objects ) ? view.objects : [];
+			const designObjects = viewDesigns[ viewId ] || [];
+
+			return new Promise( ( resolve ) => {
+				const afterTemplate = () => {
+					if ( ! designObjects.length ) {
+						applyResponsiveScale();
+						renderViewSwitcher();
+						resolve();
+						return;
+					}
+
+					fabric.util.enlivenObjects(
+						designObjects,
+						( objects ) => {
+							objects.forEach( ( obj ) => {
+								obj.wcGpdTextLayer = obj.wcGpdTextLayer || isTextLayer( obj );
+								canvas.add( obj );
+								obj.setCoords();
+							} );
+							purgePhantomLayers();
+							applyResponsiveScale();
+							renderViewSwitcher();
+							resolve();
+						},
+						'fabric'
+					);
+				};
+
+				if ( ! templateObjects.length ) {
+					afterTemplate();
 					return;
 				}
-				const scaleX = PROD_WIDTH / img.width;
-				const scaleY = PROD_HEIGHT / img.height;
-				const scale = Math.max( scaleX, scaleY );
 
-				img.set( {
-					originX: 'center',
-					originY: 'center',
-					left: PROD_WIDTH / 2,
-					top: PROD_HEIGHT / 2,
-					scaleX: scale,
-					scaleY: scale,
-					selectable: false,
-					evented: false,
-					hasControls: false,
-					hasBorders: false,
-					lockMovementX: true,
-					lockMovementY: true,
-					wcGpdBackground: true,
-				} );
+				fabric.util.enlivenObjects(
+					templateObjects,
+					( objects ) => {
+						objects.forEach( ( obj ) => {
+							obj.wcGpdTemplateLayer = true;
+							obj.wcGpdOutlineLayer = !! obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline';
+							obj.wcGpdBoundingBox = view.boundingBoxUid && obj.wcGpdUid === view.boundingBoxUid;
+							if ( obj.wcGpdBoundingBox ) {
+								obj.stroke = obj.stroke || '#2b6cb0';
+								obj.strokeDashArray = [ 8, 6 ];
+							}
+							obj.selectable = false;
+							obj.evented = false;
+							obj.hasControls = false;
+							obj.hasBorders = false;
+							canvas.add( obj );
+							canvas.sendToBack( obj );
+						} );
+						canvas.requestRenderAll();
+						afterTemplate();
+					},
+					'fabric'
+				);
+			} );
+		} );
+	}
 
-				canvas.backgroundImage = img;
-				canvas.requestRenderAll();
-				applyResponsiveScale();
-			},
-			{ crossOrigin: 'anonymous' }
-		);
+	function switchDesignView( viewId ) {
+		if ( viewId === activeViewId ) {
+			return;
+		}
+		loadDesignView( viewId );
 	}
 
 	/**
@@ -231,22 +425,22 @@
 			return;
 		}
 
+		const region = getConstraintRect();
 		obj.setCoords();
 		const rect = obj.getBoundingRect( true );
-		const pad = 2;
 		let deltaX = 0;
 		let deltaY = 0;
 
-		if ( rect.left < pad ) {
-			deltaX = pad - rect.left;
-		} else if ( rect.left + rect.width > PROD_WIDTH - pad ) {
-			deltaX = PROD_WIDTH - pad - ( rect.left + rect.width );
+		if ( rect.left < region.left ) {
+			deltaX = region.left - rect.left;
+		} else if ( rect.left + rect.width > region.left + region.width ) {
+			deltaX = region.left + region.width - ( rect.left + rect.width );
 		}
 
-		if ( rect.top < pad ) {
-			deltaY = pad - rect.top;
-		} else if ( rect.top + rect.height > PROD_HEIGHT - pad ) {
-			deltaY = PROD_HEIGHT - pad - ( rect.top + rect.height );
+		if ( rect.top < region.top ) {
+			deltaY = region.top - rect.top;
+		} else if ( rect.top + rect.height > region.top + region.height ) {
+			deltaY = region.top + region.height - ( rect.top + rect.height );
 		}
 
 		if ( deltaX !== 0 || deltaY !== 0 ) {
@@ -266,10 +460,11 @@
 			return;
 		}
 
+		const region = getConstraintRect();
 		obj.setCoords();
 		const rect = obj.getBoundingRect( true );
-		const maxW = PROD_WIDTH - 4;
-		const maxH = PROD_HEIGHT - 4;
+		const maxW = region.width;
+		const maxH = region.height;
 
 		if ( rect.width > maxW && obj.scaleX ) {
 			const factor = maxW / rect.width;
@@ -295,7 +490,7 @@
 	 * @returns {boolean}
 	 */
 	function isTemplateLayer( obj ) {
-		return !! obj && ( obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer );
+		return !! obj && ( obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer || obj.wcGpdBoundingBox );
 	}
 
 	function isTextLayer( obj ) {
@@ -371,7 +566,18 @@
 	 * @returns {boolean}
 	 */
 	function hasTextLayer() {
-		return getUsableTextLayers().length > 0;
+		persistCurrentViewDesign();
+		const current = getUsableTextLayers().length > 0;
+		if ( current ) {
+			return true;
+		}
+		return templateViews.some( ( view ) => {
+			const objects = viewDesigns[ view.id ] || [];
+			return objects.some( ( obj ) => {
+				const text = typeof obj.text === 'string' ? obj.text.trim() : '';
+				return text.length > 0;
+			} );
+		} );
 	}
 
 	/**
@@ -438,54 +644,6 @@
 	}
 
 	/**
-	 * Load locked template outline layers from product settings.
-	 *
-	 * @returns {Promise<void>}
-	 */
-	function loadTemplateOutlines() {
-		if ( ! config.templateJson ) {
-			return Promise.resolve();
-		}
-
-		return new Promise( ( resolve ) => {
-			let data;
-			try {
-				data = JSON.parse( config.templateJson );
-			} catch ( error ) {
-				resolve();
-				return;
-			}
-
-			if ( ! data.objects || ! data.objects.length ) {
-				resolve();
-				return;
-			}
-
-			fabric.util.enlivenObjects(
-				data.objects,
-				( objects ) => {
-					if ( objects && objects.length ) {
-						objects.forEach( ( obj ) => {
-							obj.wcGpdTemplateLayer = true;
-							obj.wcGpdOutlineLayer = !! obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline';
-							obj.wcGpdLayerType = obj.wcGpdOutlineLayer ? 'outline' : 'shape';
-							obj.selectable = false;
-							obj.evented = false;
-							obj.hasControls = false;
-							obj.hasBorders = false;
-							canvas.add( obj );
-							canvas.sendToBack( obj );
-						} );
-						canvas.requestRenderAll();
-					}
-					resolve();
-				},
-				'fabric'
-			);
-		} );
-	}
-
-	/**
 	 * Sync toolbar from active text object.
 	 *
 	 * @param {fabric.IText|null} obj Active text.
@@ -527,15 +685,17 @@
 	 * Add a new editable text layer.
 	 */
 	function addTextLayer() {
+		const region = getConstraintRect();
 		const text = new fabric.IText( 'Your text', {
-			left: PROD_WIDTH / 2,
-			top: PROD_HEIGHT / 2,
+			left: region.left + region.width / 2,
+			top: region.top + region.height / 2,
 			originX: 'center',
 			originY: 'center',
 			fontFamily: config.fonts[ 0 ],
 			fontSize: 32,
 			fill: '#000000',
 			wcGpdTextLayer: true,
+			wcGpdLayerType: 'text',
 		} );
 
 		canvas.add( text );
@@ -609,22 +769,19 @@
 	 * @returns {string}
 	 */
 	function exportDesignJson() {
-		const objects = canvas.getObjects()
-			.filter( ( obj ) => isDesignLayer( obj ) )
-			.map( ( obj ) => {
-				const data = obj.toObject( [ 'wcGpdTextLayer', 'wcGpdLayerType' ] );
-				if ( isUsableTextLayer( obj ) ) {
-					data.wcGpdLayerType = 'text';
-					data.wcGpdTextLayer = true;
-				} else {
-					data.wcGpdLayerType = 'shape';
-				}
-				return data;
-			} );
+		persistCurrentViewDesign();
+		const views = {};
+
+		templateViews.forEach( ( view ) => {
+			const objects = viewDesigns[ view.id ] || [];
+			if ( objects.length ) {
+				views[ view.id ] = { objects };
+			}
+		} );
 
 		return JSON.stringify( {
-			version: fabric.version,
-			objects,
+			version: 2,
+			views,
 		} );
 	}
 
@@ -1026,10 +1183,27 @@
 
 	function loadExistingDesign() {
 		if ( config.existingDesignJson ) {
+			try {
+				const data = JSON.parse( config.existingDesignJson );
+				if ( data.views && typeof data.views === 'object' ) {
+					Object.keys( data.views ).forEach( ( viewId ) => {
+						const entry = data.views[ viewId ];
+						if ( entry && Array.isArray( entry.objects ) ) {
+							viewDesigns[ viewId ] = entry.objects;
+						}
+					} );
+					const firstWithDesign = templateViews.find( ( view ) => viewDesigns[ view.id ] && viewDesigns[ view.id ].length );
+					if ( firstWithDesign ) {
+						activeViewId = firstWithDesign.id;
+					}
+					return loadDesignView( activeViewId );
+				}
+			} catch ( error ) {
+				log.warn( 'Failed to parse multi-view design JSON', error );
+			}
 			return loadDesignFromJson( config.existingDesignJson );
 		}
 
-		// Editing from cart: JSON only — SVG fallback creates phantom duplicate layers.
 		if ( config.isEditing ) {
 			return Promise.reject( new Error( 'no-json' ) );
 		}
@@ -1042,7 +1216,6 @@
 	}
 
 	initFontSelect();
-	loadBackground();
 	bindAddToCart();
 
 	if ( config.isEditing && config.i18n.updateCart ) {
@@ -1094,7 +1267,7 @@
 		requestAnimationFrame( () => {
 			applyResponsiveScale();
 
-			loadTemplateOutlines().then( () => {
+			loadDesignView( activeViewId ).then( () => {
 				if ( config.isEditing || config.existingDesignJson || config.existingDesignSvg ) {
 					loadExistingDesign().catch( () => {
 						log.warn( 'Failed to load saved design; starting fresh' );

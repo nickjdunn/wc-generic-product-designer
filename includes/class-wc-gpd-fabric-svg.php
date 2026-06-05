@@ -73,7 +73,7 @@ class WC_GPD_Fabric_Svg {
 		if ( ! empty( $object['wcGpdLayerType'] ) ) {
 			return sanitize_key( (string) $object['wcGpdLayerType'] );
 		}
-		if ( ! empty( $object['wcGpdOutlineLayer'] ) ) {
+		if ( ! empty( $object['wcGpdBoundingBox'] ) || ! empty( $object['wcGpdOutlineLayer'] ) ) {
 			return 'outline';
 		}
 		if ( ! empty( $object['wcGpdTextLayer'] ) ) {

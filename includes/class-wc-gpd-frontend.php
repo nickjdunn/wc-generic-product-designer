@@ -148,6 +148,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'canvasHeight' => $settings['height'],
 				'templateUrl'        => $settings['template_url'],
 				'templateJson'       => $settings['template_json'],
+				'templateViews'      => self::template_views_for_js( $settings ),
+				'maxViews'           => $settings['max_views'],
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'          => self::NONCE_NAME,
@@ -182,6 +184,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
 					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
 					'noLayers'        => __( 'No layers yet. Add a text layer to begin.', 'wc-generic-product-designer' ),
+					'designArea'      => __( 'Design area', 'wc-generic-product-designer' ),
+					'switchArea'      => __( 'Switch design area', 'wc-generic-product-designer' ),
 					'orderEditNotice' => __( 'You are editing this order design. Save when finished, then return to the order to download.', 'wc-generic-product-designer' ),
 					'saveOrderDesign' => __( 'Save design to order', 'wc-generic-product-designer' ),
 					'orderSaved'      => __( 'Design saved to order.', 'wc-generic-product-designer' ),
@@ -308,8 +312,16 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					</div>
 				</div>
 				</div>
-				<div class="wc-gpd-designer__canvas-wrap">
-					<canvas id="wc-gpd-canvas" aria-label="<?php esc_attr_e( 'Design canvas', 'wc-generic-product-designer' ); ?>"></canvas>
+				<div class="wc-gpd-designer__canvas-column">
+					<div
+						class="wc-gpd-view-switcher"
+						id="wc-gpd-view-switcher"
+						role="tablist"
+						aria-label="<?php esc_attr_e( 'Switch design area', 'wc-generic-product-designer' ); ?>"
+					></div>
+					<div class="wc-gpd-designer__canvas-wrap">
+						<canvas id="wc-gpd-canvas" aria-label="<?php esc_attr_e( 'Design canvas', 'wc-generic-product-designer' ); ?>"></canvas>
+					</div>
 				</div>
 			</div>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
@@ -411,5 +423,54 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			'svg'      => $svg,
 			'json'     => $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true ),
 		);
+	}
+
+	/**
+	 * Build template view payloads for the storefront designer.
+	 *
+	 * @param array $settings Product designer settings.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function template_views_for_js( $settings ) {
+		$views    = array();
+		$fallback = ! empty( $settings['template_url'] ) ? $settings['template_url'] : '';
+		$parsed   = isset( $settings['template_views'] ) && is_array( $settings['template_views'] )
+			? $settings['template_views']
+			: WC_GPD_Template_Json::empty_document();
+
+		if ( empty( $parsed['views'] ) || ! is_array( $parsed['views'] ) ) {
+			return array(
+				array(
+					'id'              => 'view_front',
+					'label'           => __( 'Front', 'wc-generic-product-designer' ),
+					'templateUrl'     => $fallback,
+					'boundingBoxUid'  => '',
+					'objects'         => array(),
+				),
+			);
+		}
+
+		foreach ( $parsed['views'] as $view ) {
+			if ( ! is_array( $view ) || empty( $view['id'] ) ) {
+				continue;
+			}
+
+			$image_id = ! empty( $view['template_image_id'] ) ? absint( $view['template_image_id'] ) : 0;
+			if ( ! $image_id && ! empty( $settings['template_id'] ) ) {
+				$image_id = absint( $settings['template_id'] );
+			}
+
+			$url = $image_id ? wp_get_attachment_image_url( $image_id, 'full' ) : $fallback;
+
+			$views[] = array(
+				'id'             => sanitize_key( (string) $view['id'] ),
+				'label'          => ! empty( $view['label'] ) ? sanitize_text_field( (string) $view['label'] ) : sanitize_key( (string) $view['id'] ),
+				'templateUrl'    => $url ? $url : '',
+				'boundingBoxUid' => ! empty( $view['bounding_box_uid'] ) ? sanitize_text_field( (string) $view['bounding_box_uid'] ) : '',
+				'objects'        => ! empty( $view['objects'] ) && is_array( $view['objects'] ) ? $view['objects'] : array(),
+			);
+		}
+
+		return $views;
 	}
 }
