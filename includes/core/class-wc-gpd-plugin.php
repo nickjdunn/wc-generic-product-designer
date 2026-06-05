@@ -22,6 +22,7 @@ final class WC_GPD_Plugin {
 	 */
 	private $modules = array(
 		WC_GPD_Debug::class,
+		WC_GPD_Admin_Templates::class,
 		WC_GPD_Admin_Settings::class,
 		WC_GPD_Admin_Product::class,
 		WC_GPD_Frontend::class,

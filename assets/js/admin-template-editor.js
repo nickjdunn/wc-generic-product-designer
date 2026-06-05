@@ -27,8 +27,17 @@
 		return;
 	}
 
-	const width = parseInt( widthInput ? widthInput.value : '800', 10 ) || 800;
-	const height = parseInt( heightInput ? heightInput.value : '600', 10 ) || 600;
+	function readCanvasDimensions() {
+		const wField = document.getElementById( 'wc_gpd_canvas_width' );
+		const hField = document.getElementById( 'wc_gpd_canvas_height' );
+		const w = parseInt( wField ? wField.value : ( widthInput ? widthInput.value : '800' ), 10 ) || 800;
+		const h = parseInt( hField ? hField.value : ( heightInput ? heightInput.value : '600' ), 10 ) || 600;
+		return { width: w, height: h };
+	}
+
+	let dims = readCanvasDimensions();
+	let width = dims.width;
+	let height = dims.height;
 	const maxViews = parseInt( maxViewsInput ? maxViewsInput.value : '1', 10 ) || 1;
 
 	function readDefault( id, fallback ) {
@@ -431,6 +440,32 @@
 		loadView( documentData.views[ 0 ].id );
 	}
 
+	function syncDimensionFields() {
+		dims = readCanvasDimensions();
+		width = dims.width;
+		height = dims.height;
+		if ( widthInput ) {
+			widthInput.value = String( width );
+		}
+		if ( heightInput ) {
+			heightInput.value = String( height );
+		}
+		const label = document.getElementById( 'wc-gpd-canvas-size-label' );
+		if ( label ) {
+			label.textContent = `${ width } × ${ height } px`;
+		}
+	}
+
+	function resizeCanvasDimensions() {
+		syncDimensionFields();
+		canvas.setWidth( width );
+		canvas.setHeight( height );
+		canvas.backgroundColor = canvasBgColor();
+		canvas.calcOffset();
+		canvas.requestRenderAll();
+		applyResponsiveScale();
+	}
+
 	function applyResponsiveScale() {
 		const col = editorRoot ? editorRoot.querySelector( '.wc-gpd-tpl-canvas-col' ) : null;
 		if ( ! col ) {
@@ -550,6 +585,8 @@
 	$( '.wc-gpd-add-template-circle' ).on( 'click', addCircle );
 	$( '#wc-gpd-template-add-view' ).on( 'click', addView );
 	$( '#wc-gpd-template-rename-view' ).on( 'click', renameView );
+	$( '#wc_gpd_canvas_width, #wc_gpd_canvas_height' ).on( 'change input', resizeCanvasDimensions );
+
 	$( '#wc_gpd_max_design_views' ).on( 'change', () => {
 		while ( documentData.views.length > getMaxViews() ) {
 			documentData.views.pop();
@@ -562,7 +599,7 @@
 		editorRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
 	}
 
-	$( '#post' ).on( 'submit', saveJson );
+	$( '#wc-gpd-template-form, #post' ).on( 'submit', saveJson );
 	$( document ).on( 'click', '#publish, #save-post', saveJson );
 	window.addEventListener( 'resize', applyResponsiveScale );
 

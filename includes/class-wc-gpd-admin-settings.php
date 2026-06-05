@@ -44,8 +44,8 @@ class WC_GPD_Admin_Settings implements WC_GPD_Module {
 	public function register_menu() {
 		add_submenu_page(
 			'woocommerce',
-			__( 'Product Designer', 'wc-generic-product-designer' ),
-			__( 'Product Designer', 'wc-generic-product-designer' ),
+			__( 'Export defaults', 'wc-generic-product-designer' ),
+			__( 'Export defaults', 'wc-generic-product-designer' ),
 			'manage_woocommerce',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )

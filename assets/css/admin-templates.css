@@ -1,0 +1,156 @@
+/**
+ * Full-page Template Designer admin UI.
+ */
+
+.wc-gpd-template-edit-wrap {
+	max-width: none;
+}
+
+.wc-gpd-fullpage-panel {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 0;
+	margin-top: 12px;
+}
+
+.wc-gpd-template-title-row {
+	padding: 16px 20px 0;
+	margin: 0;
+}
+
+.wc-gpd-template-title-row label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.wc-gpd-template-form .wc-gpd-product-subtabs-nav {
+	padding: 12px 20px 0;
+	margin: 0;
+}
+
+.wc-gpd-template-form .wc-gpd-product-subtab-panel {
+	padding: 16px 20px 20px;
+}
+
+.wc-gpd-template-form .wc-gpd-product-subtab-panel[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-template-submit {
+	padding: 0 20px 20px;
+}
+
+/* Settings cards — isolated from WooCommerce product panel CSS */
+.wc-gpd-template-designer-panel .wc-gpd-settings-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 260px, 1fr ) );
+	gap: 16px;
+	padding: 0;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-grid--2 {
+	grid-template-columns: repeat( auto-fill, minmax( 320px, 1fr ) );
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-card {
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 14px 16px;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-card h4 {
+	margin: 0 0 12px;
+	font-size: 13px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-card p {
+	margin: 0 0 10px;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-check {
+	display: block;
+	margin: 0 0 8px;
+	font-weight: 400;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-check input {
+	margin-right: 6px;
+	vertical-align: middle;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-color {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-card label {
+	float: none;
+	width: auto;
+	margin: 0;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-card input[type="number"] {
+	width: 90px;
+}
+
+.wc-gpd-template-designer-panel #wc_gpd_subtab_general label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.wc-gpd-template-designer-panel #wc_gpd_subtab_general input[type="number"] {
+	width: 120px;
+}
+
+/* Template canvas area — full width */
+.wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
+	grid-template-columns: 240px 1fr;
+	min-height: 480px;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-tpl-canvas-col {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.wc-gpd-canvas-size-label {
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: #646970;
+	font-weight: 600;
+}
+
+.wc-gpd-template-designer-panel #wc-gpd-template-canvas {
+	border: 1px solid #a7aaad;
+	box-shadow: 0 1px 3px rgba( 0, 0, 0, 0.08 );
+}
+
+/* Product apply panel */
+.wc-gpd-product-apply-panel .wc-gpd-product-template-preview {
+	padding: 12px 16px;
+	margin: 8px 12px 16px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.wc-gpd-product-apply-panel .wc-gpd-template-preview-box {
+	margin: 10px 0;
+	max-width: 100%;
+}
+
+@media ( max-width: 1100px ) {
+	.wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
+		grid-template-columns: 1fr;
+	}
+}

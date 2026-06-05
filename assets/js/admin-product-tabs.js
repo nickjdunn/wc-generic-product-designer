@@ -4,7 +4,8 @@
 ( function ( $ ) {
 	'use strict';
 
-	const panel = document.getElementById( 'wc_gpd_product_designer_panel' );
+	const panel = document.getElementById( 'wc_gpd_template_designer_panel' )
+		|| document.getElementById( 'wc_gpd_product_designer_panel' );
 	if ( ! panel ) {
 		return;
 	}
