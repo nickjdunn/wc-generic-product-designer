@@ -80,6 +80,7 @@ class WC_GPD_Product_Meta {
 					'template_json'    => $template['template_json'],
 					'template_views'   => $template['template_views'],
 					'max_views'        => $template['max_views'],
+					'graphic_library'  => $template['graphic_library'],
 					'product_settings' => $product_settings,
 				);
 			}

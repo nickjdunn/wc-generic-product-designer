@@ -23,6 +23,9 @@ class WC_GPD_Template_Json {
 		'circle',
 		'ellipse',
 		'image',
+		'i-text',
+		'text',
+		'textbox',
 	);
 
 	/**
@@ -91,11 +94,11 @@ class WC_GPD_Template_Json {
 	 */
 	public static function empty_view( $id, $label ) {
 		return array(
-			'id'               => sanitize_key( $id ),
-			'label'            => sanitize_text_field( $label ),
+			'id'                => sanitize_key( $id ),
+			'label'             => sanitize_text_field( $label ),
 			'template_image_id' => 0,
-			'bounding_box_uid' => '',
-			'objects'          => array(),
+			'bounding_box_uid'  => '',
+			'objects'           => array(),
 		);
 	}
 
@@ -130,8 +133,8 @@ class WC_GPD_Template_Json {
 			$objects = self::sanitize_objects( $data['objects'] );
 		}
 
-		$view = self::empty_view( 'view_front', __( 'Front', 'wc-generic-product-designer' ) );
-		$view['objects'] = $objects;
+		$view                     = self::empty_view( 'view_front', __( 'Front', 'wc-generic-product-designer' ) );
+		$view['objects']          = $objects;
 		$view['bounding_box_uid'] = self::find_bounding_box_uid( $objects );
 
 		return array(
@@ -150,7 +153,7 @@ class WC_GPD_Template_Json {
 			return null;
 		}
 
-		$label = ! empty( $view['label'] ) ? sanitize_text_field( (string) $view['label'] ) : $id;
+		$label   = ! empty( $view['label'] ) ? sanitize_text_field( (string) $view['label'] ) : $id;
 		$objects = ! empty( $view['objects'] ) && is_array( $view['objects'] )
 			? self::sanitize_objects( $view['objects'] )
 			: array();
@@ -186,40 +189,137 @@ class WC_GPD_Template_Json {
 
 			$uid = ! empty( $object['wcGpdUid'] ) ? sanitize_text_field( (string) $object['wcGpdUid'] ) : 'gpd-' . wp_generate_password( 10, false );
 
+			if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
+				$clean[] = self::sanitize_text_object( $object, $type, $uid );
+				continue;
+			}
+
 			if ( 'image' === $type ) {
-				$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
-				if ( ! $src ) {
-					continue;
+				$clean_obj = self::sanitize_image_object( $object, $uid );
+				if ( $clean_obj ) {
+					$clean[] = $clean_obj;
 				}
-				$object['type']               = 'image';
-				$object['src']                = $src;
-				$object['wcGpdUid']           = $uid;
-				$object['wcGpdTemplateLayer'] = true;
-				$object['wcGpdMockupImage']   = true;
-				$object['wcGpdMockupVisible'] = ! isset( $object['wcGpdMockupVisible'] ) || ! empty( $object['wcGpdMockupVisible'] );
-				$object['wcGpdLayerType']     = 'mockup';
-				$object['wcGpdAttachmentId']  = isset( $object['wcGpdAttachmentId'] ) ? absint( $object['wcGpdAttachmentId'] ) : 0;
-				$object['wcGpdOutlineLayer']  = false;
-				$object['wcGpdBoundingBox']   = false;
-				$clean[] = $object;
 				continue;
 			}
 
 			$is_outline = ! empty( $object['wcGpdOutlineLayer'] );
 			$is_bbox    = $is_outline && ! empty( $object['wcGpdBoundingBox'] );
+			$layer_type = ! empty( $object['wcGpdLayerType'] ) ? sanitize_key( (string) $object['wcGpdLayerType'] ) : ( $is_outline ? 'outline' : 'shape' );
+			if ( 'graphic_slot' === $layer_type ) {
+				$is_outline = false;
+				$is_bbox    = false;
+			}
 
 			$object['wcGpdUid']           = $uid;
 			$object['wcGpdTemplateLayer'] = true;
 			$object['wcGpdOutlineLayer']  = $is_outline;
 			$object['wcGpdBoundingBox']   = $is_bbox;
-			$object['wcGpdLayerType']     = $is_outline ? 'outline' : 'shape';
+			$object['wcGpdLayerType']     = $layer_type;
 			$object['selectable']         = false;
 			$object['evented']            = false;
+
+			if ( 'graphic_slot' === $layer_type ) {
+				$object['wcGpdCustomerMovable']   = ! empty( $object['wcGpdCustomerMovable'] );
+				$object['wcGpdCustomerResizable'] = ! empty( $object['wcGpdCustomerResizable'] );
+			}
 
 			$clean[] = $object;
 		}
 
 		return $clean;
+	}
+
+	/**
+	 * @param array  $object Fabric text object.
+	 * @param string $type   Object type.
+	 * @param string $uid    Layer UID.
+	 * @return array|null
+	 */
+	private static function sanitize_text_object( array $object, $type, $uid ) {
+		$text = isset( $object['text'] ) ? (string) $object['text'] : '';
+		$layer_type = ! empty( $object['wcGpdLayerType'] ) ? sanitize_key( (string) $object['wcGpdLayerType'] ) : 'text';
+		if ( ! in_array( $layer_type, array( 'text', 'placeholder' ), true ) ) {
+			$layer_type = 'text';
+		}
+
+		if ( 'placeholder' === $layer_type && '' === trim( $text ) ) {
+			$text = __( 'Your text', 'wc-generic-product-designer' );
+		}
+
+		if ( 'text' === $layer_type && '' === trim( $text ) ) {
+			return null;
+		}
+
+		$object['type']               = $type;
+		$object['text']               = sanitize_textarea_field( $text );
+		$object['wcGpdUid']           = $uid;
+		$object['wcGpdTemplateLayer'] = true;
+		$object['wcGpdLayerType']     = $layer_type;
+		$object['wcGpdOutlineLayer']  = false;
+		$object['wcGpdBoundingBox']   = false;
+		$object['wcGpdShrinkToFit']   = ! empty( $object['wcGpdShrinkToFit'] );
+		$object['wcGpdLockFont']      = ! empty( $object['wcGpdLockFont'] );
+		$object['wcGpdLockSize']      = ! empty( $object['wcGpdLockSize'] );
+		$object['wcGpdLockColor']     = ! empty( $object['wcGpdLockColor'] );
+		$object['wcGpdLockBold']      = ! empty( $object['wcGpdLockBold'] );
+		$object['wcGpdLockItalic']    = ! empty( $object['wcGpdLockItalic'] );
+		$object['wcGpdLockAlign']     = ! empty( $object['wcGpdLockAlign'] );
+		$object['wcGpdLockMove']      = ! empty( $object['wcGpdLockMove'] );
+		$object['wcGpdLockScale']     = ! empty( $object['wcGpdLockScale'] );
+
+		if ( 'placeholder' === $layer_type ) {
+			$key = ! empty( $object['wcGpdPlaceholderKey'] ) ? sanitize_key( (string) $object['wcGpdPlaceholderKey'] ) : sanitize_key( $uid );
+			$object['wcGpdPlaceholderKey']   = $key;
+			$object['wcGpdPlaceholderLabel'] = ! empty( $object['wcGpdPlaceholderLabel'] )
+				? sanitize_text_field( (string) $object['wcGpdPlaceholderLabel'] )
+				: __( 'Field', 'wc-generic-product-designer' );
+		}
+
+		return $object;
+	}
+
+	/**
+	 * @param array  $object Fabric image object.
+	 * @param string $uid    Layer UID.
+	 * @return array|null
+	 */
+	private static function sanitize_image_object( array $object, $uid ) {
+		$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
+		if ( ! $src ) {
+			return null;
+		}
+
+		$is_graphic = ! empty( $object['wcGpdGraphicLayer'] );
+		if ( $is_graphic ) {
+			$layer_type = ! empty( $object['wcGpdGraphicSlot'] ) ? 'graphic_slot' : 'graphic';
+			$object['type']                 = 'image';
+			$object['src']                  = $src;
+			$object['wcGpdUid']             = $uid;
+			$object['wcGpdTemplateLayer']   = true;
+			$object['wcGpdGraphicLayer']    = true;
+			$object['wcGpdLayerType']       = $layer_type;
+			$object['wcGpdExportGraphic']   = ! isset( $object['wcGpdExportGraphic'] ) || ! empty( $object['wcGpdExportGraphic'] );
+			$object['wcGpdCustomerMovable'] = ! empty( $object['wcGpdCustomerMovable'] );
+			$object['wcGpdCustomerResizable'] = ! empty( $object['wcGpdCustomerResizable'] );
+			$object['wcGpdAttachmentId']    = isset( $object['wcGpdAttachmentId'] ) ? absint( $object['wcGpdAttachmentId'] ) : 0;
+			$object['wcGpdOutlineLayer']    = false;
+			$object['wcGpdBoundingBox']     = false;
+			$object['wcGpdMockupImage']     = false;
+			return $object;
+		}
+
+		$object['type']               = 'image';
+		$object['src']                = $src;
+		$object['wcGpdUid']           = $uid;
+		$object['wcGpdTemplateLayer'] = true;
+		$object['wcGpdMockupImage']   = true;
+		$object['wcGpdMockupVisible'] = ! isset( $object['wcGpdMockupVisible'] ) || ! empty( $object['wcGpdMockupVisible'] );
+		$object['wcGpdLayerType']     = 'mockup';
+		$object['wcGpdAttachmentId']  = isset( $object['wcGpdAttachmentId'] ) ? absint( $object['wcGpdAttachmentId'] ) : 0;
+		$object['wcGpdOutlineLayer']  = false;
+		$object['wcGpdBoundingBox']   = false;
+
+		return $object;
 	}
 
 	/**

@@ -44,6 +44,34 @@ class WC_GPD_Fabric_Svg {
 	 * @param string $type    outline|text|shape.
 	 * @return array
 	 */
+	/**
+	 * Template graphics marked for production export.
+	 *
+	 * @param array $objects Template objects.
+	 * @return array
+	 */
+	public static function filter_export_graphics( $objects ) {
+		if ( ! is_array( $objects ) ) {
+			return array();
+		}
+
+		$filtered = array();
+		foreach ( $objects as $object ) {
+			if ( ! is_array( $object ) ) {
+				continue;
+			}
+			if ( 'graphic' !== self::resolve_layer_type( $object ) ) {
+				continue;
+			}
+			if ( isset( $object['wcGpdExportGraphic'] ) && empty( $object['wcGpdExportGraphic'] ) ) {
+				continue;
+			}
+			$filtered[] = $object;
+		}
+
+		return $filtered;
+	}
+
 	public static function filter_by_layer_type( $objects, $type ) {
 		if ( ! is_array( $objects ) ) {
 			return array();
@@ -112,8 +140,14 @@ class WC_GPD_Fabric_Svg {
 		if ( ! empty( $object['wcGpdBoundingBox'] ) || ! empty( $object['wcGpdOutlineLayer'] ) ) {
 			return 'outline';
 		}
+		if ( ! empty( $object['wcGpdGraphicLayer'] ) || in_array( sanitize_key( (string) ( $object['wcGpdLayerType'] ?? '' ) ), array( 'graphic', 'graphic_slot' ), true ) ) {
+			return ! empty( $object['wcGpdGraphicSlot'] ) || 'graphic_slot' === ( $object['wcGpdLayerType'] ?? '' ) ? 'graphic_slot' : 'graphic';
+		}
 		if ( ! empty( $object['wcGpdMockupImage'] ) || ( ! empty( $object['wcGpdLayerType'] ) && 'mockup' === $object['wcGpdLayerType'] ) ) {
 			return 'mockup';
+		}
+		if ( ! empty( $object['wcGpdLayerType'] ) && 'placeholder' === $object['wcGpdLayerType'] ) {
+			return 'placeholder';
 		}
 		if ( ! empty( $object['wcGpdTextLayer'] ) ) {
 			return 'text';

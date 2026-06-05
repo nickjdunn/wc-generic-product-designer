@@ -14,10 +14,11 @@ class WC_GPD_Design_Template {
 
 	const POST_TYPE = 'wc_gpd_template';
 
-	const META_CANVAS_WIDTH     = '_wc_gpd_canvas_width';
-	const META_CANVAS_HEIGHT    = '_wc_gpd_canvas_height';
-	const META_TEMPLATE_JSON    = '_wc_gpd_template_json';
-	const META_MAX_DESIGN_VIEWS = '_wc_gpd_max_design_views';
+	const META_CANVAS_WIDTH      = '_wc_gpd_canvas_width';
+	const META_CANVAS_HEIGHT     = '_wc_gpd_canvas_height';
+	const META_TEMPLATE_JSON     = '_wc_gpd_template_json';
+	const META_MAX_DESIGN_VIEWS  = '_wc_gpd_max_design_views';
+	const META_GRAPHIC_LIBRARY   = '_wc_gpd_graphic_library';
 
 	/**
 	 * Register post type.
@@ -111,6 +112,7 @@ class WC_GPD_Design_Template {
 			'template_json'    => $template_json,
 			'template_views'   => WC_GPD_Template_Json::parse( $template_json ),
 			'max_views'        => $max_views,
+			'graphic_library'  => self::get_graphic_library( $template_id ),
 			'product_settings' => WC_GPD_Product_Settings::get( $template_id ),
 		);
 	}
@@ -186,7 +188,74 @@ class WC_GPD_Design_Template {
 			update_post_meta( $template_id, self::META_TEMPLATE_JSON, $json );
 		}
 
+		$library_raw = isset( $_POST['wc_gpd_graphic_library'] ) ? wp_unslash( $_POST['wc_gpd_graphic_library'] ) : '';
+		$library     = self::sanitize_graphic_library( is_string( $library_raw ) ? $library_raw : '' );
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( $library ) );
+
 		WC_GPD_Product_Settings::save( $template_id, WC_GPD_Product_Settings::from_post( wp_unslash( $_POST ) ) );
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array<int,array{id:int,url:string,title:string}>
+	 */
+	public static function get_graphic_library( $template_id ) {
+		$template_id = absint( $template_id );
+		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, true );
+		$ids         = array();
+
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) ) {
+				$ids = $decoded;
+			}
+		} elseif ( is_array( $raw ) ) {
+			$ids = $raw;
+		}
+
+		$library = array();
+		foreach ( $ids as $id ) {
+			$attachment_id = absint( $id );
+			if ( ! $attachment_id ) {
+				continue;
+			}
+			$url = wp_get_attachment_url( $attachment_id );
+			if ( ! $url ) {
+				continue;
+			}
+			$library[] = array(
+				'id'    => $attachment_id,
+				'url'   => $url,
+				'title' => get_the_title( $attachment_id ),
+			);
+		}
+
+		return $library;
+	}
+
+	/**
+	 * @param string $json JSON array of attachment IDs.
+	 * @return int[]
+	 */
+	public static function sanitize_graphic_library( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return array();
+		}
+
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return array();
+		}
+
+		$clean = array();
+		foreach ( $data as $id ) {
+			$attachment_id = absint( $id );
+			if ( $attachment_id && wp_get_attachment_url( $attachment_id ) ) {
+				$clean[] = $attachment_id;
+			}
+		}
+
+		return array_values( array_unique( $clean ) );
 	}
 
 	/**

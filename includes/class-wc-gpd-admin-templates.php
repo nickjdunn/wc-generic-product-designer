@@ -238,34 +238,12 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 					</p>
 
 					<nav class="wc-gpd-product-subtabs-nav">
-						<a href="#wc_gpd_subtab_general" class="wc-gpd-product-subtab-link is-active"><?php esc_html_e( 'Canvas', 'wc-generic-product-designer' ); ?></a>
-						<a href="#wc_gpd_subtab_template" class="wc-gpd-product-subtab-link"><?php esc_html_e( 'Template', 'wc-generic-product-designer' ); ?></a>
+						<a href="#wc_gpd_subtab_template" class="wc-gpd-product-subtab-link is-active"><?php esc_html_e( 'Template', 'wc-generic-product-designer' ); ?></a>
 						<a href="#wc_gpd_subtab_tools" class="wc-gpd-product-subtab-link"><?php esc_html_e( 'Customer tools', 'wc-generic-product-designer' ); ?></a>
 						<a href="#wc_gpd_subtab_settings" class="wc-gpd-product-subtab-link"><?php esc_html_e( 'Settings', 'wc-generic-product-designer' ); ?></a>
 					</nav>
 
-					<div id="wc_gpd_subtab_general" class="wc-gpd-product-subtab-panel">
-						<div class="wc-gpd-settings-grid wc-gpd-settings-grid--2">
-							<div class="wc-gpd-settings-card">
-								<h4><?php esc_html_e( 'Production canvas', 'wc-generic-product-designer' ); ?></h4>
-								<p class="description"><?php esc_html_e( 'Exact pixel size used on the customer designer and exports.', 'wc-generic-product-designer' ); ?></p>
-								<p>
-									<label for="wc_gpd_canvas_width"><?php esc_html_e( 'Width (px)', 'wc-generic-product-designer' ); ?></label>
-									<input type="number" id="wc_gpd_canvas_width" name="wc_gpd_canvas_width" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
-								</p>
-								<p>
-									<label for="wc_gpd_canvas_height"><?php esc_html_e( 'Height (px)', 'wc-generic-product-designer' ); ?></label>
-									<input type="number" id="wc_gpd_canvas_height" name="wc_gpd_canvas_height" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
-								</p>
-								<p>
-									<label for="wc_gpd_max_design_views"><?php esc_html_e( 'Maximum design areas', 'wc-generic-product-designer' ); ?></label>
-									<input type="number" id="wc_gpd_max_design_views" name="wc_gpd_max_design_views" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_VIEWS ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_VIEWS ); ?>" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
-								</p>
-							</div>
-						</div>
-					</div>
-
-					<div id="wc_gpd_subtab_template" class="wc-gpd-product-subtab-panel" hidden>
+					<div id="wc_gpd_subtab_template" class="wc-gpd-product-subtab-panel">
 						<?php $this->render_template_canvas( $settings, $template_json, $ps ); ?>
 					</div>
 
@@ -292,9 +270,31 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 * @param array  $ps            Product settings.
 	 */
 	private function render_template_canvas( $settings, $template_json, $ps ) {
+		$graphic_library_json = wp_json_encode( array_column( $settings['graphic_library'], 'id' ) );
 		?>
+		<div class="wc-gpd-template-canvas-settings">
+			<div class="wc-gpd-settings-grid wc-gpd-settings-grid--3">
+				<div class="wc-gpd-settings-card">
+					<h4><?php esc_html_e( 'Production canvas', 'wc-generic-product-designer' ); ?></h4>
+					<p class="description"><?php esc_html_e( 'Exact pixel size used on the customer designer and exports.', 'wc-generic-product-designer' ); ?></p>
+					<p>
+						<label for="wc_gpd_canvas_width"><?php esc_html_e( 'Width (px)', 'wc-generic-product-designer' ); ?></label>
+						<input type="number" id="wc_gpd_canvas_width" name="wc_gpd_canvas_width" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
+					</p>
+					<p>
+						<label for="wc_gpd_canvas_height"><?php esc_html_e( 'Height (px)', 'wc-generic-product-designer' ); ?></label>
+						<input type="number" id="wc_gpd_canvas_height" name="wc_gpd_canvas_height" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_DIMENSION ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_DIMENSION ); ?>" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
+					</p>
+					<p>
+						<label for="wc_gpd_max_design_views"><?php esc_html_e( 'Maximum design areas', 'wc-generic-product-designer' ); ?></label>
+						<input type="number" id="wc_gpd_max_design_views" name="wc_gpd_max_design_views" min="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MIN_VIEWS ); ?>" max="<?php echo esc_attr( (string) WC_GPD_Product_Meta::MAX_VIEWS ); ?>" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
+					</p>
+				</div>
+			</div>
+		</div>
 		<div class="wc-gpd-template-editor-wrap" id="wc-gpd-template-editor-root">
 			<input type="hidden" id="wc_gpd_template_json" name="wc_gpd_template_json" value="<?php echo esc_attr( $template_json ); ?>" />
+			<input type="hidden" id="wc_gpd_graphic_library" name="wc_gpd_graphic_library" value="<?php echo esc_attr( $graphic_library_json ? $graphic_library_json : '[]' ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_max_views" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
@@ -313,6 +313,73 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</div>
 			<div class="wc-gpd-tpl-layout">
 				<aside class="wc-gpd-tpl-sidebar">
+					<div class="wc-gpd-tpl-panel wc-gpd-tpl-panel--layers">
+						<h4><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></h4>
+						<ul class="wc-gpd-tpl-layers-list" id="wc-gpd-template-layers-list"></ul>
+						<p class="wc-gpd-tpl-hint" id="wc-gpd-layers-empty-hint"><?php esc_html_e( 'Layers appear here as you add content.', 'wc-generic-product-designer' ); ?></p>
+					</div>
+					<div class="wc-gpd-tpl-panel">
+						<h4><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></h4>
+						<div class="wc-gpd-tpl-btn-row">
+							<button type="button" class="button button-small" id="wc-gpd-template-add-text"><?php esc_html_e( 'Fixed text', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button button-small" id="wc-gpd-template-add-placeholder"><?php esc_html_e( 'Variable field', 'wc-generic-product-designer' ); ?></button>
+						</div>
+						<div class="wc-gpd-tpl-selection" id="wc-gpd-text-props" hidden>
+							<p><label><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_template_text_content" class="widefat" /></label></p>
+							<p><label><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?> <select id="wc_gpd_template_font_family"><option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times New Roman</option><option value="Courier New">Courier New</option><option value="Verdana">Verdana</option></select></label></p>
+							<p><label><?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_template_font_size" min="8" max="400" value="32" /></label></p>
+							<p><label><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?> <input type="color" id="wc_gpd_template_text_color" value="#000000" /></label></p>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_template_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
+							<fieldset class="wc-gpd-tpl-locks">
+								<legend><?php esc_html_e( 'Lock for customer', 'wc-generic-product-designer' ); ?></legend>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_font" /> <?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_size" /> <?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_color" /> <?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_bold" /> <?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_italic" /> <?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_align" /> <?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_move" /> <?php esc_html_e( 'Position', 'wc-generic-product-designer' ); ?></label>
+							</fieldset>
+						</div>
+						<div class="wc-gpd-tpl-selection" id="wc-gpd-placeholder-props" hidden>
+							<p><label><?php esc_html_e( 'Field label', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_placeholder_label" class="widefat" /></label></p>
+							<p><label><?php esc_html_e( 'Field key', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_placeholder_key" class="widefat" /></label></p>
+							<p><label><?php esc_html_e( 'Default / hint', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_placeholder_default" class="widefat" /></label></p>
+							<p><label><?php esc_html_e( 'Box width', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_placeholder_width" min="40" max="2000" value="240" /></label></p>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_placeholder_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
+							<fieldset class="wc-gpd-tpl-locks">
+								<legend><?php esc_html_e( 'Lock for customer', 'wc-generic-product-designer' ); ?></legend>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_font" /> <?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_size" /> <?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_color" /> <?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_bold" /> <?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_italic" /> <?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_align" /> <?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></label>
+								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_ph_lock_move" /> <?php esc_html_e( 'Position', 'wc-generic-product-designer' ); ?></label>
+							</fieldset>
+						</div>
+					</div>
+					<div class="wc-gpd-tpl-panel">
+						<h4><?php esc_html_e( 'Graphics', 'wc-generic-product-designer' ); ?></h4>
+						<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Upload artwork customers can pick, or fixed graphics for production files.', 'wc-generic-product-designer' ); ?></p>
+						<div class="wc-gpd-tpl-btn-row">
+							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic"><?php esc_html_e( 'Fixed graphic', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?></button>
+						</div>
+						<button type="button" class="button button-small" id="wc-gpd-manage-graphic-library"><?php esc_html_e( 'Manage graphic library', 'wc-generic-product-designer' ); ?></button>
+						<ul class="wc-gpd-graphic-library-preview" id="wc-gpd-graphic-library-preview"></ul>
+						<div class="wc-gpd-tpl-selection" id="wc-gpd-graphic-props" hidden>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_graphic_export" checked="checked" /> <?php esc_html_e( 'Include in production file', 'wc-generic-product-designer' ); ?></label></p>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_graphic_lock_move" /> <?php esc_html_e( 'Lock position for customer', 'wc-generic-product-designer' ); ?></label></p>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_graphic_lock_scale" /> <?php esc_html_e( 'Lock size for customer', 'wc-generic-product-designer' ); ?></label></p>
+							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-graphic"><?php esc_html_e( 'Remove graphic', 'wc-generic-product-designer' ); ?></button>
+						</div>
+						<div class="wc-gpd-tpl-selection" id="wc-gpd-graphic-slot-props" hidden>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_slot_lock_move" /> <?php esc_html_e( 'Lock position for customer', 'wc-generic-product-designer' ); ?></label></p>
+							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_slot_lock_scale" /> <?php esc_html_e( 'Lock size for customer', 'wc-generic-product-designer' ); ?></label></p>
+							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-slot"><?php esc_html_e( 'Remove pick area', 'wc-generic-product-designer' ); ?></button>
+						</div>
+					</div>
 					<div class="wc-gpd-tpl-panel">
 						<h4><?php esc_html_e( 'Mockup photos', 'wc-generic-product-designer' ); ?></h4>
 						<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Upload slate photos. Drag and resize on canvas.', 'wc-generic-product-designer' ); ?></p>
@@ -335,7 +402,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" /> <?php esc_html_e( 'Production outline', 'wc-generic-product-designer' ); ?></label></p>
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_template_is_bbox" /> <?php esc_html_e( 'Bounding box', 'wc-generic-product-designer' ); ?></label></p>
 						</div>
-						<p class="wc-gpd-tpl-hint" id="wc-gpd-shape-props-hint"><?php esc_html_e( 'Select a shape or photo on the canvas.', 'wc-generic-product-designer' ); ?></p>
+						<p class="wc-gpd-tpl-hint" id="wc-gpd-shape-props-hint"><?php esc_html_e( 'Select a layer on the canvas to edit it.', 'wc-generic-product-designer' ); ?></p>
+						<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-layer"><?php esc_html_e( 'Delete selected layer', 'wc-generic-product-designer' ); ?></button>
 					</div>
 				</aside>
 				<div class="wc-gpd-tpl-canvas-col">
@@ -369,6 +437,11 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_line_height" value="1" <?php checked( $ps['allow_line_height'] ); ?> /> <?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_letter_spacing" value="1" <?php checked( $ps['allow_letter_spacing'] ); ?> /> <?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_text_align" value="1" <?php checked( $ps['allow_text_align'] ); ?> /> <?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></label></p>
+			</div>
+			<div class="wc-gpd-settings-card">
+				<h4><?php esc_html_e( 'Content', 'wc-generic-product-designer' ); ?></h4>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_free_text" value="1" <?php checked( $ps['allow_free_text'] ); ?> /> <?php esc_html_e( 'Allow customer to add free text', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_customer_graphics" value="1" <?php checked( $ps['allow_customer_graphics'] ); ?> /> <?php esc_html_e( 'Allow customer graphic picker', 'wc-generic-product-designer' ); ?></label></p>
 			</div>
 		</div>
 		<?php

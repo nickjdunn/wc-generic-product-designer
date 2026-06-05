@@ -169,6 +169,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'productSettings'    => ! empty( $settings['product_settings'] ) ? $settings['product_settings'] : WC_GPD_Product_Settings::get( $product_id ),
 				'replaceGallery'     => ! empty( $settings['product_settings']['replace_product_gallery'] ),
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
+				'graphicLibrary'     => ! empty( $settings['graphic_library'] ) ? $settings['graphic_library'] : array(),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'          => self::NONCE_NAME,
@@ -216,6 +217,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'viewPhotos'      => __( 'View listing photos', 'wc-generic-product-designer' ),
 					'closePhotos'     => __( 'Close', 'wc-generic-product-designer' ),
 					'addTextShort'    => __( 'Add text', 'wc-generic-product-designer' ),
+					'chooseGraphic'   => __( 'Choose graphic', 'wc-generic-product-designer' ),
+					'placeholderRequired' => __( 'Fill in the required fields before adding to cart.', 'wc-generic-product-designer' ),
 					'layers'          => __( 'Layers', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => array(
@@ -326,6 +329,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</p>
 			<?php endif; ?>
 			<div class="wc-gpd-designer__layout wc-gpd-designer__layout--compact">
+				<aside class="wc-gpd-designer__fields" id="wc-gpd-customer-fields" hidden>
+					<div class="wc-gpd-placeholder-fields" id="wc-gpd-placeholder-fields"></div>
+					<div class="wc-gpd-graphic-pickers" id="wc-gpd-graphic-pickers"></div>
+				</aside>
 				<div class="wc-gpd-designer__main">
 					<div class="wc-gpd-designer__topbar">
 						<div class="wc-gpd-view-switcher" id="wc-gpd-view-switcher" role="tablist" aria-label="<?php esc_attr_e( 'Switch design area', 'wc-generic-product-designer' ); ?>"></div>

@@ -27,6 +27,7 @@ class WC_GPD_Design_Json {
 		'rect',
 		'circle',
 		'ellipse',
+		'image',
 	);
 
 	/**
@@ -126,17 +127,39 @@ class WC_GPD_Design_Json {
 				continue;
 			}
 
-			if ( ! empty( $object['wcGpdTemplateLayer'] ) || ! empty( $object['wcGpdOutlineLayer'] ) || ! empty( $object['wcGpdBoundingBox'] ) ) {
+			if ( ! empty( $object['wcGpdOutlineLayer'] ) || ! empty( $object['wcGpdBoundingBox'] ) ) {
+				continue;
+			}
+
+			if ( ! empty( $object['wcGpdTemplateLayer'] ) && empty( $object['wcGpdPlaceholderKey'] ) && 'placeholder' !== ( $object['wcGpdLayerType'] ?? '' ) ) {
 				continue;
 			}
 
 			if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
 				$text = isset( $object['text'] ) ? trim( (string) $object['text'] ) : '';
-				if ( '' === $text ) {
+				$is_placeholder = ! empty( $object['wcGpdPlaceholderKey'] ) || ( ! empty( $object['wcGpdLayerType'] ) && 'placeholder' === $object['wcGpdLayerType'] );
+				if ( '' === $text && ! $is_placeholder ) {
 					continue;
 				}
-				$object['wcGpdLayerType'] = 'text';
+				$object['wcGpdLayerType'] = $is_placeholder ? 'placeholder' : 'text';
 				$object['wcGpdTextLayer']  = true;
+				if ( $is_placeholder && ! empty( $object['wcGpdPlaceholderKey'] ) ) {
+					$object['wcGpdPlaceholderKey'] = sanitize_key( (string) $object['wcGpdPlaceholderKey'] );
+				}
+			} elseif ( 'image' === $type ) {
+				$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
+				if ( ! $src ) {
+					continue;
+				}
+				$object['src']            = $src;
+				$object['wcGpdLayerType'] = 'graphic';
+				$object['wcGpdGraphicLayer'] = true;
+				if ( ! empty( $object['wcGpdGraphicSlotUid'] ) ) {
+					$object['wcGpdGraphicSlotUid'] = sanitize_text_field( (string) $object['wcGpdGraphicSlotUid'] );
+				}
+				if ( ! empty( $object['wcGpdAttachmentId'] ) ) {
+					$object['wcGpdAttachmentId'] = absint( $object['wcGpdAttachmentId'] );
+				}
 			} else {
 				$object['wcGpdLayerType'] = 'shape';
 			}

@@ -79,6 +79,70 @@
 	font-weight: 400;
 }
 
+.wc-gpd-template-canvas-settings {
+	margin-bottom: 12px;
+}
+
+.wc-gpd-template-designer-panel .wc-gpd-settings-grid--3 {
+	grid-template-columns: repeat( auto-fill, minmax( 280px, 1fr ) );
+}
+
+.wc-gpd-tpl-layers-list {
+	list-style: none;
+	margin: 0 0 8px;
+	padding: 0;
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.wc-gpd-tpl-layer-item {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 6px 8px;
+	margin-bottom: 4px;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #fff;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.wc-gpd-tpl-layer-item.is-active {
+	border-color: #2271b1;
+	background: #f0f6fc;
+}
+
+.wc-gpd-tpl-locks {
+	border: none;
+	margin: 8px 0 0;
+	padding: 0;
+}
+
+.wc-gpd-tpl-locks legend {
+	font-size: 11px;
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.wc-gpd-graphic-library-preview {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	list-style: none;
+	margin: 8px 0 0;
+	padding: 0;
+}
+
+.wc-gpd-graphic-library-preview img {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #fff;
+}
+
 .wc-gpd-template-designer-panel .wc-gpd-settings-check input {
 	margin-right: 6px;
 	vertical-align: middle;

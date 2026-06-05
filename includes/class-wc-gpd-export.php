@@ -188,9 +188,29 @@ class WC_GPD_Export {
 
 			if ( ! empty( $options['include_text'] ) ) {
 				$text_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'text' );
-				$text_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $text_objects );
+				if ( ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
+					$text_objects = array_merge(
+						$text_objects,
+						WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'text' )
+					);
+				}
+				$placeholder_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'placeholder' );
+				$text_objects        = array_merge( $text_objects, $placeholder_objects );
+				$text_markup         = WC_GPD_Fabric_Svg::objects_to_fragment( $text_objects );
 				if ( $text_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="text">' . $text_markup . '</g>';
+				}
+			}
+
+			if ( ! empty( $options['include_shapes'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
+				$graphic_objects = WC_GPD_Fabric_Svg::filter_export_graphics( $view['objects'] );
+				$graphic_objects = array_merge(
+					$graphic_objects,
+					WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'graphic' )
+				);
+				$graphic_markup = WC_GPD_Fabric_Svg::objects_to_fragment( $graphic_objects );
+				if ( $graphic_markup ) {
+					$parts[] = '<g data-wc-gpd-layer="graphics">' . $graphic_markup . '</g>';
 				}
 			}
 
