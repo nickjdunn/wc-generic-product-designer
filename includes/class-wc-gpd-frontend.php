@@ -170,6 +170,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'templateViews'      => self::template_views_for_js( $settings ),
 				'maxViews'           => $settings['max_views'],
 				'productSettings'    => ! empty( $settings['product_settings'] ) ? $settings['product_settings'] : WC_GPD_Product_Settings::get( $product_id ),
+				'templatePalettes'   => ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data(),
 				'replaceGallery'     => ! empty( $settings['product_settings']['replace_product_gallery'] ),
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
 				'graphicLibrary'     => ! empty( $settings['graphic_library'] ) ? $settings['graphic_library'] : array(),

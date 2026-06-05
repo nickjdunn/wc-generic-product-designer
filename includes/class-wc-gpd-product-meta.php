@@ -82,6 +82,7 @@ class WC_GPD_Product_Meta {
 					'max_views'         => $template['max_views'],
 					'graphic_library'   => $template['graphic_library'],
 					'graphic_libraries' => $template['graphic_libraries'],
+					'template_palettes' => $template['template_palettes'],
 					'product_settings'  => $product_settings,
 				);
 			}

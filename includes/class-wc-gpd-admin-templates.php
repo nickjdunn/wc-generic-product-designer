@@ -330,12 +330,14 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 * @param array  $ps            Product settings.
 	 */
 	private function render_template_canvas( $settings, $template_json, $ps ) {
-		$template_fonts_json = wp_json_encode( $settings['template_fonts'] );
+		$template_fonts_json    = wp_json_encode( $settings['template_fonts'] );
+		$template_palettes_json = wp_json_encode( ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data() );
 		$font_options           = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
 		?>
 		<div class="wc-gpd-template-editor-wrap" id="wc-gpd-template-editor-root">
 			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
 			<textarea id="wc_gpd_template_fonts" name="wc_gpd_template_fonts" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_fonts_json ? $template_fonts_json : '[]' ); ?></textarea>
+			<textarea id="wc_gpd_template_palettes" name="wc_gpd_template_palettes" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_palettes_json ? $template_palettes_json : '{}' ); ?></textarea>
 			<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
 			<input type="hidden" id="wc_gpd_max_design_views" name="wc_gpd_max_design_views" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
@@ -362,33 +364,39 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</div>
 			<div class="wc-gpd-tpl-layout">
 				<aside class="wc-gpd-tpl-accordion" id="wc-gpd-tpl-accordion">
-					<div class="wc-gpd-accordion-section is-open" data-section="layers">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section is-open" data-section="layers" data-layer-title="0">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true" data-base-title="<?php esc_attr_e( 'Layers', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body">
 							<ul class="wc-gpd-tpl-layers-list" id="wc-gpd-template-layers-list"></ul>
 							<p class="wc-gpd-tpl-hint" id="wc-gpd-layers-empty-hint"><?php esc_html_e( 'Layers appear here as you add content.', 'wc-generic-product-designer' ); ?></p>
 						</div>
 					</div>
-					<div class="wc-gpd-accordion-section" data-section="text">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section" data-section="text" data-layer-title="1">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Text', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body" hidden>
-						<div class="wc-gpd-tpl-btn-row">
-							<button type="button" class="button button-small" id="wc-gpd-template-add-text"><?php esc_html_e( 'Fixed text', 'wc-generic-product-designer' ); ?></button>
-							<button type="button" class="button button-small" id="wc-gpd-template-add-placeholder"><?php esc_html_e( 'Variable field', 'wc-generic-product-designer' ); ?></button>
-						</div>
+						<button type="button" class="button button-small" id="wc-gpd-template-add-text"><?php esc_html_e( 'Add text field', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-tpl-selection wc-gpd-tpl-text-editor" id="wc-gpd-text-editor" hidden>
-							<div class="wc-gpd-tpl-placeholder-meta" id="wc-gpd-placeholder-meta" hidden>
-								<p><label><?php esc_html_e( 'Field label', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_placeholder_label" class="widefat" /></label></p>
-								<p><label><?php esc_html_e( 'Field key', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_placeholder_key" class="widefat" /></label></p>
-								<p><label><?php esc_html_e( 'Box width (px)', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_placeholder_width" min="40" max="2000" value="240" /></label></p>
-							</div>
+							<p><label><?php esc_html_e( 'Layer label', 'wc-generic-product-designer' ); ?> <input type="text" id="wc_gpd_text_layer_label" class="widefat" /></label></p>
+							<p><label><?php esc_html_e( 'Box width (px)', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_placeholder_width" min="40" max="2000" value="240" /></label></p>
+							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_text_lock_box" /> <?php esc_html_e( 'Lock box position (customer cannot move)', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_text_customer_fills" /> <?php esc_html_e( 'Customer enters text in sidebar', 'wc-generic-product-designer' ); ?></label>
+							<p>
+								<label><?php esc_html_e( 'Fit to box', 'wc-generic-product-designer' ); ?>
+									<select id="wc_gpd_tpl_fit_mode">
+										<option value="none"><?php esc_html_e( 'None', 'wc-generic-product-designer' ); ?></option>
+										<option value="horizontal"><?php esc_html_e( 'Horizontal', 'wc-generic-product-designer' ); ?></option>
+										<option value="vertical"><?php esc_html_e( 'Vertical', 'wc-generic-product-designer' ); ?></option>
+										<option value="both"><?php esc_html_e( 'Horizontal & vertical', 'wc-generic-product-designer' ); ?></option>
+									</select>
+								</label>
+							</p>
 							<div class="wc-gpd-rich-text-box">
 								<label for="wc_gpd_tpl_text_content" class="wc-gpd-rich-label"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label>
 								<textarea id="wc_gpd_tpl_text_content" class="wc-gpd-rich-textarea" rows="3"></textarea>
 								<div class="wc-gpd-rich-toolbar" aria-label="<?php esc_attr_e( 'Text formatting', 'wc-generic-product-designer' ); ?>">
 									<div class="wc-gpd-rich-toolbar-row">
 										<select id="wc_gpd_tpl_font_family" class="wc-gpd-rich-font-select" title="<?php esc_attr_e( 'Font family', 'wc-generic-product-designer' ); ?>"></select>
-										<input type="number" id="wc_gpd_tpl_font_size" class="wc-gpd-rich-size" min="8" max="400" value="32" title="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" />
+										<input type="number" id="wc_gpd_tpl_font_size" class="wc-gpd-rich-size wc-gpd-rich-size--compact" min="8" max="400" value="32" title="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" />
 									</div>
 									<div class="wc-gpd-rich-toolbar-row wc-gpd-rich-toolbar-row--icons">
 										<button type="button" class="wc-gpd-rich-btn" id="wc_gpd_tpl_bold" title="<?php esc_attr_e( 'Bold', 'wc-generic-product-designer' ); ?>"><span class="dashicons dashicons-editor-bold"></span></button>
@@ -401,34 +409,41 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 											<button type="button" class="wc-gpd-rich-btn wc-gpd-tpl-align" data-align="right" title="<?php esc_attr_e( 'Align right', 'wc-generic-product-designer' ); ?>"><span class="dashicons dashicons-editor-alignright"></span></button>
 										</span>
 										<span class="wc-gpd-rich-sep" aria-hidden="true"></span>
-										<label class="wc-gpd-rich-color-btn" title="<?php esc_attr_e( 'Text color', 'wc-generic-product-designer' ); ?>"><span class="dashicons dashicons-admin-appearance"></span><input type="color" id="wc_gpd_tpl_text_color" value="#000000" /></label>
-										<input type="number" id="wc_gpd_tpl_line_height" class="wc-gpd-rich-mini" min="0.5" max="3" step="0.01" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" />
-										<input type="number" id="wc_gpd_tpl_letter_spacing" class="wc-gpd-rich-mini" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" />
+										<div class="wc-gpd-stepper" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>">
+											<button type="button" class="wc-gpd-stepper-btn" data-stepper="line_height" data-dir="-1" aria-label="<?php esc_attr_e( 'Decrease line height', 'wc-generic-product-designer' ); ?>">−</button>
+											<span class="wc-gpd-stepper-val" id="wc_gpd_tpl_line_height_display">1.16</span>
+											<button type="button" class="wc-gpd-stepper-btn" data-stepper="line_height" data-dir="1" aria-label="<?php esc_attr_e( 'Increase line height', 'wc-generic-product-designer' ); ?>">+</button>
+											<input type="hidden" id="wc_gpd_tpl_line_height" value="1.16" />
+										</div>
+										<div class="wc-gpd-stepper" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>">
+											<button type="button" class="wc-gpd-stepper-btn" data-stepper="letter_spacing" data-dir="-1" aria-label="<?php esc_attr_e( 'Decrease letter spacing', 'wc-generic-product-designer' ); ?>">−</button>
+											<span class="wc-gpd-stepper-val" id="wc_gpd_tpl_letter_spacing_display">0</span>
+											<button type="button" class="wc-gpd-stepper-btn" data-stepper="letter_spacing" data-dir="1" aria-label="<?php esc_attr_e( 'Increase letter spacing', 'wc-generic-product-designer' ); ?>">+</button>
+											<input type="hidden" id="wc_gpd_tpl_letter_spacing" value="0" />
+										</div>
 									</div>
 								</div>
 							</div>
-							<p id="wc-gpd-shrink-fit-row" hidden><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
 							<fieldset class="wc-gpd-tpl-customer-options">
 								<legend><?php esc_html_e( 'Customer can change', 'wc-generic-product-designer' ); ?></legend>
 								<div class="wc-gpd-tpl-customer-grid">
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_font" checked="checked" /> <?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_size" checked="checked" /> <?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></label>
-									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_color" checked="checked" /> <?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_bold" checked="checked" /> <?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_italic" checked="checked" /> <?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_underline" checked="checked" /> <?php esc_html_e( 'Underline', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_align" checked="checked" /> <?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_line_height" checked="checked" /> <?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?></label>
 									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_letter_spacing" checked="checked" /> <?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></label>
-									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_move" checked="checked" /> <?php esc_html_e( 'Position', 'wc-generic-product-designer' ); ?></label>
+									<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_allow_move" checked="checked" /> <?php esc_html_e( 'Box position', 'wc-generic-product-designer' ); ?></label>
 								</div>
 							</fieldset>
 						</div>
-						<p class="wc-gpd-tpl-hint" id="wc-gpd-text-editor-hint"><?php esc_html_e( 'Add text or select a text layer to edit.', 'wc-generic-product-designer' ); ?></p>
+						<p class="wc-gpd-tpl-hint" id="wc-gpd-text-editor-hint"><?php esc_html_e( 'Add a text field or select one on the canvas.', 'wc-generic-product-designer' ); ?></p>
 						</div>
 					</div>
-					<div class="wc-gpd-accordion-section" data-section="fonts">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Template fonts', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section" data-section="fonts" data-layer-title="0">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Template fonts', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Template fonts', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body" hidden>
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Choose fonts for this template. Manage fonts under Template Designer → Fonts.', 'wc-generic-product-designer' ); ?></p>
 							<div class="wc-gpd-tpl-font-picks" id="wc-gpd-template-font-picks">
@@ -444,8 +459,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							</div>
 						</div>
 					</div>
-					<div class="wc-gpd-accordion-section" data-section="images">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section" data-section="images" data-layer-title="1">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Images & graphics', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body" hidden>
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add images from the media library. Choose fixed or customer-repositionable graphics. Create pick-area libraries under Template Designer → Libraries.', 'wc-generic-product-designer' ); ?></p>
 							<div class="wc-gpd-tpl-btn-row">
@@ -480,43 +495,57 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							</div>
 						</div>
 					</div>
-					<div class="wc-gpd-accordion-section" data-section="size" id="wc-gpd-accordion-size">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Size & position', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section" data-section="size" id="wc-gpd-accordion-size" data-layer-title="1">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Size & position', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Size & position', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body" id="wc-gpd-selection-dims-panel" hidden>
-							<p>
-								<label><?php esc_html_e( 'Units', 'wc-generic-product-designer' ); ?>
+							<div class="wc-gpd-dims-compact">
+								<label class="wc-gpd-dims-compact__units"><?php esc_html_e( 'Units', 'wc-generic-product-designer' ); ?>
 									<select id="wc_gpd_tpl_units">
-										<option value="px"><?php esc_html_e( 'Pixels (px)', 'wc-generic-product-designer' ); ?></option>
-										<option value="in"><?php esc_html_e( 'Inches (in)', 'wc-generic-product-designer' ); ?></option>
-										<option value="mm"><?php esc_html_e( 'Millimeters (mm)', 'wc-generic-product-designer' ); ?></option>
-										<option value="cm"><?php esc_html_e( 'Centimeters (cm)', 'wc-generic-product-designer' ); ?></option>
+										<option value="px">px</option>
+										<option value="in">in</option>
+										<option value="mm">mm</option>
+										<option value="cm">cm</option>
 									</select>
 								</label>
-							</p>
-							<fieldset class="wc-gpd-tpl-fieldset">
-								<legend><?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></legend>
-								<div class="wc-gpd-tpl-dims-grid">
-									<label><?php esc_html_e( 'Width', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_width" min="0.01" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_w">px</span></label>
-									<label><?php esc_html_e( 'Height', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_height" min="0.01" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_h">px</span></label>
+								<div class="wc-gpd-dims-compact__row">
+									<label>W <input type="number" id="wc_gpd_sel_width" min="0.01" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_w">px</span></label>
+									<label>H <input type="number" id="wc_gpd_sel_height" min="0.01" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_h">px</span></label>
 								</div>
-								<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_aspect" /> <?php esc_html_e( 'Lock aspect ratio while editing', 'wc-generic-product-designer' ); ?></label>
-							</fieldset>
-							<fieldset class="wc-gpd-tpl-fieldset">
-								<legend><?php esc_html_e( 'Position', 'wc-generic-product-designer' ); ?></legend>
-								<div class="wc-gpd-tpl-dims-grid">
-									<label><?php esc_html_e( 'X', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_left" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_x">px</span></label>
-									<label><?php esc_html_e( 'Y', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_top" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_y">px</span></label>
+								<div class="wc-gpd-dims-compact__row">
+									<label>X <input type="number" id="wc_gpd_sel_left" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_x">px</span></label>
+									<label>Y <input type="number" id="wc_gpd_sel_top" step="0.01" /><span class="wc-gpd-unit-suffix" id="wc_gpd_unit_suffix_y">px</span></label>
 								</div>
-							</fieldset>
-							<fieldset class="wc-gpd-tpl-fieldset">
-								<legend><?php esc_html_e( 'Canvas guides', 'wc-generic-product-designer' ); ?></legend>
-								<label class="wc-gpd-tpl-check" title="<?php esc_attr_e( 'Show ruler guides on the canvas', 'wc-generic-product-designer' ); ?>"><input type="checkbox" id="wc_gpd_tpl_show_ruler" /> <?php esc_html_e( 'Show ruler', 'wc-generic-product-designer' ); ?></label>
-								<label class="wc-gpd-tpl-check" title="<?php esc_attr_e( 'Show measurements around the canvas', 'wc-generic-product-designer' ); ?>"><input type="checkbox" id="wc_gpd_tpl_show_measurements" /> <?php esc_html_e( 'Show measurements', 'wc-generic-product-designer' ); ?></label>
-							</fieldset>
+								<label class="wc-gpd-tpl-check wc-gpd-dims-compact__lock"><input type="checkbox" id="wc_gpd_lock_aspect" /> <?php esc_html_e( 'Lock aspect', 'wc-generic-product-designer' ); ?></label>
+							</div>
 						</div>
 					</div>
-					<div class="wc-gpd-accordion-section" data-section="shapes">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-accordion-section" data-section="colors" data-layer-title="1">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Colors', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Colors', 'wc-generic-product-designer' ); ?></button>
+						<div class="wc-gpd-accordion-body" hidden>
+							<div id="wc-gpd-layer-colors-panel" hidden>
+								<p><label><?php esc_html_e( 'Palette for layer', 'wc-generic-product-designer' ); ?> <select id="wc_gpd_layer_palette_id"></select></label></p>
+								<div class="wc-gpd-layer-color-swatches" id="wc-gpd-layer-color-swatches"></div>
+								<p class="description"><?php esc_html_e( 'Pick a swatch to set this layer’s color.', 'wc-generic-product-designer' ); ?></p>
+							</div>
+							<div id="wc-gpd-palettes-admin">
+								<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Color palettes', 'wc-generic-product-designer' ); ?></h5>
+								<p class="description"><?php esc_html_e( 'Create palettes and assign them to layers. Enable “same colors on entire template” in Settings to use one palette everywhere.', 'wc-generic-product-designer' ); ?></p>
+								<div id="wc-gpd-palettes-list"></div>
+								<button type="button" class="button button-small" id="wc-gpd-add-palette"><?php esc_html_e( 'Add palette', 'wc-generic-product-designer' ); ?></button>
+							</div>
+							<p class="wc-gpd-tpl-hint" id="wc-gpd-colors-hint"><?php esc_html_e( 'Select a layer to assign colors, or manage palettes below.', 'wc-generic-product-designer' ); ?></p>
+						</div>
+					</div>
+					<div class="wc-gpd-accordion-section" data-section="guides" data-layer-title="0">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Canvas guides', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Canvas guides', 'wc-generic-product-designer' ); ?></button>
+						<div class="wc-gpd-accordion-body" hidden>
+							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_ruler" /> <?php esc_html_e( 'Show ruler', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_measurements" /> <?php esc_html_e( 'Show measurements', 'wc-generic-product-designer' ); ?></label>
+							<p class="description"><?php esc_html_e( 'Ruler units follow the Units setting in Size & position.', 'wc-generic-product-designer' ); ?></p>
+						</div>
+					</div>
+					<div class="wc-gpd-accordion-section" data-section="shapes" data-layer-title="1">
+						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false" data-base-title="<?php esc_attr_e( 'Shapes', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></button>
 						<div class="wc-gpd-accordion-body" hidden>
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add production outlines, bounding boxes, or engraving-friendly vector shapes.', 'wc-generic-product-designer' ); ?></p>
 							<div class="wc-gpd-tpl-btn-row">
@@ -582,13 +611,29 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 */
 	private function render_customer_tools( $ps ) {
 		?>
-		<div class="wc-gpd-settings-grid">
-			<div class="wc-gpd-settings-card">
-				<h4><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></h4>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_text_color" value="1" <?php checked( $ps['allow_text_color'] ); ?> /> <?php esc_html_e( 'Text color picker', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_single_color_only" value="1" <?php checked( $ps['single_color_only'] ); ?> /> <?php esc_html_e( 'Single color only', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Forced color', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_forced_text_color" value="<?php echo esc_attr( $ps['forced_text_color'] ); ?>" /></label></p>
+		<div class="wc-gpd-customer-tools-layout">
+			<div class="wc-gpd-customer-mockup-wrap">
+				<h4><?php esc_html_e( 'Customer preview', 'wc-generic-product-designer' ); ?></h4>
+				<p class="description"><?php esc_html_e( 'Approximate layout shoppers see. Toggle options on the right to preview what appears.', 'wc-generic-product-designer' ); ?></p>
+				<div class="wc-gpd-customer-mockup" id="wc-gpd-customer-mockup">
+					<div class="wc-gpd-mockup-toolbar" id="wc-gpd-mockup-toolbar">
+						<span class="wc-gpd-mockup-chip" data-mockup="font"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="size"><?php esc_html_e( 'Size', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="color"><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="bold"><?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="italic"><?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="underline"><?php esc_html_e( 'Underline', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="align"><?php esc_html_e( 'Align', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="graphics"><?php esc_html_e( 'Graphics', 'wc-generic-product-designer' ); ?></span>
+						<span class="wc-gpd-mockup-chip" data-mockup="free_text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></span>
+					</div>
+					<div class="wc-gpd-mockup-canvas">
+						<div class="wc-gpd-mockup-placeholder-fields" id="wc-gpd-mockup-fields"><?php esc_html_e( 'Variable fields', 'wc-generic-product-designer' ); ?></div>
+						<div class="wc-gpd-mockup-canvas-inner"><?php esc_html_e( 'Design canvas', 'wc-generic-product-designer' ); ?></div>
+					</div>
+				</div>
 			</div>
+		<div class="wc-gpd-settings-grid">
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Typography', 'wc-generic-product-designer' ); ?></h4>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_font_family" value="1" <?php checked( $ps['allow_font_family'] ); ?> /> <?php esc_html_e( 'Font family', 'wc-generic-product-designer' ); ?></label></p>
@@ -606,6 +651,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_customer_graphics" value="1" <?php checked( $ps['allow_customer_graphics'] ); ?> /> <?php esc_html_e( 'Allow customer graphic picker', 'wc-generic-product-designer' ); ?></label></p>
 			</div>
 		</div>
+		</div>
 		<?php
 	}
 
@@ -615,6 +661,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	private function render_template_settings( $ps ) {
 		?>
 		<div class="wc-gpd-settings-grid">
+			<div class="wc-gpd-settings-card wc-gpd-settings-card--colors">
+				<h4><?php esc_html_e( 'Template colors', 'wc-generic-product-designer' ); ?></h4>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_use_same_colors" value="1" id="wc_gpd_ps_use_same_colors" <?php checked( ! empty( $ps['use_same_colors_entire_template'] ) ); ?> /> <?php esc_html_e( 'Use same colors on entire template', 'wc-generic-product-designer' ); ?></label></p>
+				<div id="wc-gpd-global-colors-panel" <?php echo empty( $ps['use_same_colors_entire_template'] ) ? 'hidden' : ''; ?>>
+					<p class="description"><?php esc_html_e( 'These colors apply to all layers. At least one color is required.', 'wc-generic-product-designer' ); ?></p>
+					<div id="wc-gpd-global-colors-list" class="wc-gpd-global-colors-list"></div>
+					<button type="button" class="button button-small" id="wc-gpd-add-global-color"><?php esc_html_e( 'Add color', 'wc-generic-product-designer' ); ?></button>
+				</div>
+			</div>
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Designer', 'wc-generic-product-designer' ); ?></h4>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_enable_popout" value="1" <?php checked( $ps['enable_popout'] ); ?> /> <?php esc_html_e( 'Pop-out / expand mode', 'wc-generic-product-designer' ); ?></label></p>

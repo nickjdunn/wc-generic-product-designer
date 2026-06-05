@@ -21,6 +21,7 @@ class WC_GPD_Design_Template {
 	const META_GRAPHIC_LIBRARY    = '_wc_gpd_graphic_library';
 	const META_GRAPHIC_LIBRARIES = '_wc_gpd_graphic_libraries';
 	const META_TEMPLATE_FONTS    = '_wc_gpd_template_fonts';
+	const META_TEMPLATE_PALETTES = '_wc_gpd_template_palettes';
 
 	/**
 	 * Register post type.
@@ -117,8 +118,122 @@ class WC_GPD_Design_Template {
 			'graphic_library'    => self::get_graphic_library( $template_id ),
 			'graphic_libraries'  => self::get_graphic_libraries( $template_id ),
 			'template_fonts'     => self::get_template_fonts( $template_id ),
+			'template_palettes'  => self::get_palettes( $template_id ),
 			'product_settings'   => WC_GPD_Product_Settings::get( $template_id ),
 		);
+	}
+
+	/**
+	 * Default palette document.
+	 *
+	 * @return array
+	 */
+	public static function default_palettes_data() {
+		return array(
+			'palettes'            => array(
+				array(
+					'id'     => 'pal_default',
+					'name'   => __( 'Default', 'wc-generic-product-designer' ),
+					'colors' => array( '#000000' ),
+				),
+			),
+			'use_global_colors'   => false,
+			'global_colors'       => array( '#000000' ),
+		);
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array
+	 */
+	public static function get_palettes( $template_id ) {
+		$raw = get_post_meta( absint( $template_id ), self::META_TEMPLATE_PALETTES, true );
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$data = json_decode( $raw, true );
+			if ( is_array( $data ) ) {
+				return self::sanitize_palettes_data( $data );
+			}
+		}
+		if ( is_array( $raw ) ) {
+			return self::sanitize_palettes_data( $raw );
+		}
+		return self::default_palettes_data();
+	}
+
+	/**
+	 * @param array $data Palette payload.
+	 * @return array
+	 */
+	public static function sanitize_palettes_data( array $data ) {
+		$defaults = self::default_palettes_data();
+		$clean    = array(
+			'palettes'          => array(),
+			'use_global_colors' => ! empty( $data['use_global_colors'] ),
+			'global_colors'     => array(),
+		);
+
+		if ( ! empty( $data['palettes'] ) && is_array( $data['palettes'] ) ) {
+			foreach ( $data['palettes'] as $palette ) {
+				if ( ! is_array( $palette ) ) {
+					continue;
+				}
+				$id = ! empty( $palette['id'] ) ? sanitize_key( (string) $palette['id'] ) : '';
+				if ( ! $id ) {
+					continue;
+				}
+				$name   = ! empty( $palette['name'] ) ? sanitize_text_field( (string) $palette['name'] ) : $id;
+				$colors = array();
+				if ( ! empty( $palette['colors'] ) && is_array( $palette['colors'] ) ) {
+					foreach ( $palette['colors'] as $color ) {
+						$hex = sanitize_hex_color( (string) $color );
+						if ( $hex ) {
+							$colors[] = $hex;
+						}
+					}
+				}
+				if ( empty( $colors ) ) {
+					$colors[] = '#000000';
+				}
+				$clean['palettes'][] = array(
+					'id'     => $id,
+					'name'   => $name,
+					'colors' => array_values( array_unique( $colors ) ),
+				);
+			}
+		}
+
+		if ( empty( $clean['palettes'] ) ) {
+			$clean['palettes'] = $defaults['palettes'];
+		}
+
+		if ( ! empty( $data['global_colors'] ) && is_array( $data['global_colors'] ) ) {
+			foreach ( $data['global_colors'] as $color ) {
+				$hex = sanitize_hex_color( (string) $color );
+				if ( $hex ) {
+					$clean['global_colors'][] = $hex;
+				}
+			}
+		}
+		if ( empty( $clean['global_colors'] ) ) {
+			$clean['global_colors'] = array( '#000000' );
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * @param string $json JSON palettes.
+	 * @return array
+	 */
+	public static function sanitize_palettes_json( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::default_palettes_data();
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::default_palettes_data();
+		}
+		return self::sanitize_palettes_data( $data );
 	}
 
 	/**
@@ -222,6 +337,10 @@ class WC_GPD_Design_Template {
 		$fonts_raw = isset( $_POST['wc_gpd_template_fonts'] ) ? wp_unslash( $_POST['wc_gpd_template_fonts'] ) : '';
 		$fonts     = self::sanitize_template_fonts( is_string( $fonts_raw ) ? $fonts_raw : '' );
 		update_post_meta( $template_id, self::META_TEMPLATE_FONTS, $fonts );
+
+		$palettes_raw = isset( $_POST['wc_gpd_template_palettes'] ) ? wp_unslash( $_POST['wc_gpd_template_palettes'] ) : '';
+		$palettes     = self::sanitize_palettes_json( is_string( $palettes_raw ) ? $palettes_raw : '' );
+		update_post_meta( $template_id, self::META_TEMPLATE_PALETTES, wp_slash( wp_json_encode( $palettes ) ) );
 
 		WC_GPD_Product_Settings::save( $template_id, WC_GPD_Product_Settings::from_post( wp_unslash( $_POST ) ) );
 

@@ -10,6 +10,11 @@
 	}
 
 	const productSettings = config.productSettings || {};
+	const templatePalettes = config.templatePalettes || {
+		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
+		use_global_colors: false,
+		global_colors: [ '#000000' ],
+	};
 
 	const log = window.wcGpdDebug || { setEnabled() {}, debug() {}, info() {}, warn() {}, error() {} };
 	log.setEnabled( !! config.debug );
@@ -123,25 +128,43 @@
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
-		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit',
+		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockMove',
 		'wcGpdLockScale', 'wcGpdLockAspect',
 	];
 
-	function defaultTextColor() {
-		return productSettings.forced_text_color || '#000000';
+	function paletteColorsForObject( obj ) {
+		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
+			return templatePalettes.global_colors && templatePalettes.global_colors.length
+				? templatePalettes.global_colors
+				: [ '#000000' ];
+		}
+		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		const palette = ( templatePalettes.palettes || [] ).find( ( item ) => item.id === paletteId );
+		return palette && palette.colors && palette.colors.length ? palette.colors : [ '#000000' ];
 	}
 
-	function enforceSingleColor( obj ) {
-		if ( ! obj || ! productSettings.single_color_only ) {
+	function defaultTextColor( obj ) {
+		const colors = paletteColorsForObject( obj );
+		return colors[ 0 ] || '#000000';
+	}
+
+	function enforcePaletteColor( obj ) {
+		if ( ! obj ) {
 			return;
 		}
-		obj.set( 'fill', defaultTextColor() );
+		const colors = paletteColorsForObject( obj );
+		if ( colors.length === 1 ) {
+			obj.set( 'fill', colors[ 0 ] );
+		}
 	}
 
-	function textColorAllowed() {
-		return productSettings.allow_text_color !== false && ! productSettings.single_color_only;
+	function textColorAllowed( obj ) {
+		if ( obj && obj.wcGpdLockColor ) {
+			return false;
+		}
+		return paletteColorsForObject( obj ).length > 1;
 	}
 
 	/**
@@ -154,7 +177,7 @@
 	}
 
 	function applyProductToolSettings() {
-		const showColor = textColorAllowed();
+		const showColor = textColorAllowed( activeText );
 		setToolVisible( ui.textColor, showColor );
 		setToolVisible( ui.fontFamily, productSettings.allow_font_family !== false );
 		setToolVisible( ui.fontSize, productSettings.allow_font_size !== false );
@@ -167,7 +190,7 @@
 		setToolVisible( ui.popoutBtn, productSettings.enable_popout !== false );
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
 		if ( ui.textColor ) {
-			ui.textColor.value = defaultTextColor();
+			ui.textColor.value = defaultTextColor( activeText );
 		}
 	}
 
@@ -514,8 +537,22 @@
 		return isTemplateGraphic( obj ) && obj.wcGpdExportGraphic !== false;
 	}
 
+	function getTextFitMode( textObj ) {
+		if ( ! textObj ) {
+			return 'none';
+		}
+		if ( textObj.wcGpdFitMode ) {
+			return textObj.wcGpdFitMode;
+		}
+		if ( textObj.wcGpdShrinkToFit ) {
+			return 'horizontal';
+		}
+		return 'none';
+	}
+
 	function shrinkTextToFit( textObj ) {
-		if ( ! textObj || ! textObj.wcGpdShrinkToFit ) {
+		const mode = getTextFitMode( textObj );
+		if ( ! textObj || mode === 'none' ) {
 			return;
 		}
 		const baseSize = textObj.wcGpdBaseFontSize || textObj.fontSize || 32;
@@ -523,17 +560,29 @@
 			textObj.wcGpdBaseFontSize = baseSize;
 		}
 		const maxWidth = textObj.width || 200;
-		let size = baseSize;
+		const maxHeight = textObj.height || 200;
 		const minSize = 8;
+		let size = baseSize;
+
 		while ( size >= minSize ) {
 			textObj.set( 'fontSize', size );
 			textObj.setCoords();
 			const textWidth = typeof textObj.calcTextWidth === 'function' ? textObj.calcTextWidth() : 0;
-			if ( ! textWidth || textWidth <= maxWidth ) {
+			const textHeight = typeof textObj.calcTextHeight === 'function' ? textObj.calcTextHeight() : 0;
+			let fits = true;
+			if ( ( mode === 'horizontal' || mode === 'both' ) && textWidth > maxWidth ) {
+				fits = false;
+			}
+			if ( ( mode === 'vertical' || mode === 'both' ) && textHeight > maxHeight ) {
+				fits = false;
+			}
+			if ( fits ) {
 				break;
 			}
 			size -= 1;
 		}
+		textObj.set( 'fontSize', Math.max( minSize, size ) );
+		textObj.setCoords();
 	}
 
 	function getPlaceholderObjectsFromView( view ) {
@@ -626,7 +675,7 @@
 									return;
 								}
 								obj.wcGpdTextLayer = obj.wcGpdTextLayer || isTextLayer( obj );
-								enforceSingleColor( obj );
+								enforcePaletteColor( obj );
 								canvas.add( obj );
 								obj.setCoords();
 							} );
@@ -1087,8 +1136,9 @@
 			ui.underlineBtn.classList.toggle( 'is-active', isUnderline );
 		}
 		if ( ui.textColor ) {
-			ui.textColor.value = obj.fill || defaultTextColor();
+			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
+		setToolVisible( ui.textColor, textColorAllowed( obj ) );
 		if ( ui.underline ) {
 			ui.underline.checked = !! obj.underline;
 		}
@@ -1106,7 +1156,7 @@
 			btn.classList.toggle( 'is-active', isActive );
 		} );
 
-		enforceSingleColor( obj );
+		enforcePaletteColor( obj );
 	}
 
 	/**
@@ -1121,7 +1171,7 @@
 			originY: 'center',
 			fontFamily: DEFAULT_FONT,
 			fontSize: 32,
-			fill: defaultTextColor(),
+			fill: defaultTextColor( null ),
 			lineHeight: 1.16,
 			charSpacing: 0,
 			wcGpdTextLayer: true,
@@ -1572,7 +1622,7 @@
 
 	if ( ui.textColor ) {
 		ui.textColor.addEventListener( 'input', () => {
-			if ( ! activeText || ! textColorAllowed() ) {
+			if ( ! activeText || ! textColorAllowed( activeText ) ) {
 				return;
 			}
 			activeText.set( 'fill', ui.textColor.value );

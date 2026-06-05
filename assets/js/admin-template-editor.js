@@ -24,7 +24,9 @@
 	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
 	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
 	const textEditorHint = document.getElementById( 'wc-gpd-text-editor-hint' );
-	const placeholderMeta = document.getElementById( 'wc-gpd-placeholder-meta' );
+	const layerColorsPanel = document.getElementById( 'wc-gpd-layer-colors-panel' );
+	const colorsHint = document.getElementById( 'wc-gpd-colors-hint' );
+	const palettesInput = document.getElementById( 'wc_gpd_template_palettes' );
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
 	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
@@ -34,7 +36,6 @@
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
 	const templateFontsInput = document.getElementById( 'wc_gpd_template_fonts' );
 	const accordionEl = document.getElementById( 'wc-gpd-tpl-accordion' );
-	const shrinkFitRow = document.getElementById( 'wc-gpd-shrink-fit-row' );
 	const showRulerToggle = document.getElementById( 'wc_gpd_tpl_show_ruler' );
 	const showMeasurementsToggle = document.getElementById( 'wc_gpd_tpl_show_measurements' );
 	const rulerTopEl = document.getElementById( 'wc-gpd-tpl-ruler-top' );
@@ -46,7 +47,7 @@
 		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
 		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
-		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit',
+		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'strokeDashArray',
@@ -55,7 +56,6 @@
 	const CUSTOMER_ALLOW_MAP = {
 		font: 'wcGpdLockFont',
 		size: 'wcGpdLockSize',
-		color: 'wcGpdLockColor',
 		bold: 'wcGpdLockBold',
 		italic: 'wcGpdLockItalic',
 		underline: 'wcGpdLockUnderline',
@@ -86,6 +86,45 @@
 	let freeformMode = false;
 	let freeformPoints = [];
 	let freeformPreview = null;
+	let palettesData = {
+		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
+		use_global_colors: false,
+		global_colors: [ '#000000' ],
+	};
+
+	const STEPPER_CONFIG = {
+		line_height: {
+			inputId: 'wc_gpd_tpl_line_height',
+			displayId: 'wc_gpd_tpl_line_height_display',
+			step: 0.05,
+			min: 0.5,
+			max: 3,
+			decimals: 2,
+			prop: 'lineHeight',
+			parse: parseFloat,
+		},
+		letter_spacing: {
+			inputId: 'wc_gpd_tpl_letter_spacing',
+			displayId: 'wc_gpd_tpl_letter_spacing_display',
+			step: 10,
+			min: -200,
+			max: 800,
+			decimals: 0,
+			prop: 'charSpacing',
+			parse: ( value ) => parseInt( value, 10 ),
+		},
+	};
+
+	const MOCKUP_CHECKBOX_MAP = {
+		font: 'wc_gpd_ps_allow_font_family',
+		size: 'wc_gpd_ps_allow_font_size',
+		bold: 'wc_gpd_ps_allow_bold',
+		italic: 'wc_gpd_ps_allow_italic',
+		underline: 'wc_gpd_ps_allow_underline',
+		align: 'wc_gpd_ps_allow_text_align',
+		graphics: 'wc_gpd_ps_allow_customer_graphics',
+		free_text: 'wc_gpd_ps_allow_free_text',
+	};
 
 	const UNIT_FACTORS = {
 		px: 1,
@@ -225,12 +264,42 @@
 		return obj && ( obj.wcGpdLayerType === 'graphic_slot' || ( obj.type === 'rect' && obj.wcGpdGraphicSlot ) );
 	}
 
+	function isTextLayer( obj ) {
+		return obj && ( obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox' )
+			&& ( obj.wcGpdLayerType === 'text' || obj.wcGpdLayerType === 'placeholder' );
+	}
+
 	function isTemplateText( obj ) {
-		return obj && ( obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox' ) && obj.wcGpdLayerType === 'text';
+		return isTextLayer( obj ) && obj.wcGpdLayerType === 'text';
 	}
 
 	function isPlaceholder( obj ) {
-		return obj && ( obj.type === 'textbox' || obj.type === 'i-text' ) && obj.wcGpdLayerType === 'placeholder';
+		return isTextLayer( obj ) && obj.wcGpdLayerType === 'placeholder';
+	}
+
+	function getFitMode( obj ) {
+		if ( ! obj ) {
+			return 'none';
+		}
+		if ( obj.wcGpdFitMode ) {
+			return obj.wcGpdFitMode;
+		}
+		if ( obj.wcGpdShrinkToFit ) {
+			return 'horizontal';
+		}
+		return 'none';
+	}
+
+	function normalizeTextLayer( obj ) {
+		if ( ! isTextLayer( obj ) ) {
+			return;
+		}
+		if ( ! obj.wcGpdFitMode && obj.wcGpdShrinkToFit ) {
+			obj.wcGpdFitMode = 'horizontal';
+		}
+		if ( ! obj.wcGpdFitMode ) {
+			obj.wcGpdFitMode = 'none';
+		}
 	}
 
 	function layerLabel( obj ) {
@@ -252,12 +321,15 @@
 		if ( isGraphicSlot( obj ) ) {
 			return 'Graphic pick area';
 		}
-		if ( isPlaceholder( obj ) ) {
-			return obj.wcGpdPlaceholderLabel || 'Variable field';
-		}
-		if ( isTemplateText( obj ) ) {
+		if ( isTextLayer( obj ) ) {
+			if ( obj.wcGpdLayerLabel ) {
+				return obj.wcGpdLayerLabel;
+			}
+			if ( isPlaceholder( obj ) ) {
+				return obj.wcGpdPlaceholderLabel || 'Text field';
+			}
 			const text = ( obj.text || '' ).trim();
-			return text ? text.slice( 0, 32 ) : 'Fixed text';
+			return text ? text.slice( 0, 32 ) : 'Text field';
 		}
 		if ( obj.wcGpdBoundingBox ) {
 			return 'Bounding box';
@@ -391,7 +463,7 @@
 		if ( ! active ) {
 			return;
 		}
-		if ( isTemplateText( active ) || isPlaceholder( active ) ) {
+		if ( isTextLayer( active ) ) {
 			openAccordionSection( 'text' );
 		} else if ( isMockupImage( active ) || isGraphicImage( active ) || isGraphicSlot( active ) ) {
 			openAccordionSection( 'images' );
@@ -399,6 +471,311 @@
 			openAccordionSection( 'shapes' );
 		} else {
 			openAccordionSection( 'size' );
+		}
+	}
+
+	function updateAccordionTitles() {
+		if ( ! accordionEl ) {
+			return;
+		}
+		const active = canvas.getActiveObject();
+		const name = active ? layerLabel( active ) : '';
+		accordionEl.querySelectorAll( '.wc-gpd-accordion-section[data-layer-title="1"]' ).forEach( ( section ) => {
+			const toggle = section.querySelector( '.wc-gpd-accordion-toggle' );
+			if ( ! toggle ) {
+				return;
+			}
+			const base = toggle.dataset.baseTitle || toggle.textContent.trim();
+			toggle.textContent = active && name ? `${ base }: ${ name }` : base;
+		} );
+	}
+
+	function objectHasColor( obj ) {
+		return !! obj && ( isTextLayer( obj ) || isShape( obj ) );
+	}
+
+	function loadPalettesFromInput() {
+		if ( ! palettesInput || ! palettesInput.value ) {
+			return;
+		}
+		try {
+			const parsed = JSON.parse( palettesInput.value );
+			if ( parsed && typeof parsed === 'object' ) {
+				palettesData = {
+					palettes: Array.isArray( parsed.palettes ) && parsed.palettes.length ? parsed.palettes : palettesData.palettes,
+					use_global_colors: !! parsed.use_global_colors,
+					global_colors: Array.isArray( parsed.global_colors ) && parsed.global_colors.length ? parsed.global_colors : [ '#000000' ],
+				};
+			}
+		} catch ( e ) {
+			// Keep defaults.
+		}
+	}
+
+	function savePalettesToInput() {
+		if ( ! palettesInput ) {
+			return;
+		}
+		if ( ! palettesData.global_colors || ! palettesData.global_colors.length ) {
+			palettesData.global_colors = [ '#000000' ];
+		}
+		palettesInput.value = JSON.stringify( palettesData );
+	}
+
+	function getPaletteById( paletteId ) {
+		return ( palettesData.palettes || [] ).find( ( palette ) => palette.id === paletteId );
+	}
+
+	function colorsForLayer( obj ) {
+		if ( palettesData.use_global_colors ) {
+			return palettesData.global_colors || [ '#000000' ];
+		}
+		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		const palette = getPaletteById( paletteId ) || getPaletteById( 'pal_default' );
+		return palette ? palette.colors : [ '#000000' ];
+	}
+
+	function renderPalettesAdmin() {
+		const list = document.getElementById( 'wc-gpd-palettes-list' );
+		if ( ! list ) {
+			return;
+		}
+		list.innerHTML = '';
+		( palettesData.palettes || [] ).forEach( ( palette ) => {
+			const card = document.createElement( 'div' );
+			card.className = 'wc-gpd-palette-card';
+			card.dataset.paletteId = palette.id;
+
+			const header = document.createElement( 'div' );
+			header.className = 'wc-gpd-palette-card__header';
+			const nameInput = document.createElement( 'input' );
+			nameInput.type = 'text';
+			nameInput.className = 'wc-gpd-palette-name';
+			nameInput.value = palette.name || palette.id;
+			nameInput.addEventListener( 'input', () => {
+				palette.name = nameInput.value;
+				savePalettesToInput();
+				populateLayerPaletteSelect();
+			} );
+			header.appendChild( nameInput );
+
+			const swatches = document.createElement( 'div' );
+			swatches.className = 'wc-gpd-palette-swatches';
+			( palette.colors || [] ).forEach( ( color, index ) => {
+				const row = document.createElement( 'label' );
+				row.className = 'wc-gpd-palette-color-row';
+				const picker = document.createElement( 'input' );
+				picker.type = 'color';
+				picker.value = color;
+				picker.addEventListener( 'input', () => {
+					palette.colors[ index ] = picker.value;
+					savePalettesToInput();
+					syncColorsPanel( canvas.getActiveObject() );
+				} );
+				const removeBtn = document.createElement( 'button' );
+				removeBtn.type = 'button';
+				removeBtn.className = 'button-link-delete wc-gpd-palette-remove-color';
+				removeBtn.textContent = '×';
+				removeBtn.disabled = ( palette.colors || [] ).length <= 1;
+				removeBtn.addEventListener( 'click', () => {
+					if ( ( palette.colors || [] ).length <= 1 ) {
+						return;
+					}
+					palette.colors.splice( index, 1 );
+					savePalettesToInput();
+					renderPalettesAdmin();
+					syncColorsPanel( canvas.getActiveObject() );
+				} );
+				row.appendChild( picker );
+				row.appendChild( removeBtn );
+				swatches.appendChild( row );
+			} );
+
+			const addColorBtn = document.createElement( 'button' );
+			addColorBtn.type = 'button';
+			addColorBtn.className = 'button button-small';
+			addColorBtn.textContent = 'Add color';
+			addColorBtn.addEventListener( 'click', () => {
+				palette.colors = palette.colors || [];
+				palette.colors.push( '#000000' );
+				savePalettesToInput();
+				renderPalettesAdmin();
+			} );
+
+			card.appendChild( header );
+			card.appendChild( swatches );
+			card.appendChild( addColorBtn );
+			list.appendChild( card );
+		} );
+	}
+
+	function populateLayerPaletteSelect() {
+		const select = document.getElementById( 'wc_gpd_layer_palette_id' );
+		if ( ! select ) {
+			return;
+		}
+		const current = select.value;
+		select.innerHTML = '';
+		( palettesData.palettes || [] ).forEach( ( palette ) => {
+			const opt = document.createElement( 'option' );
+			opt.value = palette.id;
+			opt.textContent = palette.name || palette.id;
+			select.appendChild( opt );
+		} );
+		if ( current ) {
+			select.value = current;
+		}
+	}
+
+	function syncColorsPanel( obj ) {
+		const hasColor = objectHasColor( obj );
+		if ( layerColorsPanel ) {
+			layerColorsPanel.hidden = ! hasColor;
+		}
+		if ( colorsHint ) {
+			colorsHint.hidden = hasColor;
+		}
+		if ( ! hasColor ) {
+			return;
+		}
+
+		const paletteSelect = document.getElementById( 'wc_gpd_layer_palette_id' );
+		const swatchesEl = document.getElementById( 'wc-gpd-layer-color-swatches' );
+		const useGlobal = palettesData.use_global_colors;
+
+		if ( paletteSelect ) {
+			paletteSelect.closest( 'p' ).hidden = useGlobal;
+			if ( ! useGlobal ) {
+				populateLayerPaletteSelect();
+				paletteSelect.value = obj.wcGpdPaletteId || 'pal_default';
+			}
+		}
+
+		if ( ! swatchesEl ) {
+			return;
+		}
+		swatchesEl.innerHTML = '';
+		const colors = colorsForLayer( obj );
+		const currentFill = obj.fill || '#000000';
+		colors.forEach( ( color ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-color-swatch';
+			btn.style.backgroundColor = color;
+			btn.title = color;
+			btn.classList.toggle( 'is-active', color.toLowerCase() === String( currentFill ).toLowerCase() );
+			btn.addEventListener( 'click', () => {
+				if ( isShape( obj ) && obj.wcGpdOutlineLayer && obj.fill === 'transparent' ) {
+					obj.set( 'stroke', color );
+				} else {
+					obj.set( 'fill', color );
+				}
+				canvas.requestRenderAll();
+				syncColorsPanel( obj );
+			} );
+			swatchesEl.appendChild( btn );
+		} );
+	}
+
+	function renderGlobalColorsList() {
+		const list = document.getElementById( 'wc-gpd-global-colors-list' );
+		if ( ! list ) {
+			return;
+		}
+		list.innerHTML = '';
+		( palettesData.global_colors || [] ).forEach( ( color, index ) => {
+			const row = document.createElement( 'label' );
+			row.className = 'wc-gpd-global-color-row';
+			const picker = document.createElement( 'input' );
+			picker.type = 'color';
+			picker.value = color;
+			picker.addEventListener( 'input', () => {
+				palettesData.global_colors[ index ] = picker.value;
+				savePalettesToInput();
+				syncColorsPanel( canvas.getActiveObject() );
+			} );
+			const removeBtn = document.createElement( 'button' );
+			removeBtn.type = 'button';
+			removeBtn.className = 'button-link-delete';
+			removeBtn.textContent = '×';
+			removeBtn.disabled = ( palettesData.global_colors || [] ).length <= 1;
+			removeBtn.addEventListener( 'click', () => {
+				if ( ( palettesData.global_colors || [] ).length <= 1 ) {
+					return;
+				}
+				palettesData.global_colors.splice( index, 1 );
+				savePalettesToInput();
+				renderGlobalColorsList();
+				syncColorsPanel( canvas.getActiveObject() );
+			} );
+			row.appendChild( picker );
+			row.appendChild( removeBtn );
+			list.appendChild( row );
+		} );
+	}
+
+	function syncCustomerMockup() {
+		Object.keys( MOCKUP_CHECKBOX_MAP ).forEach( ( key ) => {
+			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
+			const chip = document.querySelector( `.wc-gpd-mockup-chip[data-mockup="${ key }"]` );
+			if ( chip ) {
+				chip.hidden = checkbox ? ! checkbox.checked : true;
+			}
+		} );
+		const colorChip = document.querySelector( '.wc-gpd-mockup-chip[data-mockup="color"]' );
+		if ( colorChip ) {
+			colorChip.hidden = false;
+		}
+		const fieldsEl = document.getElementById( 'wc-gpd-mockup-fields' );
+		if ( fieldsEl ) {
+			const hasSidebarFields = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) );
+			fieldsEl.hidden = ! hasSidebarFields;
+		}
+	}
+
+	function setStepperDisplay( key, value ) {
+		const config = STEPPER_CONFIG[ key ];
+		if ( ! config ) {
+			return;
+		}
+		const input = document.getElementById( config.inputId );
+		const display = document.getElementById( config.displayId );
+		const rounded = config.decimals > 0
+			? Math.round( value * Math.pow( 10, config.decimals ) ) / Math.pow( 10, config.decimals )
+			: Math.round( value );
+		if ( input ) {
+			input.value = String( rounded );
+		}
+		if ( display ) {
+			display.textContent = String( rounded );
+		}
+	}
+
+	function applyTextLayerFlags( obj ) {
+		if ( ! isTextLayer( obj ) ) {
+			return;
+		}
+		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
+		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
+		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
+
+		if ( customerFills && customerFills.checked ) {
+			obj.wcGpdLayerType = 'placeholder';
+			if ( ! obj.wcGpdPlaceholderKey ) {
+				obj.wcGpdPlaceholderKey = `field_${ Date.now().toString( 36 ) }`;
+			}
+			if ( layerLabelInput ) {
+				obj.wcGpdPlaceholderLabel = layerLabelInput.value || 'Field';
+				obj.wcGpdLayerLabel = layerLabelInput.value;
+			}
+		} else {
+			obj.wcGpdLayerType = 'text';
+			if ( layerLabelInput ) {
+				obj.wcGpdLayerLabel = layerLabelInput.value;
+			}
+		}
+		if ( lockBox ) {
+			obj.wcGpdLockMove = lockBox.checked;
 		}
 	}
 
@@ -505,7 +882,7 @@
 
 	function activeTextObject() {
 		const active = canvas.getActiveObject();
-		if ( isTemplateText( active ) || isPlaceholder( active ) ) {
+		if ( isTextLayer( active ) ) {
 			return active;
 		}
 		return null;
@@ -515,14 +892,13 @@
 		const active = canvas.getActiveObject();
 		const shapeSelected = isShape( active );
 		const imageSelected = isTemplateImage( active );
-		const textSelected = isTemplateText( active );
-		const placeholderSelected = isPlaceholder( active );
+		const textSelected = isTextLayer( active );
 		const slotSelected = isGraphicSlot( active );
 
 		hideAllPropPanels();
 
 		if ( shapePropsHint ) {
-			shapePropsHint.hidden = shapeSelected || imageSelected || textSelected || placeholderSelected || slotSelected;
+			shapePropsHint.hidden = shapeSelected || imageSelected || textSelected || slotSelected;
 		}
 
 		if ( shapeSelected && shapePropsFields ) {
@@ -532,15 +908,12 @@
 			imagePropsPanel.hidden = false;
 			syncImagePropsPanel( active );
 		}
-		if ( ( textSelected || placeholderSelected ) && textEditorPanel ) {
+		if ( isTextLayer( active ) && textEditorPanel ) {
 			textEditorPanel.hidden = false;
 			if ( textEditorHint ) {
 				textEditorHint.hidden = true;
 			}
-			if ( placeholderMeta ) {
-				placeholderMeta.hidden = ! placeholderSelected;
-			}
-			syncTextEditorPanel( active, placeholderSelected );
+			syncTextEditorPanel( active );
 		}
 		if ( slotSelected && graphicSlotPropsPanel ) {
 			graphicSlotPropsPanel.hidden = false;
@@ -567,35 +940,47 @@
 		}
 		if ( active ) {
 			syncSelectionDimsPanel( active );
+			syncColorsPanel( active );
 			openAccordionForSelection( active );
+		} else {
+			syncColorsPanel( null );
 		}
 
 		renderLayersList();
+		updateAccordionTitles();
 		updateRulers();
+		syncCustomerMockup();
 	}
 
-	function syncTextEditorPanel( obj, isPlaceholder ) {
+	function syncTextEditorPanel( obj ) {
 		const content = document.getElementById( 'wc_gpd_tpl_text_content' );
 		const font = document.getElementById( 'wc_gpd_tpl_font_family' );
 		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
-		const color = document.getElementById( 'wc_gpd_tpl_text_color' );
-		const shrink = document.getElementById( 'wc_gpd_tpl_shrink_fit' );
-		const lineHeight = document.getElementById( 'wc_gpd_tpl_line_height' );
-		const letterSpacing = document.getElementById( 'wc_gpd_tpl_letter_spacing' );
+		const fitMode = document.getElementById( 'wc_gpd_tpl_fit_mode' );
+		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
+		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
+		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
+		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 		const boldBtn = document.getElementById( 'wc_gpd_tpl_bold' );
 		const italicBtn = document.getElementById( 'wc_gpd_tpl_italic' );
 		const underlineBtn = document.getElementById( 'wc_gpd_tpl_underline' );
-		const label = document.getElementById( 'wc_gpd_placeholder_label' );
-		const key = document.getElementById( 'wc_gpd_placeholder_key' );
-		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 
-		if ( isPlaceholder && label ) {
-			label.value = obj.wcGpdPlaceholderLabel || '';
+		normalizeTextLayer( obj );
+
+		if ( layerLabelInput ) {
+			layerLabelInput.value = obj.wcGpdLayerLabel || obj.wcGpdPlaceholderLabel || '';
 		}
-		if ( isPlaceholder && key ) {
-			key.value = obj.wcGpdPlaceholderKey || '';
+		if ( lockBox ) {
+			lockBox.checked = !! obj.wcGpdLockMove;
 		}
-		if ( isPlaceholder && boxW ) {
+		const allowMove = document.getElementById( 'wc_gpd_allow_move' );
+		if ( allowMove ) {
+			allowMove.checked = ! obj.wcGpdLockMove;
+		}
+		if ( customerFills ) {
+			customerFills.checked = isPlaceholder( obj );
+		}
+		if ( boxW ) {
 			boxW.value = String( Math.round( obj.width || 240 ) );
 		}
 		if ( content ) {
@@ -607,21 +992,11 @@
 		if ( size ) {
 			size.value = String( Math.round( obj.fontSize || 32 ) );
 		}
-		if ( color ) {
-			color.value = obj.fill || '#000000';
+		if ( fitMode ) {
+			fitMode.value = getFitMode( obj );
 		}
-		if ( lineHeight ) {
-			lineHeight.value = String( obj.lineHeight || 1.16 );
-		}
-		if ( letterSpacing ) {
-			letterSpacing.value = String( obj.charSpacing || 0 );
-		}
-		if ( shrinkFitRow ) {
-			shrinkFitRow.hidden = ! isPlaceholder;
-		}
-		if ( shrink ) {
-			shrink.checked = !! obj.wcGpdShrinkToFit;
-		}
+		setStepperDisplay( 'line_height', obj.lineHeight || 1.16 );
+		setStepperDisplay( 'letter_spacing', obj.charSpacing || 0 );
 		if ( boldBtn ) {
 			boldBtn.classList.toggle( 'is-active', obj.fontWeight === 'bold' );
 		}
@@ -885,11 +1260,9 @@
 	function prepareLoadedObject( obj ) {
 		obj.wcGpdTemplateLayer = true;
 		obj.set( { selectable: true, evented: true, hasControls: true, hasBorders: true } );
-		if ( isPlaceholder( obj ) ) {
+		if ( isTextLayer( obj ) ) {
 			obj.set( { editable: true } );
-		}
-		if ( isTemplateText( obj ) ) {
-			obj.set( { editable: true } );
+			normalizeTextLayer( obj );
 		}
 	}
 
@@ -1224,29 +1597,8 @@
 		}
 	}
 
-	function addTemplateText() {
-		const text = new fabric.IText( 'Your text here', {
-			left: width / 2,
-			top: height / 2,
-			originX: 'center',
-			originY: 'center',
-			fontFamily: DEFAULT_FONT,
-			fontSize: 32,
-			fill: '#000000',
-			wcGpdUid: uid(),
-			wcGpdTemplateLayer: true,
-			wcGpdLayerType: 'text',
-		} );
-		canvas.add( text );
-		canvas.setActiveObject( text );
-		sortLayers();
-		canvas.requestRenderAll();
-		updateSelectionPanels();
-	}
-
-	function addPlaceholder() {
-		const key = `field_${ Date.now().toString( 36 ) }`;
-		const box = new fabric.Textbox( 'Name', {
+	function addTextField() {
+		const box = new fabric.Textbox( 'Your text here', {
 			left: width / 2,
 			top: height / 2,
 			originX: 'center',
@@ -1255,28 +1607,21 @@
 			fontFamily: DEFAULT_FONT,
 			fontSize: 32,
 			fill: '#000000',
+			textAlign: 'center',
 			wcGpdUid: uid(),
 			wcGpdTemplateLayer: true,
-			wcGpdLayerType: 'placeholder',
-			wcGpdPlaceholderLabel: 'Name',
-			wcGpdPlaceholderKey: key,
-			wcGpdShrinkToFit: true,
-			wcGpdLockFont: true,
-			wcGpdLockSize: true,
-			wcGpdLockColor: true,
-			wcGpdLockBold: true,
-			wcGpdLockItalic: true,
-			wcGpdLockUnderline: true,
-			wcGpdLockAlign: true,
-			wcGpdLockLineHeight: true,
-			wcGpdLockLetterSpacing: true,
-			wcGpdLockMove: true,
+			wcGpdLayerType: 'text',
+			wcGpdLayerLabel: '',
+			wcGpdFitMode: 'none',
+			wcGpdPaletteId: 'pal_default',
+			wcGpdLockMove: false,
 		} );
 		canvas.add( box );
 		canvas.setActiveObject( box );
 		sortLayers();
 		canvas.requestRenderAll();
 		updateSelectionPanels();
+		openAccordionSection( 'text' );
 	}
 
 	function addImageFromLibrary( attachment ) {
@@ -1539,11 +1884,11 @@
 		}
 		const parsed = parseFloat( lineHeight.value );
 		if ( Number.isNaN( parsed ) ) {
-			lineHeight.value = '1.16';
+			setStepperDisplay( 'line_height', 1.16 );
 			return;
 		}
 		const clamped = Math.min( 3, Math.max( 0.5, parsed ) );
-		lineHeight.value = String( Math.round( clamped * 100 ) / 100 );
+		setStepperDisplay( 'line_height', clamped );
 	}
 
 	function sanitizeFormNumbersBeforeSave() {
@@ -1573,16 +1918,36 @@
 		canvas.requestRenderAll();
 	}
 
+	function bindSteppers() {
+		document.querySelectorAll( '.wc-gpd-stepper-btn' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				const key = btn.dataset.stepper;
+				const dir = parseInt( btn.dataset.dir, 10 ) || 0;
+				const config = STEPPER_CONFIG[ key ];
+				if ( ! config || ! dir ) {
+					return;
+				}
+				const input = document.getElementById( config.inputId );
+				const current = config.parse( input ? input.value : '0', 10 ) || 0;
+				const next = Math.min( config.max, Math.max( config.min, current + ( config.step * dir ) ) );
+				setStepperDisplay( key, next );
+				const obj = activeTextObject();
+				if ( obj ) {
+					obj.set( config.prop, next );
+					canvas.requestRenderAll();
+				}
+			} );
+		} );
+	}
+
 	function bindTextEditor() {
 		const content = document.getElementById( 'wc_gpd_tpl_text_content' );
 		const font = document.getElementById( 'wc_gpd_tpl_font_family' );
 		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
-		const color = document.getElementById( 'wc_gpd_tpl_text_color' );
-		const shrink = document.getElementById( 'wc_gpd_tpl_shrink_fit' );
-		const lineHeight = document.getElementById( 'wc_gpd_tpl_line_height' );
-		const letterSpacing = document.getElementById( 'wc_gpd_tpl_letter_spacing' );
-		const label = document.getElementById( 'wc_gpd_placeholder_label' );
-		const key = document.getElementById( 'wc_gpd_placeholder_key' );
+		const fitMode = document.getElementById( 'wc_gpd_tpl_fit_mode' );
+		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
+		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
+		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
 		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 
 		function applyAndRender( obj ) {
@@ -1620,66 +1985,55 @@
 				}
 			} );
 		}
-		if ( color ) {
-			color.addEventListener( 'input', () => {
+		if ( fitMode ) {
+			fitMode.addEventListener( 'change', () => {
 				const obj = activeTextObject();
 				if ( obj ) {
-					obj.set( 'fill', color.value );
-					applyAndRender( obj );
+					obj.wcGpdFitMode = fitMode.value || 'none';
+					obj.wcGpdShrinkToFit = obj.wcGpdFitMode !== 'none';
 				}
 			} );
 		}
-		if ( lineHeight ) {
-			const applyLineHeight = () => {
-				roundLineHeightInput();
+		if ( layerLabelInput ) {
+			layerLabelInput.addEventListener( 'input', () => {
 				const obj = activeTextObject();
-				if ( obj ) {
-					obj.set( 'lineHeight', parseFloat( lineHeight.value ) || 1.16 );
-					applyAndRender( obj );
+				if ( ! obj ) {
+					return;
 				}
-			};
-			lineHeight.addEventListener( 'input', applyLineHeight );
-			lineHeight.addEventListener( 'change', applyLineHeight );
-			lineHeight.addEventListener( 'blur', roundLineHeightInput );
-		}
-		if ( letterSpacing ) {
-			letterSpacing.addEventListener( 'input', () => {
-				const obj = activeTextObject();
-				if ( obj ) {
-					obj.set( 'charSpacing', parseInt( letterSpacing.value, 10 ) || 0 );
-					applyAndRender( obj );
-				}
+				applyTextLayerFlags( obj );
+				renderLayersList();
+				updateAccordionTitles();
 			} );
 		}
-		if ( shrink ) {
-			shrink.addEventListener( 'change', () => {
+		if ( lockBox ) {
+			lockBox.addEventListener( 'change', () => {
 				const obj = activeTextObject();
 				if ( obj ) {
-					obj.wcGpdShrinkToFit = shrink.checked;
-				}
-			} );
-		}
-		if ( label ) {
-			label.addEventListener( 'input', () => {
-				const obj = activeTextObject();
-				if ( obj && isPlaceholder( obj ) ) {
-					obj.wcGpdPlaceholderLabel = label.value;
+					obj.wcGpdLockMove = lockBox.checked;
+					const allowMove = document.getElementById( 'wc_gpd_allow_move' );
+					if ( allowMove ) {
+						allowMove.checked = ! lockBox.checked;
+					}
 					renderLayersList();
 				}
 			} );
 		}
-		if ( key ) {
-			key.addEventListener( 'input', () => {
+		if ( customerFills ) {
+			customerFills.addEventListener( 'change', () => {
 				const obj = activeTextObject();
-				if ( obj && isPlaceholder( obj ) ) {
-					obj.wcGpdPlaceholderKey = key.value.replace( /\s+/g, '_' ).toLowerCase();
+				if ( obj ) {
+					applyTextLayerFlags( obj );
+					syncTextEditorPanel( obj );
+					renderLayersList();
+					updateAccordionTitles();
+					syncCustomerMockup();
 				}
 			} );
 		}
 		if ( boxW ) {
 			boxW.addEventListener( 'input', () => {
 				const obj = activeTextObject();
-				if ( obj && isPlaceholder( obj ) ) {
+				if ( obj && isTextLayer( obj ) ) {
 					obj.set( 'width', parseInt( boxW.value, 10 ) || 240 );
 					applyAndRender( obj );
 				}
@@ -1930,8 +2284,44 @@
 		showMeasurementsToggle.addEventListener( 'change', updateRulers );
 	}
 
-	document.getElementById( 'wc-gpd-template-add-text' )?.addEventListener( 'click', addTemplateText );
-	document.getElementById( 'wc-gpd-template-add-placeholder' )?.addEventListener( 'click', addPlaceholder );
+	document.getElementById( 'wc-gpd-template-add-text' )?.addEventListener( 'click', addTextField );
+	document.getElementById( 'wc-gpd-add-palette' )?.addEventListener( 'click', () => {
+		const id = `pal_${ Date.now().toString( 36 ) }`;
+		palettesData.palettes = palettesData.palettes || [];
+		palettesData.palettes.push( { id, name: 'New palette', colors: [ '#000000' ] } );
+		savePalettesToInput();
+		renderPalettesAdmin();
+		populateLayerPaletteSelect();
+	} );
+	document.getElementById( 'wc_gpd_layer_palette_id' )?.addEventListener( 'change', ( event ) => {
+		const obj = canvas.getActiveObject();
+		if ( obj && objectHasColor( obj ) ) {
+			obj.wcGpdPaletteId = event.target.value;
+			syncColorsPanel( obj );
+		}
+	} );
+	document.getElementById( 'wc-gpd-add-global-color' )?.addEventListener( 'click', () => {
+		palettesData.global_colors = palettesData.global_colors || [];
+		palettesData.global_colors.push( '#000000' );
+		savePalettesToInput();
+		renderGlobalColorsList();
+		syncColorsPanel( canvas.getActiveObject() );
+	} );
+	const useSameColorsCheckbox = document.getElementById( 'wc_gpd_ps_use_same_colors' );
+	const globalColorsPanel = document.getElementById( 'wc-gpd-global-colors-panel' );
+	if ( useSameColorsCheckbox ) {
+		useSameColorsCheckbox.addEventListener( 'change', () => {
+			palettesData.use_global_colors = useSameColorsCheckbox.checked;
+			savePalettesToInput();
+			if ( globalColorsPanel ) {
+				globalColorsPanel.hidden = ! useSameColorsCheckbox.checked;
+			}
+			syncColorsPanel( canvas.getActiveObject() );
+		} );
+	}
+	Object.values( MOCKUP_CHECKBOX_MAP ).forEach( ( name ) => {
+		document.querySelector( `input[name="${ name }"]` )?.addEventListener( 'change', syncCustomerMockup );
+	} );
 	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', () => {
 		cancelFreeformMode();
 		addGraphicSlot();
@@ -1992,6 +2382,10 @@
 
 	function handleFormSave( event ) {
 		sanitizeFormNumbersBeforeSave();
+		if ( useSameColorsCheckbox ) {
+			palettesData.use_global_colors = useSameColorsCheckbox.checked;
+		}
+		savePalettesToInput();
 		saveJson();
 	}
 
@@ -2005,10 +2399,19 @@
 	initFontSelect();
 	initAccordion();
 	updateUnitSuffixes();
+	loadPalettesFromInput();
+	if ( useSameColorsCheckbox ) {
+		palettesData.use_global_colors = useSameColorsCheckbox.checked;
+	}
+	renderPalettesAdmin();
+	renderGlobalColorsList();
+	populateLayerPaletteSelect();
+	bindSteppers();
 	bindTextEditor();
 	bindImagePropInputs();
 	loadGraphicLibraries();
 	loadJson();
 	updateRulers();
+	syncCustomerMockup();
 	applyResponsiveScale();
 }( jQuery ) );
