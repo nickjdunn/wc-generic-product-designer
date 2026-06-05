@@ -1233,6 +1233,23 @@
 	font-size: 0.6875rem;
 }
 
+.wc-gpd-mockup-layers li.is-active {
+	background: #dbeafe;
+	font-weight: 600;
+}
+
+.wc-gpd-settings-card--wide {
+	grid-column: 1 / -1;
+}
+
+.wc-gpd-context-block--customer .wc-gpd-tpl-customer-options {
+	margin-top: 0.5rem;
+}
+
+.wc-gpd-customer-access-type[hidden] {
+	display: none !important;
+}
+
 .wc-gpd-mockup-field label {
 	display: block;
 	margin-bottom: 0.2rem;

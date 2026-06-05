@@ -358,6 +358,39 @@
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
+	height: 100%;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio.wc-gpd-tpl-layout {
+	min-height: 0;
+	flex: 1 1 auto;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-layers-list {
+	max-height: none;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-section[data-section="layers"] .wc-gpd-accordion-body,
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-section[data-section="add"] .wc-gpd-accordion-body,
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-accordion-section[data-section="context"] .wc-gpd-accordion-body {
+	display: flex !important;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-context-pane {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.wc-gpd-tpl-layer-action--settings {
+	font-size: 13px;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-studio-drawer__body {

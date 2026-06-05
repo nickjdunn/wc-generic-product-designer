@@ -53,12 +53,15 @@
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
-		'wcGpdLockMove', 'wcGpdLockScale', 'strokeDashArray',
+		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockText', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'strokeDashArray',
 	];
 
 	const CUSTOMER_ALLOW_MAP = {
+		text_edit: 'wcGpdLockText',
 		font: 'wcGpdLockFont',
 		size: 'wcGpdLockSize',
+		color: 'wcGpdLockColor',
 		bold: 'wcGpdLockBold',
 		italic: 'wcGpdLockItalic',
 		underline: 'wcGpdLockUnderline',
@@ -66,6 +69,7 @@
 		line_height: 'wcGpdLockLineHeight',
 		letter_spacing: 'wcGpdLockLetterSpacing',
 		move: 'wcGpdLockMove',
+		resize: 'wcGpdLockScale',
 	};
 
 	if ( ! canvasEl || typeof fabric === 'undefined' ) {
@@ -118,20 +122,16 @@
 		},
 	};
 
-	const MOCKUP_CHECKBOX_MAP = {
-		free_text: 'wc_gpd_ps_allow_free_text',
-		font: 'wc_gpd_ps_allow_font_family',
-		size: 'wc_gpd_ps_allow_font_size',
-		color: 'wc_gpd_ps_allow_text_color',
-		bold: 'wc_gpd_ps_allow_bold',
-		italic: 'wc_gpd_ps_allow_italic',
-		underline: 'wc_gpd_ps_allow_underline',
-		line_height: 'wc_gpd_ps_allow_line_height',
-		letter_spacing: 'wc_gpd_ps_allow_letter_spacing',
-		align: 'wc_gpd_ps_allow_text_align',
-		details: 'wc_gpd_ps_allow_details_panel',
-		graphics: 'wc_gpd_ps_allow_customer_graphics',
-		layers: 'wc_gpd_ps_allow_layers_panel',
+	const MOCKUP_LAYER_TOOL_MAP = {
+		font: 'wcGpdLockFont',
+		size: 'wcGpdLockSize',
+		color: 'wcGpdLockColor',
+		bold: 'wcGpdLockBold',
+		italic: 'wcGpdLockItalic',
+		underline: 'wcGpdLockUnderline',
+		line_height: 'wcGpdLockLineHeight',
+		letter_spacing: 'wcGpdLockLetterSpacing',
+		align: 'wcGpdLockAlign',
 	};
 
 	const UNIT_FACTORS = {
@@ -785,8 +785,6 @@
 		context: 'Edit',
 	};
 
-	const MOCKUP_EDIT_KEYS = [ 'font', 'size', 'color', 'bold', 'italic', 'underline', 'line_height', 'letter_spacing', 'align' ];
-
 	function initAddMenuCollapsible( root ) {
 		const scope = root || document;
 		scope.querySelectorAll( '.wc-gpd-add-menu--collapsible .wc-gpd-add-menu__toggle' ).forEach( ( toggle ) => {
@@ -859,25 +857,41 @@
 		} );
 	}
 
+	function layerCustomerEditable( obj ) {
+		return !! obj && obj.wcGpdCustomerEditable !== false;
+	}
+
 	function syncCustomerMockup() {
 		const mockupRoot = '#wc-gpd-customer-mockup';
-		Object.keys( MOCKUP_CHECKBOX_MAP ).forEach( ( key ) => {
-			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
-			const on = checkbox ? checkbox.checked : false;
+		const active = canvas.getActiveObject();
+		const editable = layerCustomerEditable( active );
+
+		Object.keys( MOCKUP_LAYER_TOOL_MAP ).forEach( ( key ) => {
+			const lockProp = MOCKUP_LAYER_TOOL_MAP[ key ];
+			const allowed = editable && active && ! active[ lockProp ];
 			document.querySelectorAll( `${ mockupRoot } [data-mockup="${ key }"]` ).forEach( ( el ) => {
-				el.hidden = ! on;
+				el.hidden = ! allowed;
 			} );
 		} );
 
-		const anyEdit = MOCKUP_EDIT_KEYS.some( ( key ) => {
-			const checkbox = document.querySelector( `input[name="${ MOCKUP_CHECKBOX_MAP[ key ] }"]` );
-			return checkbox && checkbox.checked;
-		} );
+		const anyEdit = editable && active && isTextLayer( active ) && Object.keys( MOCKUP_LAYER_TOOL_MAP ).some( ( key ) => ! active[ MOCKUP_LAYER_TOOL_MAP[ key ] ] );
 		document.querySelectorAll( `${ mockupRoot } [data-mockup-edit-nav]` ).forEach( ( el ) => {
 			el.hidden = ! anyEdit;
 		} );
 
-		const hasPlaceholders = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) );
+		const freeTextCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_free_text"]' );
+		const freeTextOn = ! freeTextCheckbox || freeTextCheckbox.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="free_text"]` ).forEach( ( el ) => {
+			el.hidden = ! freeTextOn;
+		} );
+
+		const layersCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_layers_panel"]' );
+		const layersOn = ! layersCheckbox || layersCheckbox.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="layers"]` ).forEach( ( el ) => {
+			el.hidden = ! layersOn;
+		} );
+
+		const hasPlaceholders = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) && layerCustomerEditable( obj ) );
 		const detailsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_details_panel"]' );
 		const graphicsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_customer_graphics"]' );
 		const detailsOn = detailsCheckbox && detailsCheckbox.checked;
@@ -897,6 +911,112 @@
 		const graphicsEl = document.querySelector( `${ mockupRoot } .wc-gpd-mockup-graphics` );
 		if ( graphicsEl ) {
 			graphicsEl.hidden = ! graphicsOn || ! detailsOn;
+		}
+
+		const mockupLayers = document.querySelector( `${ mockupRoot } .wc-gpd-mockup-layers` );
+		if ( mockupLayers ) {
+			const visibleLayers = canvas.getObjects().filter( ( obj ) => ! obj.wcGpdHideFromCustomerLayers && layerCustomerEditable( obj ) && ( isTextLayer( obj ) || isPlaceholder( obj ) ) );
+			mockupLayers.innerHTML = '';
+			if ( ! visibleLayers.length ) {
+				const empty = document.createElement( 'li' );
+				empty.textContent = 'No editable layers';
+				mockupLayers.appendChild( empty );
+			} else {
+				visibleLayers.reverse().forEach( ( obj ) => {
+					const li = document.createElement( 'li' );
+					li.textContent = layerLabel( obj );
+					if ( active === obj ) {
+						li.classList.add( 'is-active' );
+					}
+					mockupLayers.appendChild( li );
+				} );
+			}
+		}
+	}
+
+	function syncCustomerAccessPanel( obj ) {
+		const editableEl = document.getElementById( 'wc_gpd_customer_editable' );
+		const visibleEl = document.getElementById( 'wc_gpd_show_in_customer_layers' );
+		const customerBlock = document.getElementById( 'wc-gpd-context-block-customer' );
+		if ( ! obj || ! customerBlock ) {
+			return;
+		}
+
+		const type = contextTypeForObject( obj );
+		document.querySelectorAll( '.wc-gpd-customer-access-type' ).forEach( ( panel ) => {
+			panel.hidden = panel.dataset.accessFor !== type;
+		} );
+
+		if ( editableEl ) {
+			editableEl.checked = obj.wcGpdCustomerEditable !== false;
+		}
+		if ( visibleEl ) {
+			visibleEl.checked = ! obj.wcGpdHideFromCustomerLayers;
+		}
+
+		const subDisabled = obj.wcGpdCustomerEditable === false;
+		customerBlock.querySelectorAll( '.wc-gpd-customer-access-type input' ).forEach( ( input ) => {
+			input.disabled = subDisabled;
+		} );
+
+		if ( isTextLayer( obj ) ) {
+			const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
+			if ( customerFills ) {
+				customerFills.checked = isPlaceholder( obj );
+			}
+			setAllowCheckboxes( obj );
+		}
+
+		if ( isTemplateImage( obj ) ) {
+			const allowMove = document.getElementById( 'wc_gpd_graphic_allow_move' );
+			const allowResize = document.getElementById( 'wc_gpd_graphic_allow_resize' );
+			const lockAspect = document.getElementById( 'wc_gpd_graphic_lock_aspect' );
+			if ( allowMove ) {
+				allowMove.checked = ! obj.wcGpdLockMove;
+			}
+			if ( allowResize ) {
+				allowResize.checked = ! obj.wcGpdLockScale;
+			}
+			if ( lockAspect ) {
+				lockAspect.checked = !! obj.wcGpdLockAspect;
+			}
+		}
+
+		if ( isShape( obj ) ) {
+			const allowColor = document.getElementById( 'wc_gpd_shape_allow_color' );
+			const allowMove = document.getElementById( 'wc_gpd_shape_allow_move' );
+			const allowResize = document.getElementById( 'wc_gpd_shape_allow_resize' );
+			const outline = document.getElementById( 'wc_gpd_customer_shape_outline' );
+			const bbox = document.getElementById( 'wc_gpd_customer_shape_bbox' );
+			if ( allowColor ) {
+				allowColor.checked = ! obj.wcGpdLockColor;
+			}
+			if ( allowMove ) {
+				allowMove.checked = ! obj.wcGpdLockMove;
+			}
+			if ( allowResize ) {
+				allowResize.checked = ! obj.wcGpdLockScale;
+			}
+			if ( outline ) {
+				outline.checked = !! obj.wcGpdOutlineLayer;
+			}
+			if ( bbox ) {
+				bbox.checked = !! obj.wcGpdBoundingBox;
+			}
+		}
+	}
+
+	function openLayerSettings( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		canvas.setActiveObject( obj );
+		canvas.requestRenderAll();
+		updateSelectionPanels();
+		openContextPane();
+		const block = document.getElementById( 'wc-gpd-context-block-customer' );
+		if ( block ) {
+			block.scrollIntoView( { behavior: 'smooth', block: 'nearest' } );
 		}
 	}
 
@@ -924,7 +1044,6 @@
 		}
 		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
 		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
-		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
 
 		if ( customerFills && customerFills.checked ) {
 			obj.wcGpdLayerType = 'placeholder';
@@ -940,9 +1059,6 @@
 			if ( layerLabelInput ) {
 				obj.wcGpdLayerLabel = layerLabelInput.value;
 			}
-		}
-		if ( lockBox ) {
-			obj.wcGpdLockMove = lockBox.checked;
 		}
 	}
 
@@ -1127,6 +1243,7 @@
 				contextLayerName.textContent = layerLabel( active );
 			}
 			showContextBlocks( active );
+			syncCustomerAccessPanel( active );
 			syncSelectionDimsPanel( active );
 			syncColorsPanel( active );
 			syncContextNav( active );
@@ -1154,7 +1271,6 @@
 		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
 		const fitMode = document.getElementById( 'wc_gpd_tpl_fit_mode' );
 		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
-		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
 		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
 		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 		const boldBtn = document.getElementById( 'wc_gpd_tpl_bold' );
@@ -1165,9 +1281,6 @@
 
 		if ( layerLabelInput ) {
 			layerLabelInput.value = obj.wcGpdLayerLabel || obj.wcGpdPlaceholderLabel || '';
-		}
-		if ( lockBox ) {
-			lockBox.checked = !! obj.wcGpdLockMove;
 		}
 		const allowMove = document.getElementById( 'wc_gpd_allow_move' );
 		if ( allowMove ) {
@@ -1249,6 +1362,8 @@
 			obj.wcGpdLockMove = true;
 			obj.wcGpdLockScale = true;
 			obj.wcGpdLockAspect = false;
+			obj.wcGpdCustomerEditable = false;
+			obj.wcGpdHideFromCustomerLayers = true;
 		} else if ( role === 'fixed' ) {
 			obj.wcGpdMockupImage = false;
 			obj.wcGpdGraphicLayer = true;
@@ -1259,6 +1374,8 @@
 			obj.wcGpdCustomerMovable = false;
 			obj.wcGpdCustomerResizable = false;
 			obj.wcGpdLockAspect = false;
+			obj.wcGpdCustomerEditable = false;
+			obj.wcGpdHideFromCustomerLayers = true;
 		} else {
 			obj.wcGpdMockupImage = false;
 			obj.wcGpdGraphicLayer = true;
@@ -1268,6 +1385,8 @@
 			obj.wcGpdLockScale = false;
 			obj.wcGpdCustomerMovable = true;
 			obj.wcGpdCustomerResizable = true;
+			obj.wcGpdCustomerEditable = true;
+			obj.wcGpdHideFromCustomerLayers = false;
 		}
 		if ( canvas.getObjects().indexOf( obj ) >= 0 ) {
 			sortLayers();
@@ -1411,6 +1530,9 @@
 			} );
 			const actions = document.createElement( 'span' );
 			actions.className = 'wc-gpd-tpl-layer-actions';
+			const settingsBtn = layerActionBtn( 'Layer settings', '⚙', () => openLayerSettings( obj ) );
+			settingsBtn.classList.add( 'wc-gpd-tpl-layer-action--settings' );
+			actions.appendChild( settingsBtn );
 			actions.appendChild( layerActionBtn( 'Move up', '↑', () => moveLayer( obj, 'up' ) ) );
 			actions.appendChild( layerActionBtn( 'Move down', '↓', () => moveLayer( obj, 'down' ) ) );
 			actions.appendChild( layerActionBtn( 'Rename', '✎', () => renameLayer( obj ) ) );
@@ -1811,6 +1933,8 @@
 			wcGpdLayerLabel: '',
 			wcGpdFitMode: 'none',
 			wcGpdPaletteId: 'pal_default',
+			wcGpdCustomerEditable: true,
+			wcGpdHideFromCustomerLayers: false,
 			wcGpdLockMove: false,
 		} );
 		canvas.add( box );
@@ -2143,7 +2267,6 @@
 		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
 		const fitMode = document.getElementById( 'wc_gpd_tpl_fit_mode' );
 		const layerLabelInput = document.getElementById( 'wc_gpd_text_layer_label' );
-		const lockBox = document.getElementById( 'wc_gpd_text_lock_box' );
 		const customerFills = document.getElementById( 'wc_gpd_text_customer_fills' );
 		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 
@@ -2200,19 +2323,6 @@
 				applyTextLayerFlags( obj );
 				renderLayersList();
 				updateAccordionTitles();
-			} );
-		}
-		if ( lockBox ) {
-			lockBox.addEventListener( 'change', () => {
-				const obj = activeTextObject();
-				if ( obj ) {
-					obj.wcGpdLockMove = lockBox.checked;
-					const allowMove = document.getElementById( 'wc_gpd_allow_move' );
-					if ( allowMove ) {
-						allowMove.checked = ! lockBox.checked;
-					}
-					renderLayersList();
-				}
 			} );
 		}
 		if ( customerFills ) {
@@ -2285,13 +2395,115 @@
 			const el = document.getElementById( 'wc_gpd_allow_' + key );
 			if ( el ) {
 				el.addEventListener( 'change', () => {
-					const obj = activeTextObject();
-					if ( obj ) {
+					const obj = canvas.getActiveObject();
+					if ( obj && isTextLayer( obj ) ) {
 						applyAllowCheckboxes( obj );
+						syncCustomerMockup();
 					}
 				} );
 			}
 		} );
+	}
+
+	function bindCustomerAccessPanel() {
+		const editableEl = document.getElementById( 'wc_gpd_customer_editable' );
+		const visibleEl = document.getElementById( 'wc_gpd_show_in_customer_layers' );
+
+		function refreshCustomerAccess() {
+			const obj = canvas.getActiveObject();
+			if ( obj ) {
+				syncCustomerAccessPanel( obj );
+				syncCustomerMockup();
+				renderLayersList();
+			}
+		}
+
+		if ( editableEl ) {
+			editableEl.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( ! obj ) {
+					return;
+				}
+				obj.wcGpdCustomerEditable = editableEl.checked;
+				if ( ! editableEl.checked ) {
+					obj.wcGpdHideFromCustomerLayers = true;
+					if ( visibleEl ) {
+						visibleEl.checked = false;
+					}
+				}
+				refreshCustomerAccess();
+			} );
+		}
+		if ( visibleEl ) {
+			visibleEl.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( ! obj ) {
+					return;
+				}
+				obj.wcGpdHideFromCustomerLayers = ! visibleEl.checked;
+				refreshCustomerAccess();
+			} );
+		}
+
+		const shapeColor = document.getElementById( 'wc_gpd_shape_allow_color' );
+		const shapeMove = document.getElementById( 'wc_gpd_shape_allow_move' );
+		const shapeResize = document.getElementById( 'wc_gpd_shape_allow_resize' );
+		const shapeOutline = document.getElementById( 'wc_gpd_customer_shape_outline' );
+		const shapeBbox = document.getElementById( 'wc_gpd_customer_shape_bbox' );
+
+		if ( shapeColor ) {
+			shapeColor.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isShape( obj ) ) {
+					obj.wcGpdLockColor = ! shapeColor.checked;
+					syncCustomerMockup();
+				}
+			} );
+		}
+		if ( shapeMove ) {
+			shapeMove.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isShape( obj ) ) {
+					obj.wcGpdLockMove = ! shapeMove.checked;
+					syncCustomerMockup();
+				}
+			} );
+		}
+		if ( shapeResize ) {
+			shapeResize.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isShape( obj ) ) {
+					obj.wcGpdLockScale = ! shapeResize.checked;
+					syncCustomerMockup();
+				}
+			} );
+		}
+		if ( shapeOutline ) {
+			shapeOutline.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isShape( obj ) ) {
+					obj.wcGpdOutlineLayer = shapeOutline.checked;
+					if ( outlineToggle ) {
+						outlineToggle.checked = shapeOutline.checked;
+					}
+					applyStrokeToObject( obj, shapeOutline.checked );
+					canvas.requestRenderAll();
+				}
+			} );
+		}
+		if ( shapeBbox ) {
+			shapeBbox.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isShape( obj ) ) {
+					obj.wcGpdBoundingBox = shapeBbox.checked;
+					if ( bboxToggle ) {
+						bboxToggle.checked = shapeBbox.checked;
+					}
+					applyStrokeToObject( obj, !! obj.wcGpdOutlineLayer );
+					canvas.requestRenderAll();
+				}
+			} );
+		}
 	}
 
 	function bindImagePropInputs() {
@@ -2325,6 +2537,7 @@
 				if ( isGraphicImage( obj ) ) {
 					obj.wcGpdLockMove = ! allowMove.checked;
 					obj.wcGpdCustomerMovable = allowMove.checked;
+					syncCustomerMockup();
 				}
 			} );
 		}
@@ -2334,6 +2547,7 @@
 				if ( isGraphicImage( obj ) ) {
 					obj.wcGpdLockScale = ! allowResize.checked;
 					obj.wcGpdCustomerResizable = allowResize.checked;
+					syncCustomerMockup();
 				}
 			} );
 		}
@@ -2342,6 +2556,7 @@
 				const obj = canvas.getActiveObject();
 				if ( isGraphicImage( obj ) ) {
 					obj.wcGpdLockAspect = lockAspect.checked;
+					syncCustomerMockup();
 				}
 			} );
 		}
@@ -2516,7 +2731,12 @@
 			syncColorsPanel( canvas.getActiveObject() );
 		} );
 	}
-	Object.values( MOCKUP_CHECKBOX_MAP ).forEach( ( name ) => {
+	[
+		'wc_gpd_ps_allow_free_text',
+		'wc_gpd_ps_allow_layers_panel',
+		'wc_gpd_ps_allow_details_panel',
+		'wc_gpd_ps_allow_customer_graphics',
+	].forEach( ( name ) => {
 		document.querySelector( `input[name="${ name }"]` )?.addEventListener( 'change', syncCustomerMockup );
 	} );
 	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', () => {
@@ -2607,6 +2827,7 @@
 	populateLayerPaletteSelect();
 	bindSteppers();
 	bindTextEditor();
+	bindCustomerAccessPanel();
 	bindImagePropInputs();
 	loadGraphicLibraries();
 	loadJson();

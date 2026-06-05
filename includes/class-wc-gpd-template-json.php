@@ -278,6 +278,9 @@ class WC_GPD_Template_Json {
 		$object['wcGpdLockLetterSpacing']  = ! empty( $object['wcGpdLockLetterSpacing'] );
 		$object['wcGpdLockMove']           = ! empty( $object['wcGpdLockMove'] );
 		$object['wcGpdLockScale']          = ! empty( $object['wcGpdLockScale'] );
+		$object['wcGpdLockText']           = ! empty( $object['wcGpdLockText'] );
+		$object['wcGpdCustomerEditable']   = ! isset( $object['wcGpdCustomerEditable'] ) || ! empty( $object['wcGpdCustomerEditable'] );
+		$object['wcGpdHideFromCustomerLayers'] = ! empty( $object['wcGpdHideFromCustomerLayers'] );
 		if ( ! empty( $object['wcGpdLayerLabel'] ) ) {
 			$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
 		} else {

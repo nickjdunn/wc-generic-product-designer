@@ -162,8 +162,9 @@
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
-		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockMove',
-		'wcGpdLockScale', 'wcGpdLockAspect',
+		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
+		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
+		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 	];
 
 	function paletteColorsForObject( obj ) {
@@ -193,10 +194,7 @@
 	}
 
 	function textColorAllowed( obj ) {
-		if ( productSettings.allow_text_color === false ) {
-			return false;
-		}
-		if ( obj && obj.wcGpdLockColor ) {
+		if ( ! layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' ) ) {
 			return false;
 		}
 		return paletteColorsForObject( obj ).length > 1;
@@ -285,24 +283,38 @@
 		designerOpen = false;
 	}
 
+	function layerAllowsTool( obj, lockProp, productKey ) {
+		if ( ! obj || obj[ lockProp ] ) {
+			return false;
+		}
+		if ( productKey && productSettings[ productKey ] === false ) {
+			return false;
+		}
+		return true;
+	}
+
 	function applyProductToolSettings() {
-		const showColor = textColorAllowed( activeText );
-		setToolVisible( ui.colorSwatches, showColor );
-		setToolVisible( ui.textColor, showColor );
-		setToolVisible( ui.fontFamily, productSettings.allow_font_family !== false );
-		setToolVisible( ui.fontSize, productSettings.allow_font_size !== false );
-		setToolVisible( ui.boldBtn, productSettings.allow_bold !== false );
-		setToolVisible( ui.italicBtn, productSettings.allow_italic !== false );
-		setToolVisible( ui.underlineBtn, productSettings.allow_underline !== false );
-		setToolVisible( ui.lineHeightLabel || ui.lineHeight, productSettings.allow_line_height !== false );
-		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, productSettings.allow_letter_spacing !== false );
-		setToolVisible( ui.alignRow, productSettings.allow_text_align !== false );
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
 		if ( ui.navLayers ) {
 			ui.navLayers.hidden = productSettings.allow_layers_panel === false;
 		}
+		applyLayerToolSettings( activeText );
+	}
+
+	function applyLayerToolSettings( obj ) {
+		const showColor = textColorAllowed( obj );
+		setToolVisible( ui.colorSwatches, showColor );
+		setToolVisible( ui.textColor, showColor );
+		setToolVisible( ui.fontFamily, layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ) );
+		setToolVisible( ui.fontSize, layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ) );
+		setToolVisible( ui.boldBtn, layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ) );
+		setToolVisible( ui.italicBtn, layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' ) );
+		setToolVisible( ui.underlineBtn, layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' ) );
+		setToolVisible( ui.lineHeightLabel || ui.lineHeight, layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' ) );
+		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' ) );
+		setToolVisible( ui.alignRow, layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' ) );
 		if ( ui.textColor ) {
-			ui.textColor.value = defaultTextColor( activeText );
+			ui.textColor.value = defaultTextColor( obj );
 		}
 	}
 
@@ -678,8 +690,16 @@
 		return !! obj && obj.wcGpdLayerType === 'placeholder';
 	}
 
+	function isCustomerEditableTemplateText( obj ) {
+		return !! obj && obj.wcGpdLayerType === 'text' && obj.wcGpdTemplateLayer && obj.wcGpdCustomerEditable !== false;
+	}
+
 	function isFixedTemplateText( obj ) {
-		return !! obj && obj.wcGpdLayerType === 'text' && obj.wcGpdTemplateLayer;
+		return !! obj && obj.wcGpdLayerType === 'text' && obj.wcGpdTemplateLayer && obj.wcGpdCustomerEditable === false;
+	}
+
+	function layerVisibleToCustomer( obj ) {
+		return !! obj && ! obj.wcGpdHideFromCustomerLayers && obj.wcGpdCustomerEditable !== false;
 	}
 
 	function isTemplateGraphic( obj ) {
@@ -906,6 +926,20 @@
 								canvas.add( obj );
 								return;
 							}
+							if ( isCustomerEditableTemplateText( obj ) ) {
+								if ( ! obj.wcGpdBaseFontSize ) {
+									obj.wcGpdBaseFontSize = obj.fontSize || 32;
+								}
+								shrinkTextToFit( obj );
+								applyTextCustomerInteractivity( obj );
+								canvas.add( obj );
+								return;
+							}
+							if ( isTemplateGraphic( obj ) && layerVisibleToCustomer( obj ) && ( ! obj.wcGpdLockMove || ! obj.wcGpdLockScale ) ) {
+								applyGraphicInteractivity( obj );
+								canvas.add( obj );
+								return;
+							}
 							if ( isFixedTemplateText( obj ) || isTemplateGraphic( obj ) ) {
 								obj.set( {
 									selectable: false,
@@ -1040,7 +1074,7 @@
 		if ( ! obj || obj.wcGpdBackground ) {
 			return false;
 		}
-		if ( isPlaceholderLayer( obj ) || isFixedTemplateText( obj ) ) {
+		if ( isPlaceholderLayer( obj ) || isFixedTemplateText( obj ) || isCustomerEditableTemplateText( obj ) ) {
 			return true;
 		}
 		if ( isTemplateLayer( obj ) ) {
@@ -1065,6 +1099,27 @@
 		}
 		const type = obj.type || '';
 		return ( type === 'rect' || type === 'circle' || type === 'ellipse' ) && obj.wcGpdLayerType === 'shape';
+	}
+
+	function applyTextCustomerInteractivity( obj ) {
+		if ( ! obj || isPlaceholderLayer( obj ) ) {
+			return;
+		}
+		const lockMove = !! obj.wcGpdLockMove;
+		const lockScale = !! obj.wcGpdLockScale;
+		const lockText = !! obj.wcGpdLockText;
+		const visible = layerVisibleToCustomer( obj );
+		obj.set( {
+			selectable: visible,
+			evented: visible,
+			hasControls: visible && ! lockScale,
+			hasBorders: visible && ! lockScale,
+			lockMovementX: lockMove,
+			lockMovementY: lockMove,
+			lockScalingX: lockScale,
+			lockScalingY: lockScale,
+			editable: visible && ! lockText,
+		} );
 	}
 
 	function applyGraphicInteractivity( obj ) {
@@ -1154,6 +1209,43 @@
 		return canvas.getObjects().filter( ( o ) => isUsableTextLayer( o ) );
 	}
 
+	function getCustomerLayers() {
+		return canvas.getObjects().filter( ( obj ) => {
+			if ( ! layerVisibleToCustomer( obj ) ) {
+				return false;
+			}
+			if ( isPlaceholderLayer( obj ) ) {
+				return false;
+			}
+			if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
+				return true;
+			}
+			if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
+				return true;
+			}
+			if ( isCustomerGraphic( obj ) ) {
+				return true;
+			}
+			return false;
+		} );
+	}
+
+	function isCustomerSelectableLayer( obj ) {
+		if ( ! layerVisibleToCustomer( obj ) ) {
+			return false;
+		}
+		if ( isPlaceholderLayer( obj ) ) {
+			return false;
+		}
+		if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
+			return true;
+		}
+		if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
+			return true;
+		}
+		return false;
+	}
+
 	/**
 	 * @returns {boolean}
 	 */
@@ -1207,7 +1299,7 @@
 			return;
 		}
 
-		const layers = getUsableTextLayers();
+		const layers = getCustomerLayers();
 		ui.layersList.innerHTML = '';
 
 		if ( ! layers.length ) {
@@ -1343,6 +1435,7 @@
 		} );
 
 		enforcePaletteColor( obj );
+		applyLayerToolSettings( obj );
 	}
 
 	/**
@@ -1761,7 +1854,7 @@
 	// Events
 	canvas.on( 'selection:created', ( e ) => {
 		const target = e.selected?.[ 0 ] || e.target;
-		if ( isUsableTextLayer( target ) ) {
+		if ( isCustomerSelectableLayer( target ) ) {
 			syncToolbar( target );
 			syncLayersList();
 		} else {
@@ -1771,7 +1864,7 @@
 
 	canvas.on( 'selection:updated', ( e ) => {
 		const target = e.selected?.[ 0 ] || e.target;
-		if ( isUsableTextLayer( target ) ) {
+		if ( isCustomerSelectableLayer( target ) ) {
 			syncToolbar( target );
 			syncLayersList();
 		} else {
