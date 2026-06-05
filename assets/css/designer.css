@@ -137,3 +137,8 @@
 .single-product.wc-gpd-product .woocommerce-product-gallery {
 	display: none;
 }
+
+.single_add_to_cart_button.wc-gpd-submitting {
+	opacity: 0.65;
+	pointer-events: none;
+}

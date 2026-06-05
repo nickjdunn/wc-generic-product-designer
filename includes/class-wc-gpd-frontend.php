@@ -49,6 +49,22 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
 		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer' ), 5 );
 		add_filter( 'body_class', array( $this, 'add_body_class' ) );
+		add_filter( 'woocommerce_product_supports', array( $this, 'disable_ajax_add_to_cart' ), 10, 3 );
+	}
+
+	/**
+	 * Force standard form POST on designer products (not AJAX from archive handlers).
+	 *
+	 * @param bool       $supports  Whether product supports feature.
+	 * @param string     $feature   Feature name.
+	 * @param WC_Product $product   Product.
+	 * @return bool
+	 */
+	public function disable_ajax_add_to_cart( $supports, $feature, $product ) {
+		if ( 'ajax_add_to_cart' === $feature && $product && WC_GPD_Product_Meta::is_enabled( $product->get_id() ) ) {
+			return false;
+		}
+		return $supports;
 	}
 
 	/**

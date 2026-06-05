@@ -15,13 +15,55 @@
 
 	const canvasEl = document.getElementById( 'wc-gpd-canvas' );
 	const designerRoot = document.getElementById( 'wc-gpd-designer' );
-	const svgInput = document.getElementById( 'wc-gpd-design-svg' );
-	const form = document.querySelector( 'form.cart' );
+	let svgInput = document.getElementById( 'wc-gpd-design-svg' );
+
+	/**
+	 * Find the add-to-cart form (theme-safe).
+	 *
+	 * @returns {HTMLFormElement|null}
+	 */
+	function resolveCartForm() {
+		if ( designerRoot ) {
+			const closest = designerRoot.closest( 'form' );
+			if ( closest ) {
+				return closest;
+			}
+		}
+		return document.querySelector( 'form.cart, form.variations_form, .cart form' );
+	}
+
+	const form = resolveCartForm();
 
 	if ( ! canvasEl || ! designerRoot || ! svgInput || ! form ) {
-		log.error( 'Designer markup missing required elements' );
+		if ( log.error ) {
+			log.error( 'Designer markup missing required elements', {
+				canvas: !! canvasEl,
+				root: !! designerRoot,
+				svgInput: !! svgInput,
+				form: !! form,
+			} );
+		}
 		return;
 	}
+
+	/**
+	 * Ensure hidden SVG field and nonce live inside the cart form.
+	 */
+	function ensureFieldsInForm() {
+		if ( form.contains( svgInput ) ) {
+			return;
+		}
+		form.appendChild( svgInput );
+		log.debug( 'Moved SVG input into cart form' );
+
+		const nonce = designerRoot.querySelector( 'input[name="wc_gpd_add_to_cart_nonce"]' );
+		if ( nonce && ! form.contains( nonce ) ) {
+			form.appendChild( nonce );
+			log.debug( 'Moved nonce into cart form' );
+		}
+	}
+
+	ensureFieldsInForm();
 
 	const PROD_WIDTH = config.canvasWidth;
 	const PROD_HEIGHT = config.canvasHeight;
@@ -215,10 +257,22 @@
 	}
 
 	/**
+	 * @param {fabric.Object} obj Fabric object.
+	 * @returns {boolean}
+	 */
+	function isTextLayer( obj ) {
+		if ( ! obj || obj.wcGpdBackground ) {
+			return false;
+		}
+		const type = obj.type || '';
+		return !! obj.wcGpdTextLayer || type === 'i-text' || type === 'text' || type === 'textbox';
+	}
+
+	/**
 	 * @returns {boolean}
 	 */
 	function hasTextLayer() {
-		return canvas.getObjects().some( ( o ) => o.wcGpdTextLayer );
+		return canvas.getObjects().some( ( o ) => isTextLayer( o ) );
 	}
 
 	/**
@@ -301,7 +355,7 @@
 
 		canvas.getObjects().forEach( ( o ) => {
 			o._wcGpdWasVisible = o.visible;
-			o.visible = !! o.wcGpdTextLayer;
+			o.visible = isTextLayer( o );
 		} );
 
 		canvas.renderAll();
@@ -338,34 +392,113 @@
 	}
 
 	/**
-	 * Intercept add to cart: inject SVG then submit natively.
+	 * Export SVG and write to hidden input.
+	 *
+	 * @returns {boolean}
+	 */
+	function prepareDesignForCart() {
+		if ( ! hasTextLayer() ) {
+			log.warn( 'Add to cart blocked: no text layers' );
+			window.alert( config.i18n.layerRequired );
+			return false;
+		}
+
+		const svg = exportProductionSvg();
+		if ( ! svg ) {
+			log.error( 'SVG export failed' );
+			window.alert( config.i18n.exportError );
+			return false;
+		}
+
+		ensureFieldsInForm();
+		svgInput.value = svg;
+		return true;
+	}
+
+	/**
+	 * @returns {HTMLElement|null}
+	 */
+	function getAddToCartButton() {
+		return form.querySelector(
+			'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"], .single_add_to_cart_button'
+		);
+	}
+
+	/**
+	 * POST the cart form after SVG is ready.
+	 */
+	function submitCartForm() {
+		submitApproved = true;
+		const btn = getAddToCartButton();
+
+		if ( btn ) {
+			btn.classList.add( 'wc-gpd-submitting' );
+			btn.setAttribute( 'aria-busy', 'true' );
+		}
+
+		log.info( 'Submitting add to cart with design SVG' );
+
+		if ( typeof form.requestSubmit === 'function' ) {
+			form.requestSubmit( btn || undefined );
+			return;
+		}
+
+		// Fallback: temporary submit control (fires submit event unlike form.submit()).
+		const fallback = document.createElement( 'input' );
+		fallback.type = 'submit';
+		fallback.hidden = true;
+		fallback.setAttribute( 'aria-hidden', 'true' );
+		form.appendChild( fallback );
+		fallback.click();
+		fallback.remove();
+	}
+
+	/**
+	 * Intercept add to cart (themes often use click/AJAX instead of form submit).
 	 */
 	function bindAddToCart() {
-		form.addEventListener( 'submit', ( event ) => {
+		const onIntent = ( event ) => {
 			if ( submitApproved ) {
 				return;
 			}
 
 			event.preventDefault();
+			event.stopPropagation();
+			if ( typeof event.stopImmediatePropagation === 'function' ) {
+				event.stopImmediatePropagation();
+			}
 
-			if ( ! hasTextLayer() ) {
-				log.warn( 'Add to cart blocked: no text layers' );
-				window.alert( config.i18n.layerRequired );
+			if ( ! prepareDesignForCart() ) {
 				return;
 			}
 
-			const svg = exportProductionSvg();
-			if ( ! svg ) {
-				log.error( 'SVG export failed' );
-				window.alert( config.i18n.exportError );
+			submitCartForm();
+		};
+
+		form.addEventListener( 'submit', ( event ) => {
+			if ( submitApproved ) {
 				return;
 			}
-
-			svgInput.value = svg;
-			submitApproved = true;
-			log.info( 'Submitting add to cart with design SVG' );
-			form.submit();
+			onIntent( event );
 		} );
+
+		// Capture phase runs before theme/WooCommerce jQuery handlers.
+		document.addEventListener(
+			'click',
+			( event ) => {
+				if ( submitApproved ) {
+					return;
+				}
+				const btn = event.target.closest(
+					'button.single_add_to_cart_button, button[name="add-to-cart"], input[name="add-to-cart"]'
+				);
+				if ( ! btn || ! form.contains( btn ) ) {
+					return;
+				}
+				onIntent( event );
+			},
+			true
+		);
 	}
 
 	// Events
