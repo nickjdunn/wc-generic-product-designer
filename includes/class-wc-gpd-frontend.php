@@ -156,6 +156,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			true
 		);
 
+		$template_ref = ! empty( $settings['template_ref'] ) ? absint( $settings['template_ref'] ) : 0;
+		WC_GPD_Font_Registry::enqueue_for_designer( $template_ref );
+
 		wp_localize_script(
 			'wc-gpd-designer',
 			'wcGpdDesigner',
@@ -170,6 +173,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'replaceGallery'     => ! empty( $settings['product_settings']['replace_product_gallery'] ),
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
 				'graphicLibrary'     => ! empty( $settings['graphic_library'] ) ? $settings['graphic_library'] : array(),
+				'graphicLibraries'   => ! empty( $settings['graphic_libraries'] ) ? $settings['graphic_libraries'] : array(),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'          => self::NONCE_NAME,
@@ -221,14 +225,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'placeholderRequired' => __( 'Fill in the required fields before adding to cart.', 'wc-generic-product-designer' ),
 					'layers'          => __( 'Layers', 'wc-generic-product-designer' ),
 				),
-				'fonts'        => array(
-					'Arial, Helvetica, sans-serif',
-					'Georgia, serif',
-					'"Times New Roman", Times, serif',
-					'Impact, Charcoal, sans-serif',
-					'Courier, "Courier New", monospace',
-					'Verdana, Geneva, sans-serif',
-				),
+				'fonts'        => WC_GPD_Font_Registry::font_families_for_js( $template_ref ),
+				'fontOptions'  => WC_GPD_Font_Registry::fonts_for_template( $template_ref ),
+				'defaultFont'  => WC_GPD_Font_Registry::default_font_family(),
 			)
 		);
 

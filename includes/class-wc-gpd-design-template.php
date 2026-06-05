@@ -18,7 +18,9 @@ class WC_GPD_Design_Template {
 	const META_CANVAS_HEIGHT     = '_wc_gpd_canvas_height';
 	const META_TEMPLATE_JSON     = '_wc_gpd_template_json';
 	const META_MAX_DESIGN_VIEWS  = '_wc_gpd_max_design_views';
-	const META_GRAPHIC_LIBRARY   = '_wc_gpd_graphic_library';
+	const META_GRAPHIC_LIBRARY    = '_wc_gpd_graphic_library';
+	const META_GRAPHIC_LIBRARIES = '_wc_gpd_graphic_libraries';
+	const META_TEMPLATE_FONTS    = '_wc_gpd_template_fonts';
 
 	/**
 	 * Register post type.
@@ -112,8 +114,10 @@ class WC_GPD_Design_Template {
 			'template_json'    => $template_json,
 			'template_views'   => WC_GPD_Template_Json::parse( $template_json ),
 			'max_views'        => $max_views,
-			'graphic_library'  => self::get_graphic_library( $template_id ),
-			'product_settings' => WC_GPD_Product_Settings::get( $template_id ),
+			'graphic_library'    => self::get_graphic_library( $template_id ),
+			'graphic_libraries'  => self::get_graphic_libraries( $template_id ),
+			'template_fonts'     => self::get_template_fonts( $template_id ),
+			'product_settings'   => WC_GPD_Product_Settings::get( $template_id ),
 		);
 	}
 
@@ -155,10 +159,18 @@ class WC_GPD_Design_Template {
 	 *
 	 * @param int $template_id Template ID.
 	 */
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array{ok:bool,json_saved:bool,message:string}
+	 */
 	public static function save_from_post( $template_id ) {
 		$template_id = absint( $template_id );
 		if ( ! $template_id || ! current_user_can( 'edit_post', $template_id ) ) {
-			return;
+			return array(
+				'ok'         => false,
+				'json_saved' => false,
+				'message'    => __( 'Permission denied.', 'wc-generic-product-designer' ),
+			);
 		}
 
 		if ( isset( $_POST['wc_gpd_template_title'] ) ) {
@@ -178,10 +190,20 @@ class WC_GPD_Design_Template {
 		update_post_meta( $template_id, self::META_CANVAS_WIDTH, $width );
 		update_post_meta( $template_id, self::META_CANVAS_HEIGHT, $height );
 
-		$raw_json = isset( $_POST['wc_gpd_template_json'] ) ? wp_unslash( $_POST['wc_gpd_template_json'] ) : '';
-		$json     = WC_GPD_Template_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
+		$raw_json    = isset( $_POST['wc_gpd_template_json'] ) ? wp_unslash( $_POST['wc_gpd_template_json'] ) : '';
+		$json_saved  = false;
+		$json        = WC_GPD_Template_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
 		if ( false !== $json ) {
-			update_post_meta( $template_id, self::META_TEMPLATE_JSON, $json );
+			update_post_meta( $template_id, self::META_TEMPLATE_JSON, wp_slash( $json ) );
+			$json_saved = true;
+		} else {
+			WC_GPD_Logger::error(
+				'Template JSON sanitize failed',
+				array(
+					'template_id' => $template_id,
+					'bytes'       => is_string( $raw_json ) ? strlen( $raw_json ) : 0,
+				)
+			);
 		}
 
 		$max_views = WC_GPD_Product_Meta::MIN_VIEWS;
@@ -194,11 +216,148 @@ class WC_GPD_Design_Template {
 		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
 		update_post_meta( $template_id, self::META_MAX_DESIGN_VIEWS, $max_views );
 
-		$library_raw = isset( $_POST['wc_gpd_graphic_library'] ) ? wp_unslash( $_POST['wc_gpd_graphic_library'] ) : '';
-		$library     = self::sanitize_graphic_library( is_string( $library_raw ) ? $library_raw : '' );
-		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( $library ) );
+		$libraries_raw = isset( $_POST['wc_gpd_graphic_libraries'] ) ? wp_unslash( $_POST['wc_gpd_graphic_libraries'] ) : '';
+		$libraries     = self::sanitize_graphic_libraries( is_string( $libraries_raw ) ? $libraries_raw : '' );
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, wp_json_encode( $libraries ) );
+		$flat_ids = array();
+		foreach ( $libraries as $library ) {
+			if ( ! empty( $library['ids'] ) && is_array( $library['ids'] ) ) {
+				$flat_ids = array_merge( $flat_ids, $library['ids'] );
+			}
+		}
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( array_values( array_unique( $flat_ids ) ) ) );
+
+		$fonts_raw = isset( $_POST['wc_gpd_template_fonts'] ) ? wp_unslash( $_POST['wc_gpd_template_fonts'] ) : '';
+		$fonts     = self::sanitize_template_fonts( is_string( $fonts_raw ) ? $fonts_raw : '' );
+		update_post_meta( $template_id, self::META_TEMPLATE_FONTS, $fonts );
 
 		WC_GPD_Product_Settings::save( $template_id, WC_GPD_Product_Settings::from_post( wp_unslash( $_POST ) ) );
+
+		return array(
+			'ok'         => $json_saved,
+			'json_saved' => $json_saved,
+			'message'    => $json_saved
+				? __( 'Template saved.', 'wc-generic-product-designer' )
+				: __( 'Template could not be saved. The design data was invalid or too large. Try saving again or simplify the template.', 'wc-generic-product-designer' ),
+		);
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return string[]
+	 */
+	public static function get_template_fonts( $template_id ) {
+		$stored = get_post_meta( absint( $template_id ), self::META_TEMPLATE_FONTS, true );
+		return is_array( $stored ) ? $stored : array();
+	}
+
+	/**
+	 * @param string $json JSON font keys.
+	 * @return string[]
+	 */
+	public static function sanitize_template_fonts( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return array();
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return array();
+		}
+		$clean = array();
+		foreach ( $data as $key ) {
+			$key = sanitize_text_field( (string) $key );
+			if ( $key ) {
+				$clean[] = $key;
+			}
+		}
+		return array_values( array_unique( $clean ) );
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array<int,array{id:string,name:string,ids:int[]}>
+	 */
+	public static function get_graphic_libraries( $template_id ) {
+		$template_id = absint( $template_id );
+		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, true );
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) && ! empty( $decoded ) ) {
+				return self::normalize_libraries_array( $decoded );
+			}
+		}
+		$legacy = self::get_graphic_library( $template_id );
+		if ( empty( $legacy ) ) {
+			return array(
+				array(
+					'id'   => 'default',
+					'name' => __( 'Default graphics', 'wc-generic-product-designer' ),
+					'ids'  => array(),
+				),
+			);
+		}
+		return array(
+			array(
+				'id'   => 'default',
+				'name' => __( 'Default graphics', 'wc-generic-product-designer' ),
+				'ids'  => array_column( $legacy, 'id' ),
+			),
+		);
+	}
+
+	/**
+	 * @param array $libraries Raw libraries.
+	 * @return array<int,array{id:string,name:string,ids:int[]}>
+	 */
+	public static function normalize_libraries_array( array $libraries ) {
+		$clean = array();
+		foreach ( $libraries as $library ) {
+			if ( ! is_array( $library ) ) {
+				continue;
+			}
+			$id = ! empty( $library['id'] ) ? sanitize_key( (string) $library['id'] ) : '';
+			if ( ! $id ) {
+				continue;
+			}
+			$name = ! empty( $library['name'] ) ? sanitize_text_field( (string) $library['name'] ) : $id;
+			$ids  = array();
+			if ( ! empty( $library['ids'] ) && is_array( $library['ids'] ) ) {
+				foreach ( $library['ids'] as $attachment_id ) {
+					$attachment_id = absint( $attachment_id );
+					if ( $attachment_id && wp_get_attachment_url( $attachment_id ) ) {
+						$ids[] = $attachment_id;
+					}
+				}
+			}
+			$clean[] = array(
+				'id'   => $id,
+				'name' => $name,
+				'ids'  => array_values( array_unique( $ids ) ),
+			);
+		}
+		if ( empty( $clean ) ) {
+			$clean[] = array(
+				'id'   => 'default',
+				'name' => __( 'Default graphics', 'wc-generic-product-designer' ),
+				'ids'  => array(),
+			);
+		}
+		return $clean;
+	}
+
+	/**
+	 * @param string $json Libraries JSON.
+	 * @return array<int,array{id:string,name:string,ids:int[]}>
+	 */
+	public static function sanitize_graphic_libraries( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::normalize_libraries_array( array() );
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::normalize_libraries_array( array() );
+		}
+		return self::normalize_libraries_array( $data );
 	}
 
 	/**

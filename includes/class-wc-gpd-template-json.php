@@ -221,6 +221,15 @@ class WC_GPD_Template_Json {
 			if ( 'graphic_slot' === $layer_type ) {
 				$object['wcGpdCustomerMovable']   = ! empty( $object['wcGpdCustomerMovable'] );
 				$object['wcGpdCustomerResizable'] = ! empty( $object['wcGpdCustomerResizable'] );
+				$object['wcGpdGraphicLibraryId']  = ! empty( $object['wcGpdGraphicLibraryId'] )
+					? sanitize_key( (string) $object['wcGpdGraphicLibraryId'] )
+					: '';
+			}
+
+			if ( ! empty( $object['wcGpdLayerLabel'] ) ) {
+				$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
+			} else {
+				unset( $object['wcGpdLayerLabel'] );
 			}
 
 			$clean[] = $object;
@@ -269,6 +278,11 @@ class WC_GPD_Template_Json {
 		$object['wcGpdLockLetterSpacing']  = ! empty( $object['wcGpdLockLetterSpacing'] );
 		$object['wcGpdLockMove']           = ! empty( $object['wcGpdLockMove'] );
 		$object['wcGpdLockScale']          = ! empty( $object['wcGpdLockScale'] );
+		if ( ! empty( $object['wcGpdLayerLabel'] ) ) {
+			$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
+		} else {
+			unset( $object['wcGpdLayerLabel'] );
+		}
 
 		if ( 'placeholder' === $layer_type ) {
 			$key = ! empty( $object['wcGpdPlaceholderKey'] ) ? sanitize_key( (string) $object['wcGpdPlaceholderKey'] ) : sanitize_key( $uid );

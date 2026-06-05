@@ -326,6 +326,196 @@
 	max-width: 100%;
 }
 
+.wc-gpd-tpl-header-toggle {
+	font-size: 12px;
+	margin: 0;
+}
+
+.wc-gpd-help-tip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #dcdcde;
+	color: #1d2327;
+	font-size: 11px;
+	font-weight: 700;
+	cursor: help;
+	vertical-align: middle;
+}
+
+.wc-gpd-tpl-layer-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+
+.wc-gpd-tpl-layer-row.is-active .wc-gpd-tpl-layer-item {
+	border-color: #2271b1;
+	background: #f0f6fc;
+}
+
+.wc-gpd-tpl-layer-row .wc-gpd-tpl-layer-item {
+	flex: 1;
+	margin-bottom: 0;
+}
+
+.wc-gpd-tpl-layer-actions {
+	display: inline-flex;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
+.wc-gpd-tpl-layer-action {
+	min-width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #fff;
+	font-size: 11px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.wc-gpd-tpl-layer-action:hover {
+	border-color: #2271b1;
+	color: #2271b1;
+}
+
+.wc-gpd-tpl-dims-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.wc-gpd-tpl-dims-grid label {
+	font-size: 12px;
+}
+
+.wc-gpd-tpl-dims-grid input {
+	width: 100%;
+}
+
+.wc-gpd-tpl-font-picks {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 140px;
+	overflow-y: auto;
+}
+
+.wc-gpd-template-image-bin {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	list-style: none;
+	margin: 8px 0;
+	padding: 0;
+}
+
+.wc-gpd-image-bin-thumb {
+	padding: 0;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	background: #fff;
+	cursor: pointer;
+}
+
+.wc-gpd-image-bin-thumb img {
+	width: 48px;
+	height: 48px;
+	object-fit: cover;
+	display: block;
+}
+
+.wc-gpd-image-bin-thumb:hover {
+	border-color: #2271b1;
+}
+
+.wc-gpd-graphic-library-row {
+	margin-bottom: 10px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.wc-gpd-library-name {
+	width: 100%;
+	margin-bottom: 6px;
+}
+
+.wc-gpd-tpl-canvas-frame {
+	position: relative;
+	display: inline-block;
+}
+
+.wc-gpd-tpl-ruler {
+	position: absolute;
+	background: #f0f0f1;
+	border: 1px solid #c3c4c7;
+	font-size: 9px;
+	color: #50575e;
+	overflow: hidden;
+	z-index: 2;
+}
+
+.wc-gpd-tpl-ruler--top {
+	top: -20px;
+	left: 20px;
+	right: 0;
+	height: 20px;
+}
+
+.wc-gpd-tpl-ruler--left {
+	top: 0;
+	left: -20px;
+	width: 20px;
+	bottom: 0;
+}
+
+.wc-gpd-tpl-ruler-mark {
+	position: absolute;
+	transform: translateX( -50% );
+	white-space: nowrap;
+}
+
+.wc-gpd-tpl-ruler-mark--v {
+	transform: translateY( -50% );
+}
+
+.wc-gpd-tpl-measure {
+	position: absolute;
+	font-size: 10px;
+	color: #646970;
+	background: rgba( 255, 255, 255, 0.9 );
+	padding: 2px 4px;
+	z-index: 2;
+}
+
+.wc-gpd-tpl-measure--bottom {
+	bottom: -18px;
+	left: 50%;
+	transform: translateX( -50% );
+}
+
+.wc-gpd-tpl-measure--right {
+	right: -52px;
+	top: 50%;
+	transform: translateY( -50% );
+}
+
+.wc-gpd-template-json-field {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+
 @media ( max-width: 1100px ) {
 	.wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
 		grid-template-columns: 1fr;

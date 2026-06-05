@@ -71,17 +71,18 @@ class WC_GPD_Product_Meta {
 				$product_settings['replace_product_gallery'] = $replace_gallery;
 
 				return array(
-					'enabled'          => self::is_enabled( $product_id ),
-					'template_ref'     => $template_ref,
-					'width'            => $template['width'],
-					'height'           => $template['height'],
-					'template_id'      => 0,
-					'template_url'     => '',
-					'template_json'    => $template['template_json'],
-					'template_views'   => $template['template_views'],
-					'max_views'        => $template['max_views'],
-					'graphic_library'  => $template['graphic_library'],
-					'product_settings' => $product_settings,
+					'enabled'           => self::is_enabled( $product_id ),
+					'template_ref'      => $template_ref,
+					'width'             => $template['width'],
+					'height'            => $template['height'],
+					'template_id'       => 0,
+					'template_url'      => '',
+					'template_json'     => $template['template_json'],
+					'template_views'    => $template['template_views'],
+					'max_views'         => $template['max_views'],
+					'graphic_library'   => $template['graphic_library'],
+					'graphic_libraries' => $template['graphic_libraries'],
+					'product_settings'  => $product_settings,
 				);
 			}
 		}

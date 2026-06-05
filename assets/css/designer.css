@@ -394,8 +394,13 @@
 }
 
 .wc-gpd-popout-close {
+	display: none !important;
 	margin: 0.5rem 0.75rem 0;
 	flex: 0 0 auto;
+}
+
+.wc-gpd-is-popout > .wc-gpd-popout-close {
+	display: block !important;
 }
 
 .wc-gpd-popout-backdrop {

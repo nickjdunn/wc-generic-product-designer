@@ -120,6 +120,8 @@
 	};
 
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
+	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
+	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
@@ -202,12 +204,32 @@
 		if ( ! ui.fontFamily ) {
 			return;
 		}
-		config.fonts.forEach( ( font ) => {
+		const options = config.fontOptions || ( config.fonts || [] ).map( ( family ) => ( {
+			family,
+			label: family.split( ',' )[ 0 ].replace( /"/g, '' ).trim(),
+			css: family,
+		} ) );
+		options.forEach( ( font ) => {
 			const option = document.createElement( 'option' );
-			option.value = font;
-			option.textContent = font.split( ',' )[ 0 ].replace( /"/g, '' ).trim();
+			option.value = font.family || font.css;
+			option.textContent = font.label || option.value;
+			option.style.fontFamily = font.css || font.family;
 			ui.fontFamily.appendChild( option );
 		} );
+	}
+
+	function graphicItemsForSlot( slot ) {
+		const libId = slot && slot.wcGpdGraphicLibraryId ? slot.wcGpdGraphicLibraryId : '';
+		if ( ! libId || ! graphicLibraries.length ) {
+			return graphicLibrary;
+		}
+		const library = graphicLibraries.find( ( row ) => row.id === libId );
+		if ( ! library || ! library.ids || ! library.ids.length ) {
+			return graphicLibrary;
+		}
+		const allowed = new Set( library.ids.map( ( id ) => Number( id ) ) );
+		const filtered = graphicLibrary.filter( ( item ) => allowed.has( Number( item.id ) ) );
+		return filtered.length ? filtered : graphicLibrary;
 	}
 
 	/**
@@ -366,7 +388,7 @@
 				wrap.appendChild( label );
 				const row = document.createElement( 'div' );
 				row.className = 'wc-gpd-graphic-thumb-row';
-				graphicLibrary.forEach( ( item ) => {
+				graphicItemsForSlot( slot ).forEach( ( item ) => {
 					const btn = document.createElement( 'button' );
 					btn.type = 'button';
 					btn.className = 'wc-gpd-graphic-thumb';
@@ -1030,7 +1052,7 @@
 		}
 
 		if ( ui.fontFamily ) {
-			ui.fontFamily.value = obj.fontFamily || config.fonts[ 0 ];
+			ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
 		}
 		if ( ui.fontSize ) {
 			ui.fontSize.value = String( Math.round( obj.fontSize || 32 ) );
@@ -1086,7 +1108,7 @@
 			top: region.top + region.height / 2,
 			originX: 'center',
 			originY: 'center',
-			fontFamily: config.fonts[ 0 ],
+			fontFamily: DEFAULT_FONT,
 			fontSize: 32,
 			fill: defaultTextColor(),
 			lineHeight: 1.16,

@@ -10,8 +10,9 @@
 	const heightInput = document.getElementById( 'wc_gpd_template_canvas_height' );
 	const maxViewsHidden = document.getElementById( 'wc_gpd_max_design_views' );
 	const viewTabsEl = document.getElementById( 'wc-gpd-template-view-tabs' );
-	const editorConfig = window.wcGpdTemplateEditor || { maxViews: 6, fonts: [ 'Arial, Helvetica, sans-serif' ] };
+	const editorConfig = window.wcGpdTemplateEditor || { maxViews: 6, fonts: [ '"Times New Roman", Times, serif' ], defaultFont: '"Times New Roman", Times, serif' };
 	const MAX_VIEWS = editorConfig.maxViews || 6;
+	const DEFAULT_FONT = editorConfig.defaultFont || '"Times New Roman", Times, serif';
 	const layersListEl = document.getElementById( 'wc-gpd-template-layers-list' );
 	const layersEmptyHint = document.getElementById( 'wc-gpd-layers-empty-hint' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
@@ -28,16 +29,26 @@
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
 	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
-	const addImageBtn = document.getElementById( 'wc-gpd-template-add-image' );
+	const uploadImageBtn = document.getElementById( 'wc-gpd-template-upload-image' );
+	const imageBinEl = document.getElementById( 'wc-gpd-template-image-bin' );
 	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
-	const graphicLibraryInput = document.getElementById( 'wc_gpd_graphic_library' );
-	const graphicLibraryPreview = document.getElementById( 'wc-gpd-graphic-library-preview' );
+	const graphicLibrariesInput = document.getElementById( 'wc_gpd_graphic_libraries' );
+	const templateFontsInput = document.getElementById( 'wc_gpd_template_fonts' );
+	const graphicLibrariesListEl = document.getElementById( 'wc-gpd-graphic-libraries-list' );
+	const selectionDimsPanel = document.getElementById( 'wc-gpd-selection-dims-panel' );
+	const shrinkFitRow = document.getElementById( 'wc-gpd-shrink-fit-row' );
+	const showRulerToggle = document.getElementById( 'wc_gpd_tpl_show_ruler' );
+	const showMeasurementsToggle = document.getElementById( 'wc_gpd_tpl_show_measurements' );
+	const rulerTopEl = document.getElementById( 'wc-gpd-tpl-ruler-top' );
+	const rulerLeftEl = document.getElementById( 'wc-gpd-tpl-ruler-left' );
+	const measureBottomEl = document.getElementById( 'wc-gpd-tpl-measure-bottom' );
+	const measureRightEl = document.getElementById( 'wc-gpd-tpl-measure-right' );
 
 	const SERIALIZE_PROPS = [
-		'wcGpdUid', 'wcGpdLayerType', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
+		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
-		'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable',
+		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
@@ -72,7 +83,9 @@
 	let dims = readCanvasDimensions();
 	let width = dims.width;
 	let height = dims.height;
-	let graphicLibraryIds = [];
+	let graphicLibraries = [];
+	let uploadedImages = [];
+	let lockAspectRatio = false;
 
 	function initFontSelect() {
 		const fontSelect = document.getElementById( 'wc_gpd_tpl_font_family' );
@@ -80,10 +93,16 @@
 			return;
 		}
 		fontSelect.innerHTML = '';
-		( editorConfig.fonts || [] ).forEach( ( font ) => {
+		const options = editorConfig.fontOptions || ( editorConfig.fonts || [] ).map( ( family ) => ( {
+			family,
+			label: family.split( ',' )[ 0 ].replace( /"/g, '' ).trim(),
+			css: family,
+		} ) );
+		options.forEach( ( font ) => {
 			const option = document.createElement( 'option' );
-			option.value = font;
-			option.textContent = font.split( ',' )[ 0 ].replace( /"/g, '' ).trim();
+			option.value = font.family || font.css;
+			option.textContent = font.label || option.value;
+			option.style.fontFamily = font.css || font.family;
 			fontSelect.appendChild( option );
 		} );
 	}
@@ -179,8 +198,11 @@
 		if ( ! obj ) {
 			return 'Layer';
 		}
+		if ( obj.wcGpdLayerLabel ) {
+			return obj.wcGpdLayerLabel;
+		}
 		if ( isMockupImage( obj ) ) {
-			return 'Mockup photo';
+			return 'Mockup background';
 		}
 		if ( isGraphicImage( obj ) ) {
 			return 'Graphic';
@@ -283,7 +305,7 @@
 	}
 
 	function hideAllPropPanels() {
-		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
+		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel, selectionDimsPanel ].forEach( ( el ) => {
 			if ( el ) {
 				el.hidden = true;
 			}
@@ -291,6 +313,84 @@
 		if ( textEditorHint ) {
 			textEditorHint.hidden = false;
 		}
+	}
+
+	function objectDimensions( obj ) {
+		if ( ! obj ) {
+			return { width: 0, height: 0, left: 0, top: 0 };
+		}
+		const bounds = obj.getBoundingRect( true, true );
+		return {
+			width: Math.round( bounds.width ),
+			height: Math.round( bounds.height ),
+			left: Math.round( bounds.left ),
+			top: Math.round( bounds.top ),
+		};
+	}
+
+	function syncSelectionDimsPanel( obj ) {
+		if ( ! selectionDimsPanel || ! obj ) {
+			return;
+		}
+		selectionDimsPanel.hidden = false;
+		const dims = objectDimensions( obj );
+		const wEl = document.getElementById( 'wc_gpd_sel_width' );
+		const hEl = document.getElementById( 'wc_gpd_sel_height' );
+		const lEl = document.getElementById( 'wc_gpd_sel_left' );
+		const tEl = document.getElementById( 'wc_gpd_sel_top' );
+		const lockEl = document.getElementById( 'wc_gpd_lock_aspect' );
+		if ( wEl ) {
+			wEl.value = String( dims.width );
+		}
+		if ( hEl ) {
+			hEl.value = String( dims.height );
+		}
+		if ( lEl ) {
+			lEl.value = String( dims.left );
+		}
+		if ( tEl ) {
+			tEl.value = String( dims.top );
+		}
+		if ( lockEl ) {
+			lockEl.checked = lockAspectRatio;
+		}
+	}
+
+	function applySelectionDimsFromInputs() {
+		const obj = canvas.getActiveObject();
+		if ( ! obj ) {
+			return;
+		}
+		const wEl = document.getElementById( 'wc_gpd_sel_width' );
+		const hEl = document.getElementById( 'wc_gpd_sel_height' );
+		const lEl = document.getElementById( 'wc_gpd_sel_left' );
+		const tEl = document.getElementById( 'wc_gpd_sel_top' );
+		const newW = parseInt( wEl ? wEl.value : '0', 10 );
+		const newH = parseInt( hEl ? hEl.value : '0', 10 );
+		const newL = parseInt( lEl ? lEl.value : '0', 10 );
+		const newT = parseInt( tEl ? tEl.value : '0', 10 );
+		if ( ! newW || ! newH ) {
+			return;
+		}
+		const current = objectDimensions( obj );
+		if ( lockAspectRatio && current.width > 0 ) {
+			const ratio = current.height / current.width;
+			if ( obj.scaleX !== undefined ) {
+				const baseW = obj.width * ( obj.scaleX || 1 );
+				const scale = newW / ( obj.width || 1 );
+				obj.set( { scaleX: scale, scaleY: scale } );
+			} else {
+				obj.set( { height: Math.round( newW * ratio ) } );
+			}
+		} else if ( obj.scaleX !== undefined && obj.width ) {
+			obj.set( { scaleX: newW / obj.width, scaleY: newH / ( obj.height || 1 ) } );
+		} else if ( obj.width !== undefined ) {
+			obj.set( { width: newW, height: newH } );
+		}
+		obj.set( { left: newL, top: newT } );
+		obj.setCoords();
+		canvas.requestRenderAll();
+		renderLayersList();
 	}
 
 	function activeTextObject() {
@@ -359,8 +459,12 @@
 		if ( imageSelected && mockupVisibleToggle ) {
 			mockupVisibleToggle.checked = active.wcGpdMockupVisible !== false;
 		}
+		if ( active ) {
+			syncSelectionDimsPanel( active );
+		}
 
 		renderLayersList();
+		updateRulers();
 	}
 
 	function syncTextEditorPanel( obj, isPlaceholder ) {
@@ -391,7 +495,7 @@
 			content.value = obj.text || '';
 		}
 		if ( font ) {
-			font.value = obj.fontFamily || ( editorConfig.fonts ? editorConfig.fonts[ 0 ] : 'Arial' );
+			font.value = obj.fontFamily || DEFAULT_FONT;
 		}
 		if ( size ) {
 			size.value = String( Math.round( obj.fontSize || 32 ) );
@@ -404,6 +508,9 @@
 		}
 		if ( letterSpacing ) {
 			letterSpacing.value = String( obj.charSpacing || 0 );
+		}
+		if ( shrinkFitRow ) {
+			shrinkFitRow.hidden = ! isPlaceholder;
 		}
 		if ( shrink ) {
 			shrink.checked = !! obj.wcGpdShrinkToFit;
@@ -459,11 +566,82 @@
 	function syncGraphicSlotPropsPanel( obj ) {
 		const move = document.getElementById( 'wc_gpd_slot_lock_move' );
 		const scale = document.getElementById( 'wc_gpd_slot_lock_scale' );
+		const librarySelect = document.getElementById( 'wc_gpd_slot_library_id' );
 		if ( move ) {
 			move.checked = ! obj.wcGpdCustomerMovable;
 		}
 		if ( scale ) {
 			scale.checked = ! obj.wcGpdCustomerResizable;
+		}
+		if ( librarySelect ) {
+			librarySelect.innerHTML = '<option value="">— Select library —</option>';
+			graphicLibraries.forEach( ( lib ) => {
+				const opt = document.createElement( 'option' );
+				opt.value = lib.id;
+				opt.textContent = lib.name || lib.id;
+				librarySelect.appendChild( opt );
+			} );
+			librarySelect.value = obj.wcGpdGraphicLibraryId || '';
+		}
+	}
+
+	function layerActionBtn( title, glyph, handler ) {
+		const btn = document.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'wc-gpd-tpl-layer-action';
+		btn.title = title;
+		btn.setAttribute( 'aria-label', title );
+		btn.textContent = glyph;
+		btn.addEventListener( 'click', ( event ) => {
+			event.stopPropagation();
+			handler();
+		} );
+		return btn;
+	}
+
+	function moveLayer( obj, direction ) {
+		const objects = canvas.getObjects();
+		const index = objects.indexOf( obj );
+		if ( index < 0 ) {
+			return;
+		}
+		if ( direction === 'up' && index < objects.length - 1 ) {
+			canvas.bringForward( obj );
+		} else if ( direction === 'down' && index > 0 ) {
+			canvas.sendBackwards( obj );
+		}
+		sortLayers();
+		canvas.requestRenderAll();
+		renderLayersList();
+	}
+
+	function duplicateLayer( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		obj.clone( ( cloned ) => {
+			cloned.set( {
+				left: ( obj.left || 0 ) + 16,
+				top: ( obj.top || 0 ) + 16,
+				wcGpdUid: uid(),
+			} );
+			prepareLoadedObject( cloned );
+			canvas.add( cloned );
+			canvas.setActiveObject( cloned );
+			sortLayers();
+			canvas.requestRenderAll();
+			updateSelectionPanels();
+		}, SERIALIZE_PROPS );
+	}
+
+	function renameLayer( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		const next = window.prompt( 'Layer name', layerLabel( obj ) );
+		if ( next && next.trim() ) {
+			obj.wcGpdLayerLabel = next.trim();
+			renderLayersList();
 		}
 	}
 
@@ -478,16 +656,30 @@
 		}
 		objects.forEach( ( obj ) => {
 			const li = document.createElement( 'li' );
+			li.className = 'wc-gpd-tpl-layer-row' + ( canvas.getActiveObject() === obj ? ' is-active' : '' );
 			const btn = document.createElement( 'button' );
 			btn.type = 'button';
-			btn.className = 'wc-gpd-tpl-layer-item' + ( canvas.getActiveObject() === obj ? ' is-active' : '' );
+			btn.className = 'wc-gpd-tpl-layer-item';
 			btn.textContent = layerLabel( obj );
 			btn.addEventListener( 'click', () => {
 				canvas.setActiveObject( obj );
 				canvas.requestRenderAll();
 				updateSelectionPanels();
 			} );
+			const actions = document.createElement( 'span' );
+			actions.className = 'wc-gpd-tpl-layer-actions';
+			actions.appendChild( layerActionBtn( 'Move up', '↑', () => moveLayer( obj, 'up' ) ) );
+			actions.appendChild( layerActionBtn( 'Move down', '↓', () => moveLayer( obj, 'down' ) ) );
+			actions.appendChild( layerActionBtn( 'Rename', '✎', () => renameLayer( obj ) ) );
+			actions.appendChild( layerActionBtn( 'Duplicate', '⧉', () => duplicateLayer( obj ) ) );
+			actions.appendChild( layerActionBtn( 'Delete', '✕', () => {
+				canvas.remove( obj );
+				canvas.discardActiveObject();
+				canvas.requestRenderAll();
+				updateSelectionPanels();
+			} ) );
 			li.appendChild( btn );
+			li.appendChild( actions );
 			layersListEl.appendChild( li );
 		} );
 	}
@@ -652,7 +844,7 @@
 			top: height / 2,
 			originX: 'center',
 			originY: 'center',
-			fontFamily: 'Arial',
+			fontFamily: DEFAULT_FONT,
 			fontSize: 32,
 			fill: '#000000',
 			wcGpdUid: uid(),
@@ -674,7 +866,7 @@
 			originX: 'center',
 			originY: 'center',
 			width: 240,
-			fontFamily: 'Arial',
+			fontFamily: DEFAULT_FONT,
 			fontSize: 32,
 			fill: '#000000',
 			wcGpdUid: uid(),
@@ -706,6 +898,7 @@
 		if ( ! url ) {
 			return;
 		}
+		trackUploadedImage( attachment );
 		fabric.Image.fromURL( url, ( img ) => {
 			if ( ! img ) {
 				return;
@@ -776,72 +969,238 @@
 		updateSelectionPanels();
 	}
 
-	function loadGraphicLibrary() {
-		if ( ! graphicLibraryInput || ! graphicLibraryInput.value ) {
-			graphicLibraryIds = [];
-			renderGraphicLibraryPreview();
+	function loadGraphicLibraries() {
+		if ( ! graphicLibrariesInput || ! graphicLibrariesInput.value ) {
+			graphicLibraries = [];
+			renderGraphicLibrariesPanel();
 			return;
 		}
 		try {
-			graphicLibraryIds = JSON.parse( graphicLibraryInput.value ) || [];
+			graphicLibraries = JSON.parse( graphicLibrariesInput.value ) || [];
 		} catch ( e ) {
-			graphicLibraryIds = [];
+			graphicLibraries = [];
 		}
-		renderGraphicLibraryPreview();
+		if ( ! Array.isArray( graphicLibraries ) ) {
+			graphicLibraries = [];
+		}
+		renderGraphicLibrariesPanel();
 	}
 
-	function saveGraphicLibrary() {
-		if ( graphicLibraryInput ) {
-			graphicLibraryInput.value = JSON.stringify( graphicLibraryIds );
+	function saveGraphicLibraries() {
+		if ( graphicLibrariesInput ) {
+			graphicLibrariesInput.value = JSON.stringify( graphicLibraries );
 		}
-		renderGraphicLibraryPreview();
+		renderGraphicLibrariesPanel();
 	}
 
-	function renderGraphicLibraryPreview() {
-		if ( ! graphicLibraryPreview || ! window.wp || ! wp.media ) {
+	function saveTemplateFonts() {
+		if ( ! templateFontsInput ) {
 			return;
 		}
-		graphicLibraryPreview.innerHTML = '';
-		graphicLibraryIds.forEach( ( id ) => {
-			const attachment = wp.media.attachment( id );
-			attachment.fetch().then( () => {
-				const url = attachment.get( 'url' );
-				if ( ! url ) {
+		const keys = [];
+		document.querySelectorAll( '.wc-gpd-template-font-pick:checked' ).forEach( ( el ) => {
+			if ( el.value ) {
+				keys.push( el.value );
+			}
+		} );
+		templateFontsInput.value = JSON.stringify( keys );
+	}
+
+	function renderGraphicLibrariesPanel() {
+		if ( ! graphicLibrariesListEl ) {
+			return;
+		}
+		graphicLibrariesListEl.innerHTML = '';
+		graphicLibraries.forEach( ( lib, index ) => {
+			const row = document.createElement( 'div' );
+			row.className = 'wc-gpd-graphic-library-row';
+			const nameInput = document.createElement( 'input' );
+			nameInput.type = 'text';
+			nameInput.className = 'wc-gpd-library-name';
+			nameInput.value = lib.name || '';
+			nameInput.placeholder = 'Library name';
+			nameInput.addEventListener( 'input', () => {
+				lib.name = nameInput.value;
+				saveGraphicLibraries();
+			} );
+			const manageBtn = document.createElement( 'button' );
+			manageBtn.type = 'button';
+			manageBtn.className = 'button button-small';
+			manageBtn.textContent = 'Images';
+			manageBtn.addEventListener( 'click', () => manageLibraryImages( lib ) );
+			const removeBtn = document.createElement( 'button' );
+			removeBtn.type = 'button';
+			removeBtn.className = 'button button-link-delete';
+			removeBtn.textContent = 'Remove';
+			removeBtn.addEventListener( 'click', () => {
+				graphicLibraries.splice( index, 1 );
+				saveGraphicLibraries();
+			} );
+			const preview = document.createElement( 'ul' );
+			preview.className = 'wc-gpd-graphic-library-preview';
+			( lib.ids || [] ).forEach( ( id ) => {
+				if ( ! window.wp || ! wp.media ) {
 					return;
 				}
-				const li = document.createElement( 'li' );
-				const img = document.createElement( 'img' );
-				img.src = url;
-				img.alt = attachment.get( 'title' ) || '';
-				li.appendChild( img );
-				graphicLibraryPreview.appendChild( li );
+				wp.media.attachment( id ).fetch().then( () => {
+					const att = wp.media.attachment( id );
+					const url = att.get( 'url' );
+					if ( ! url ) {
+						return;
+					}
+					const li = document.createElement( 'li' );
+					const img = document.createElement( 'img' );
+					img.src = url;
+					img.alt = att.get( 'title' ) || '';
+					li.appendChild( img );
+					preview.appendChild( li );
+				} );
 			} );
+			row.appendChild( nameInput );
+			row.appendChild( manageBtn );
+			row.appendChild( removeBtn );
+			row.appendChild( preview );
+			graphicLibrariesListEl.appendChild( row );
 		} );
 	}
 
-	function manageGraphicLibrary() {
+	function manageLibraryImages( lib ) {
 		if ( ! window.wp || ! wp.media ) {
 			return;
 		}
 		const frame = wp.media( {
-			title: 'Graphic library',
+			title: 'Graphic library images',
 			button: { text: 'Use selected' },
 			multiple: true,
 			library: { type: [ 'image' ] },
 		} );
 		frame.on( 'open', () => {
 			const selection = frame.state().get( 'selection' );
-			graphicLibraryIds.forEach( ( id ) => {
+			( lib.ids || [] ).forEach( ( id ) => {
 				const attachment = wp.media.attachment( id );
 				attachment.fetch();
 				selection.add( attachment );
 			} );
 		} );
 		frame.on( 'select', () => {
-			graphicLibraryIds = frame.state().get( 'selection' ).map( ( att ) => att.id );
-			saveGraphicLibrary();
+			lib.ids = frame.state().get( 'selection' ).map( ( att ) => att.id );
+			saveGraphicLibraries();
 		} );
 		frame.open();
+	}
+
+	function addGraphicLibrary() {
+		graphicLibraries.push( {
+			id: `lib_${ Date.now().toString( 36 ) }`,
+			name: `Library ${ graphicLibraries.length + 1 }`,
+			ids: [],
+		} );
+		saveGraphicLibraries();
+	}
+
+	function trackUploadedImage( attachment ) {
+		if ( ! attachment || ! attachment.id ) {
+			return;
+		}
+		if ( ! uploadedImages.some( ( row ) => row.id === attachment.id ) ) {
+			uploadedImages.push( { id: attachment.id, url: attachment.url, title: attachment.title || '' } );
+		}
+		renderImageBin();
+	}
+
+	function renderImageBin() {
+		if ( ! imageBinEl ) {
+			return;
+		}
+		imageBinEl.innerHTML = '';
+		uploadedImages.forEach( ( row ) => {
+			const li = document.createElement( 'li' );
+			li.className = 'wc-gpd-image-bin-item';
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-image-bin-thumb';
+			btn.title = row.title || 'Uploaded image';
+			const img = document.createElement( 'img' );
+			img.src = row.url;
+			img.alt = row.title || '';
+			btn.appendChild( img );
+			btn.addEventListener( 'click', () => {
+				addMockupImage( row );
+			} );
+			li.appendChild( btn );
+			imageBinEl.appendChild( li );
+		} );
+	}
+
+	function setMockupBackground() {
+		const active = canvas.getActiveObject();
+		if ( ! active || ! isMockupImage( active ) ) {
+			return;
+		}
+		canvas.getObjects().forEach( ( obj ) => {
+			if ( isMockupImage( obj ) && obj !== active ) {
+				obj.wcGpdMockupImage = false;
+				obj.wcGpdLayerType = 'graphic';
+				obj.wcGpdGraphicLayer = true;
+			}
+		} );
+		active.wcGpdMockupImage = true;
+		active.wcGpdLayerType = 'mockup';
+		active.wcGpdGraphicLayer = false;
+		sortLayers();
+		canvas.requestRenderAll();
+		renderLayersList();
+	}
+
+	function updateRulers() {
+		const showRuler = showRulerToggle && showRulerToggle.checked;
+		const showMeasure = showMeasurementsToggle && showMeasurementsToggle.checked;
+		if ( rulerTopEl ) {
+			rulerTopEl.hidden = ! showRuler;
+		}
+		if ( rulerLeftEl ) {
+			rulerLeftEl.hidden = ! showRuler;
+		}
+		if ( measureBottomEl ) {
+			measureBottomEl.hidden = ! showMeasure;
+			measureBottomEl.textContent = showMeasure ? `${ width } px` : '';
+		}
+		if ( measureRightEl ) {
+			measureRightEl.hidden = ! showMeasure;
+			measureRightEl.textContent = showMeasure ? `${ height } px` : '';
+		}
+		if ( ! showRuler || ! rulerTopEl || ! rulerLeftEl ) {
+			return;
+		}
+		const step = width > 1200 ? 100 : 50;
+		let topMarks = '';
+		let leftMarks = '';
+		for ( let x = 0; x <= width; x += step ) {
+			topMarks += `<span class="wc-gpd-tpl-ruler-mark" style="left:${ ( x / width ) * 100 }%">${ x }</span>`;
+		}
+		for ( let y = 0; y <= height; y += step ) {
+			leftMarks += `<span class="wc-gpd-tpl-ruler-mark wc-gpd-tpl-ruler-mark--v" style="top:${ ( y / height ) * 100 }%">${ y }</span>`;
+		}
+		rulerTopEl.innerHTML = topMarks;
+		rulerLeftEl.innerHTML = leftMarks;
+	}
+
+	function collectUploadedImagesFromCanvas() {
+		const seen = {};
+		uploadedImages = [];
+		documentData.views.forEach( ( view ) => {
+			( view.objects || [] ).forEach( ( obj ) => {
+				if ( obj.type === 'image' && obj.wcGpdAttachmentId && ! seen[ obj.wcGpdAttachmentId ] ) {
+					seen[ obj.wcGpdAttachmentId ] = true;
+					uploadedImages.push( {
+						id: obj.wcGpdAttachmentId,
+						url: obj.src || '',
+						title: '',
+					} );
+				}
+			} );
+		} );
+		renderImageBin();
 	}
 
 	function addView() {
@@ -890,7 +1249,8 @@
 		if ( jsonInput ) {
 			jsonInput.value = JSON.stringify( documentData );
 		}
-		saveGraphicLibrary();
+		saveGraphicLibraries();
+		saveTemplateFonts();
 	}
 
 	function loadJson() {
@@ -911,6 +1271,7 @@
 			documentData.views = documentData.views.slice( 0, MAX_VIEWS );
 		}
 		syncMaxViewsField();
+		collectUploadedImagesFromCanvas();
 		loadView( documentData.views[ 0 ].id );
 	}
 
@@ -933,6 +1294,7 @@
 		canvas.backgroundColor = canvasBgColor();
 		canvas.calcOffset();
 		canvas.requestRenderAll();
+		updateRulers();
 		applyResponsiveScale();
 	}
 
@@ -1167,6 +1529,15 @@
 				}
 			} );
 		}
+		const slotLibrary = document.getElementById( 'wc_gpd_slot_library_id' );
+		if ( slotLibrary ) {
+			slotLibrary.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( isGraphicSlot( obj ) ) {
+					obj.wcGpdGraphicLibraryId = slotLibrary.value;
+				}
+			} );
+		}
 	}
 
 	canvas.on( 'selection:created', updateSelectionPanels );
@@ -1174,6 +1545,10 @@
 	canvas.on( 'selection:cleared', updateSelectionPanels );
 	canvas.on( 'object:modified', () => {
 		sortLayers();
+		const active = canvas.getActiveObject();
+		if ( active ) {
+			syncSelectionDimsPanel( active );
+		}
 		renderLayersList();
 	} );
 	canvas.on( 'object:added', renderLayersList );
@@ -1255,21 +1630,42 @@
 	document.getElementById( 'wc-gpd-template-delete-slot' )?.addEventListener( 'click', deleteActiveLayer );
 	document.getElementById( 'wc-gpd-template-delete-layer' )?.addEventListener( 'click', deleteActiveLayer );
 
-	if ( addImageBtn && window.wp && wp.media ) {
-		addImageBtn.addEventListener( 'click', () => {
-			const frame = wp.media( { title: 'Add mockup photo', button: { text: 'Add to canvas' }, multiple: false } );
+	if ( uploadImageBtn && window.wp && wp.media ) {
+		uploadImageBtn.addEventListener( 'click', () => {
+			const frame = wp.media( { title: 'Upload image', button: { text: 'Add to library' }, multiple: true, library: { type: [ 'image' ] } } );
 			frame.on( 'select', () => {
-				const attachment = frame.state().get( 'selection' ).first().toJSON();
-				addMockupImage( attachment );
+				frame.state().get( 'selection' ).each( ( att ) => {
+					const attachment = att.toJSON();
+					trackUploadedImage( attachment );
+				} );
 			} );
 			frame.open();
 		} );
 	}
 
+	document.getElementById( 'wc-gpd-set-mockup-background' )?.addEventListener( 'click', setMockupBackground );
+	document.getElementById( 'wc-gpd-add-graphic-library' )?.addEventListener( 'click', addGraphicLibrary );
+	document.querySelectorAll( '.wc-gpd-template-font-pick' ).forEach( ( el ) => {
+		el.addEventListener( 'change', saveTemplateFonts );
+	} );
+
+	[ 'wc_gpd_sel_width', 'wc_gpd_sel_height', 'wc_gpd_sel_left', 'wc_gpd_sel_top' ].forEach( ( id ) => {
+		document.getElementById( id )?.addEventListener( 'change', applySelectionDimsFromInputs );
+	} );
+	document.getElementById( 'wc_gpd_lock_aspect' )?.addEventListener( 'change', ( event ) => {
+		lockAspectRatio = !! event.target.checked;
+	} );
+
+	if ( showRulerToggle ) {
+		showRulerToggle.addEventListener( 'change', updateRulers );
+	}
+	if ( showMeasurementsToggle ) {
+		showMeasurementsToggle.addEventListener( 'change', updateRulers );
+	}
+
 	document.getElementById( 'wc-gpd-template-add-text' )?.addEventListener( 'click', addTemplateText );
 	document.getElementById( 'wc-gpd-template-add-placeholder' )?.addEventListener( 'click', addPlaceholder );
 	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', addGraphicSlot );
-	document.getElementById( 'wc-gpd-manage-graphic-library' )?.addEventListener( 'click', manageGraphicLibrary );
 
 	const addGraphicBtn = document.getElementById( 'wc-gpd-template-add-graphic' );
 	if ( addGraphicBtn && window.wp && wp.media ) {
@@ -1302,7 +1698,8 @@
 	initFontSelect();
 	bindTextEditor();
 	bindGraphicPropInputs();
-	loadGraphicLibrary();
+	loadGraphicLibraries();
 	loadJson();
+	updateRulers();
 	applyResponsiveScale();
 }( jQuery ) );

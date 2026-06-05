@@ -53,6 +53,24 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			'dashicons-art',
 			56
 		);
+
+		add_submenu_page(
+			self::PAGE_SLUG,
+			__( 'Export defaults', 'wc-generic-product-designer' ),
+			__( 'Export defaults', 'wc-generic-product-designer' ),
+			'manage_woocommerce',
+			WC_GPD_Admin_Settings::PAGE_SLUG,
+			array( WC_GPD_Admin_Settings::instance(), 'render_page' )
+		);
+
+		add_submenu_page(
+			self::PAGE_SLUG,
+			__( 'Debug', 'wc-generic-product-designer' ),
+			__( 'Debug', 'wc-generic-product-designer' ),
+			'manage_woocommerce',
+			WC_GPD_Debug::PAGE_SLUG,
+			array( WC_GPD_Debug::instance(), 'render_page' )
+		);
 	}
 
 	/**
@@ -109,23 +127,18 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			WC_GPD_VERSION,
 			true
 		);
+		$template_id = isset( $_GET['template_id'] ) ? absint( $_GET['template_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		wp_localize_script(
 			'wc-gpd-admin-template-editor',
 			'wcGpdTemplateEditor',
 			array(
 				'maxViews' => WC_GPD_Product_Meta::MAX_VIEWS,
-				'fonts'    => array(
-					'Arial, Helvetica, sans-serif',
-					'Georgia, serif',
-					'"Times New Roman", Times, serif',
-					'Impact, Charcoal, sans-serif',
-					'Courier, "Courier New", monospace',
-					'Verdana, Geneva, sans-serif',
-					'Trebuchet MS, Helvetica, sans-serif',
-					'Palatino Linotype, Book Antiqua, Palatino, serif',
-				),
+				'fonts'    => WC_GPD_Font_Registry::font_families_for_js( $template_id ),
+				'fontOptions' => WC_GPD_Font_Registry::fonts_for_template( $template_id ),
+				'defaultFont' => WC_GPD_Font_Registry::default_font_family(),
 			)
 		);
+		WC_GPD_Font_Registry::enqueue_for_designer( $template_id );
 	}
 
 	/**
@@ -225,9 +238,10 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 
 		if ( isset( $_POST['wc_gpd_template_save'] ) ) {
 			check_admin_referer( self::NONCE_ACTION, self::NONCE_NAME );
-			WC_GPD_Design_Template::save_from_post( $template_id );
+			$result   = WC_GPD_Design_Template::save_from_post( $template_id );
 			$settings = WC_GPD_Design_Template::get_settings( $template_id );
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Template saved.', 'wc-generic-product-designer' ) . '</p></div>';
+			$class    = ! empty( $result['ok'] ) ? 'notice-success' : 'notice-error';
+			echo '<div class="notice ' . esc_attr( $class ) . ' is-dismissible"><p>' . esc_html( $result['message'] ?? '' ) . '</p></div>';
 		}
 
 		$ps            = $settings['product_settings'];
@@ -287,11 +301,14 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 * @param array  $ps            Product settings.
 	 */
 	private function render_template_canvas( $settings, $template_json, $ps ) {
-		$graphic_library_json = wp_json_encode( array_column( $settings['graphic_library'], 'id' ) );
+		$graphic_libraries_json = wp_json_encode( $settings['graphic_libraries'] );
+		$template_fonts_json    = wp_json_encode( $settings['template_fonts'] );
+		$font_options           = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
 		?>
 		<div class="wc-gpd-template-editor-wrap" id="wc-gpd-template-editor-root">
-			<input type="hidden" id="wc_gpd_template_json" name="wc_gpd_template_json" value="<?php echo esc_attr( $template_json ); ?>" />
-			<input type="hidden" id="wc_gpd_graphic_library" name="wc_gpd_graphic_library" value="<?php echo esc_attr( $graphic_library_json ? $graphic_library_json : '[]' ); ?>" />
+			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
+			<textarea id="wc_gpd_graphic_libraries" name="wc_gpd_graphic_libraries" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $graphic_libraries_json ? $graphic_libraries_json : '[]' ); ?></textarea>
+			<textarea id="wc_gpd_template_fonts" name="wc_gpd_template_fonts" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_fonts_json ? $template_fonts_json : '[]' ); ?></textarea>
 			<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
 			<input type="hidden" id="wc_gpd_max_design_views" name="wc_gpd_max_design_views" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
@@ -310,6 +327,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 					<span class="wc-gpd-tpl-size-unit">px</span>
 				</div>
 				<div class="wc-gpd-tpl-header-actions">
+					<label class="wc-gpd-tpl-check wc-gpd-tpl-header-toggle" title="<?php esc_attr_e( 'Show ruler guides on the canvas', 'wc-generic-product-designer' ); ?>"><input type="checkbox" id="wc_gpd_tpl_show_ruler" /> <?php esc_html_e( 'Ruler', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-tpl-check wc-gpd-tpl-header-toggle" title="<?php esc_attr_e( 'Show pixel measurements around the canvas', 'wc-generic-product-designer' ); ?>"><input type="checkbox" id="wc_gpd_tpl_show_measurements" /> <?php esc_html_e( 'Measurements', 'wc-generic-product-designer' ); ?></label>
 					<button type="button" class="button button-small" id="wc-gpd-template-add-view"><?php esc_html_e( 'Add area', 'wc-generic-product-designer' ); ?></button>
 					<button type="button" class="button button-small" id="wc-gpd-template-rename-view"><?php esc_html_e( 'Rename', 'wc-generic-product-designer' ); ?></button>
 					<button type="button" class="button button-small wc-gpd-popout-trigger" id="wc-gpd-template-popout"><?php esc_html_e( 'Expand', 'wc-generic-product-designer' ); ?></button>
@@ -353,7 +372,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 								<input type="number" id="wc_gpd_tpl_line_height" class="wc-gpd-tpl-toolbar-mini" min="0.5" max="3" step="0.05" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" />
 								<input type="number" id="wc_gpd_tpl_letter_spacing" class="wc-gpd-tpl-toolbar-mini" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" />
 							</div>
-							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
+							<p id="wc-gpd-shrink-fit-row" hidden><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
 							<fieldset class="wc-gpd-tpl-customer-options">
 								<legend><?php esc_html_e( 'Customer can change', 'wc-generic-product-designer' ); ?></legend>
 								<div class="wc-gpd-tpl-customer-grid">
@@ -373,14 +392,35 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<p class="wc-gpd-tpl-hint" id="wc-gpd-text-editor-hint"><?php esc_html_e( 'Add text or select a text layer to edit.', 'wc-generic-product-designer' ); ?></p>
 					</div>
 					<div class="wc-gpd-tpl-panel">
-						<h4><?php esc_html_e( 'Graphics', 'wc-generic-product-designer' ); ?></h4>
-						<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Upload artwork customers can pick, or fixed graphics for production files.', 'wc-generic-product-designer' ); ?></p>
-						<div class="wc-gpd-tpl-btn-row">
-							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic"><?php esc_html_e( 'Fixed graphic', 'wc-generic-product-designer' ); ?></button>
-							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?></button>
+						<h4><?php esc_html_e( 'Template fonts', 'wc-generic-product-designer' ); ?> <span class="wc-gpd-help-tip" title="<?php esc_attr_e( 'Choose which fonts appear in this template. Manage the site font list under Template Designer → Fonts.', 'wc-generic-product-designer' ); ?>">?</span></h4>
+						<div class="wc-gpd-tpl-font-picks" id="wc-gpd-template-font-picks">
+							<?php foreach ( $font_options as $font ) : ?>
+								<label class="wc-gpd-tpl-check" style="font-family:<?php echo esc_attr( $font['css'] ); ?>">
+									<input type="checkbox" class="wc-gpd-template-font-pick" value="<?php echo esc_attr( $font['key'] ); ?>" <?php checked( empty( $settings['template_fonts'] ) || in_array( $font['key'], $settings['template_fonts'], true ) ); ?> />
+									<?php echo esc_html( $font['label'] ); ?>
+								</label>
+							<?php endforeach; ?>
 						</div>
-						<button type="button" class="button button-small" id="wc-gpd-manage-graphic-library"><?php esc_html_e( 'Manage graphic library', 'wc-generic-product-designer' ); ?></button>
-						<ul class="wc-gpd-graphic-library-preview" id="wc-gpd-graphic-library-preview"></ul>
+					</div>
+					<div class="wc-gpd-tpl-panel">
+						<h4><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></h4>
+						<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Upload photos and artwork. Set a photo as the mockup background, or add fixed/customer-pick graphics.', 'wc-generic-product-designer' ); ?></p>
+						<button type="button" class="button button-small" id="wc-gpd-template-upload-image" title="<?php esc_attr_e( 'Upload PNG/JPG for mockup background or graphics', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Upload image', 'wc-generic-product-designer' ); ?></button>
+						<ul class="wc-gpd-template-image-bin" id="wc-gpd-template-image-bin"></ul>
+						<div class="wc-gpd-tpl-btn-row">
+							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic" title="<?php esc_attr_e( 'Adds a locked graphic included in production files (paw prints, logos, etc.)', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Fixed graphic', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button button-small" id="wc-gpd-template-add-graphic-slot" title="<?php esc_attr_e( 'A dashed box where the customer picks an image from a library you assign', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?> <span class="wc-gpd-help-tip" title="<?php esc_attr_e( 'Customer pick area: shoppers choose one graphic from your library and it appears inside this box on the mockup.', 'wc-generic-product-designer' ); ?>">?</span></button>
+						</div>
+						<div class="wc-gpd-tpl-libraries" id="wc-gpd-graphic-libraries-panel">
+							<h5><?php esc_html_e( 'Graphic libraries', 'wc-generic-product-designer' ); ?> <span class="wc-gpd-help-tip" title="<?php esc_attr_e( 'Create named sets (e.g. Paw prints, Flowers). Assign a library to each customer pick area.', 'wc-generic-product-designer' ); ?>">?</span></h5>
+							<div id="wc-gpd-graphic-libraries-list"></div>
+							<button type="button" class="button button-small" id="wc-gpd-add-graphic-library"><?php esc_html_e( 'Add library', 'wc-generic-product-designer' ); ?></button>
+						</div>
+						<div class="wc-gpd-tpl-selection" id="wc-gpd-image-props" hidden>
+							<button type="button" class="button button-small" id="wc-gpd-set-mockup-background" title="<?php esc_attr_e( 'Use as product mockup background (shown to customers)', 'wc-generic-product-designer' ); ?>"><?php esc_html_e( 'Set as mockup background', 'wc-generic-product-designer' ); ?></button>
+							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_template_mockup_visible" checked="checked" /> <?php esc_html_e( 'Show in customer mockup', 'wc-generic-product-designer' ); ?></label>
+							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-image"><?php esc_html_e( 'Remove', 'wc-generic-product-designer' ); ?></button>
+						</div>
 						<div class="wc-gpd-tpl-selection" id="wc-gpd-graphic-props" hidden>
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_graphic_export" checked="checked" /> <?php esc_html_e( 'Include in production file', 'wc-generic-product-designer' ); ?></label></p>
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_graphic_lock_move" /> <?php esc_html_e( 'Lock position for customer', 'wc-generic-product-designer' ); ?></label></p>
@@ -388,19 +428,21 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-graphic"><?php esc_html_e( 'Remove graphic', 'wc-generic-product-designer' ); ?></button>
 						</div>
 						<div class="wc-gpd-tpl-selection" id="wc-gpd-graphic-slot-props" hidden>
+							<p><label><?php esc_html_e( 'Graphic library', 'wc-generic-product-designer' ); ?> <select id="wc_gpd_slot_library_id"></select></label></p>
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_slot_lock_move" /> <?php esc_html_e( 'Lock position for customer', 'wc-generic-product-designer' ); ?></label></p>
 							<p><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_slot_lock_scale" /> <?php esc_html_e( 'Lock size for customer', 'wc-generic-product-designer' ); ?></label></p>
 							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-slot"><?php esc_html_e( 'Remove pick area', 'wc-generic-product-designer' ); ?></button>
 						</div>
 					</div>
-					<div class="wc-gpd-tpl-panel">
-						<h4><?php esc_html_e( 'Mockup photos', 'wc-generic-product-designer' ); ?></h4>
-						<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Upload slate photos. Drag and resize on canvas.', 'wc-generic-product-designer' ); ?></p>
-						<button type="button" class="button button-primary" id="wc-gpd-template-add-image"><?php esc_html_e( 'Add photo', 'wc-generic-product-designer' ); ?></button>
-						<div class="wc-gpd-tpl-selection" id="wc-gpd-image-props" hidden>
-							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_template_mockup_visible" checked="checked" /> <?php esc_html_e( 'Show in customer mockup', 'wc-generic-product-designer' ); ?></label>
-							<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-image"><?php esc_html_e( 'Remove photo', 'wc-generic-product-designer' ); ?></button>
+					<div class="wc-gpd-tpl-panel" id="wc-gpd-selection-dims-panel" hidden>
+						<h4><?php esc_html_e( 'Size & position', 'wc-generic-product-designer' ); ?></h4>
+						<div class="wc-gpd-tpl-dims-grid">
+							<label><?php esc_html_e( 'W', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_width" min="1" step="1" /></label>
+							<label><?php esc_html_e( 'H', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_height" min="1" step="1" /></label>
+							<label><?php esc_html_e( 'X', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_left" step="1" /></label>
+							<label><?php esc_html_e( 'Y', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_sel_top" step="1" /></label>
 						</div>
+						<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_lock_aspect" /> <?php esc_html_e( 'Lock aspect ratio', 'wc-generic-product-designer' ); ?></label>
 					</div>
 					<div class="wc-gpd-tpl-panel">
 						<h4><?php esc_html_e( 'Outlines', 'wc-generic-product-designer' ); ?></h4>
@@ -419,8 +461,14 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-layer"><?php esc_html_e( 'Delete selected layer', 'wc-generic-product-designer' ); ?></button>
 					</div>
 				</aside>
-				<div class="wc-gpd-tpl-canvas-col">
-					<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) $settings['width'] ); ?>" height="<?php echo esc_attr( (string) $settings['height'] ); ?>"></canvas>
+				<div class="wc-gpd-tpl-canvas-col" id="wc-gpd-tpl-canvas-col">
+					<div class="wc-gpd-tpl-canvas-frame" id="wc-gpd-tpl-canvas-frame">
+						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--top" id="wc-gpd-tpl-ruler-top" hidden></div>
+						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--left" id="wc-gpd-tpl-ruler-left" hidden></div>
+						<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) $settings['width'] ); ?>" height="<?php echo esc_attr( (string) $settings['height'] ); ?>"></canvas>
+						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--bottom" id="wc-gpd-tpl-measure-bottom" hidden></div>
+						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--right" id="wc-gpd-tpl-measure-right" hidden></div>
+					</div>
 				</div>
 			</div>
 		</div>

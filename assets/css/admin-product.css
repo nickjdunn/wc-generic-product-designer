@@ -223,7 +223,12 @@
 }
 
 .wc-gpd-popout-close {
+	display: none !important;
 	margin-bottom: 8px;
+}
+
+.wc-gpd-is-popout > .wc-gpd-popout-close {
+	display: block !important;
 }
 
 .wc-gpd-popout-backdrop {
