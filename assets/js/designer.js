@@ -106,9 +106,10 @@
 
 	const ui = {
 		addText: document.getElementById( 'wc-gpd-add-text' ),
-		dock: document.getElementById( 'wc-gpd-dock' ),
 		toolsPanel: document.getElementById( 'wc-gpd-tools-panel' ),
-		toolsHint: document.getElementById( 'wc-gpd-tools-hint' ),
+		contextEmpty: document.getElementById( 'wc-gpd-context-empty' ),
+		contextPane: document.getElementById( 'wc-gpd-context-pane' ),
+		contextLayerName: document.getElementById( 'wc-gpd-context-layer-name' ),
 		fontFamily: document.getElementById( 'wc-gpd-font-family' ),
 		fontSize: document.getElementById( 'wc-gpd-font-size' ),
 		bold: document.getElementById( 'wc-gpd-bold' ),
@@ -133,16 +134,22 @@
 		studioPanel: document.getElementById( 'wc-gpd-studio-panel' ),
 		studioNav: document.getElementById( 'wc-gpd-studio-nav' ),
 		drawerTitle: document.getElementById( 'wc-gpd-studio-drawer-title' ),
+		sectionAdd: document.getElementById( 'wc-gpd-section-add' ),
+		sectionContext: document.getElementById( 'wc-gpd-section-context' ),
 		sectionDetails: document.getElementById( 'wc-gpd-section-details' ),
+		navAdd: document.getElementById( 'wc-gpd-nav-add' ),
+		navContext: document.getElementById( 'wc-gpd-nav-context' ),
 		navDetails: document.getElementById( 'wc-gpd-nav-details' ),
+		navLayers: document.getElementById( 'wc-gpd-nav-layers' ),
 		designerAtc: document.getElementById( 'wc-gpd-designer-atc' ),
 		placeholderFields: document.getElementById( 'wc-gpd-placeholder-fields' ),
 		graphicPickers: document.getElementById( 'wc-gpd-graphic-pickers' ),
 	};
 
 	const sectionTitles = {
+		add: config.i18n?.panelAdd || 'Add',
 		details: config.i18n?.panelDetails || 'Your details',
-		text: config.i18n?.panelText || 'Text',
+		context: config.i18n?.panelContext || 'Edit',
 		layers: config.i18n?.panelLayers || 'Layers',
 	};
 
@@ -186,6 +193,9 @@
 	}
 
 	function textColorAllowed( obj ) {
+		if ( productSettings.allow_text_color === false ) {
+			return false;
+		}
 		if ( obj && obj.wcGpdLockColor ) {
 			return false;
 		}
@@ -233,7 +243,7 @@
 				if ( btn.hidden ) {
 					return;
 				}
-				openCustomerSection( btn.dataset.section || 'text' );
+				openCustomerSection( btn.dataset.section || 'add' );
 			} );
 		} );
 	}
@@ -268,8 +278,17 @@
 		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, productSettings.allow_letter_spacing !== false );
 		setToolVisible( ui.alignRow, productSettings.allow_text_align !== false );
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
+		if ( ui.navLayers ) {
+			ui.navLayers.hidden = productSettings.allow_layers_panel === false;
+		}
 		if ( ui.textColor ) {
 			ui.textColor.value = defaultTextColor( activeText );
+		}
+	}
+
+	function syncContextNav( active ) {
+		if ( ui.navContext ) {
+			ui.navContext.hidden = ! active;
 		}
 	}
 
@@ -485,15 +504,10 @@
 		const placeholders = view ? getPlaceholderObjectsFromView( view ) : [];
 		const slots = view ? getGraphicSlotsFromView( view ) : [];
 		const showFields = placeholders.length > 0 || ( slots.length > 0 && graphicLibrary.length && productSettings.allow_customer_graphics !== false );
+		const detailsEnabled = showFields && productSettings.allow_details_panel !== false;
 
-		if ( ui.sectionDetails ) {
-			ui.sectionDetails.hidden = ! showFields;
-		}
 		if ( ui.navDetails ) {
-			ui.navDetails.hidden = ! showFields;
-			if ( showFields ) {
-				openCustomerSection( 'details' );
-			}
+			ui.navDetails.hidden = ! detailsEnabled;
 		}
 
 		if ( ui.placeholderFields ) {
@@ -1102,6 +1116,13 @@
 		canvas.discardActiveObject();
 		activeText = null;
 		syncToolbar( null );
+		syncContextNav( null );
+		if ( ui.contextEmpty ) {
+			ui.contextEmpty.hidden = false;
+		}
+		if ( ui.contextPane ) {
+			ui.contextPane.hidden = true;
+		}
 		syncLayersList();
 		canvas.requestRenderAll();
 	}
@@ -1202,6 +1223,7 @@
 				syncToolbar( obj );
 				syncLayersList();
 				canvas.requestRenderAll();
+				openCustomerSection( 'context' );
 			} );
 
 			li.appendChild( btn );
@@ -1233,8 +1255,17 @@
 		if ( ui.toolsPanel ) {
 			ui.toolsPanel.classList.toggle( 'is-disabled', ! enabled );
 		}
-		if ( ui.toolsHint ) {
-			ui.toolsHint.hidden = enabled;
+		if ( ui.contextEmpty ) {
+			ui.contextEmpty.hidden = enabled;
+		}
+		if ( ui.contextPane ) {
+			ui.contextPane.hidden = ! enabled;
+		}
+		if ( ui.contextLayerName && enabled ) {
+			const label = ( obj.text && String( obj.text ).trim() )
+				? String( obj.text ).trim().slice( 0, 48 )
+				: ( config.i18n.layerText || 'Text layer' );
+			ui.contextLayerName.textContent = label;
 		}
 
 		if ( ! enabled ) {
@@ -1242,7 +1273,8 @@
 			return;
 		}
 
-		openCustomerSection( 'text' );
+		syncContextNav( obj );
+		openCustomerSection( 'context' );
 
 		if ( ui.fontFamily ) {
 			ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
@@ -1949,7 +1981,7 @@
 	initStudioNav();
 	applyProductToolSettings();
 	bindAddToCart();
-	openCustomerSection( 'text' );
+	openCustomerSection( 'add' );
 
 	if ( config.isEditing || config.orderEdit || config.autoOpenDesigner ) {
 		setTimeout( () => openDesigner(), 120 );

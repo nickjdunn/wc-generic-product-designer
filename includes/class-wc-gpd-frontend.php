@@ -369,8 +369,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'customizeTitle'  => __( 'Customize your design', 'wc-generic-product-designer' ),
 					'yourDetails'     => __( 'Your details', 'wc-generic-product-designer' ),
 					'selectTextHint'  => __( 'Tap text on the canvas to edit, or add new text below.', 'wc-generic-product-designer' ),
+					'panelAdd'        => __( 'Add', 'wc-generic-product-designer' ),
 					'panelDetails'    => __( 'Your details', 'wc-generic-product-designer' ),
-					'panelText'       => __( 'Text', 'wc-generic-product-designer' ),
+					'panelContext'    => __( 'Edit', 'wc-generic-product-designer' ),
 					'panelLayers'     => __( 'Layers', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => WC_GPD_Font_Registry::font_families_for_js( $template_ref ),
@@ -472,58 +473,73 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			</header>
 			<div class="wc-gpd-modern-studio" id="wc-gpd-studio">
 				<nav class="wc-gpd-studio-nav" id="wc-gpd-studio-nav" aria-label="<?php esc_attr_e( 'Designer tools', 'wc-generic-product-designer' ); ?>">
-					<button type="button" class="wc-gpd-studio-nav__btn" data-section="details" id="wc-gpd-nav-details" hidden>
-						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">✎</span>
-						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Details', 'wc-generic-product-designer' ); ?></span>
-					</button>
-					<button type="button" class="wc-gpd-studio-nav__btn is-active" data-section="text" id="wc-gpd-nav-text">
-						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">T</span>
-						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></span>
+					<button type="button" class="wc-gpd-studio-nav__btn wc-gpd-studio-nav__btn--add is-active" data-section="add" id="wc-gpd-nav-add">
+						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">+</span>
+						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Add', 'wc-generic-product-designer' ); ?></span>
 					</button>
 					<button type="button" class="wc-gpd-studio-nav__btn" data-section="layers" id="wc-gpd-nav-layers">
 						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">☰</span>
 						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></span>
 					</button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="details" id="wc-gpd-nav-details" hidden>
+						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">✎</span>
+						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Details', 'wc-generic-product-designer' ); ?></span>
+					</button>
+					<button type="button" class="wc-gpd-studio-nav__btn" data-section="context" id="wc-gpd-nav-context" hidden>
+						<span class="wc-gpd-studio-nav__icon" aria-hidden="true">✎</span>
+						<span class="wc-gpd-studio-nav__label"><?php esc_html_e( 'Edit', 'wc-generic-product-designer' ); ?></span>
+					</button>
 				</nav>
 				<aside class="wc-gpd-studio-drawer" id="wc-gpd-studio-panel">
 					<div class="wc-gpd-studio-drawer__head">
-						<h2 class="wc-gpd-studio-drawer__title" id="wc-gpd-studio-drawer-title"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></h2>
+						<h2 class="wc-gpd-studio-drawer__title" id="wc-gpd-studio-drawer-title"><?php esc_html_e( 'Add', 'wc-generic-product-designer' ); ?></h2>
 					</div>
 					<div class="wc-gpd-studio-drawer__body">
+						<div class="wc-gpd-studio-panel-section is-active" data-section="add" id="wc-gpd-section-add">
+							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add elements to your design.', 'wc-generic-product-designer' ); ?></p>
+							<div class="wc-gpd-add-menu">
+								<div class="wc-gpd-add-menu__group">
+									<h5 class="wc-gpd-add-menu__title"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></h5>
+									<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+								</div>
+							</div>
+						</div>
 						<div class="wc-gpd-studio-panel-section" data-section="details" id="wc-gpd-section-details" hidden>
 							<div class="wc-gpd-placeholder-fields" id="wc-gpd-placeholder-fields"></div>
 							<div class="wc-gpd-graphic-pickers" id="wc-gpd-graphic-pickers"></div>
 						</div>
-						<div class="wc-gpd-studio-panel-section is-active" data-section="text" id="wc-gpd-dock">
-							<p class="wc-gpd-tools-hint" id="wc-gpd-tools-hint"><?php esc_html_e( 'Tap text on the canvas to edit, or add new text below.', 'wc-generic-product-designer' ); ?></p>
-							<div class="wc-gpd-tools-panel" id="wc-gpd-tools-panel">
-								<div class="wc-gpd-tools-row wc-gpd-tools-row--type">
-									<button type="button" class="wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
-									<select id="wc-gpd-font-family" class="wc-gpd-tool-select" title="<?php esc_attr_e( 'Font family', 'wc-generic-product-designer' ); ?>"></select>
-									<input type="number" id="wc-gpd-font-size" class="wc-gpd-tool-size" min="8" max="400" step="1" value="32" title="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" aria-label="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" />
-								</div>
-								<div class="wc-gpd-tools-row wc-gpd-tools-row--style">
-									<div class="wc-gpd-tool-group" role="group" aria-label="<?php esc_attr_e( 'Text style', 'wc-generic-product-designer' ); ?>">
-										<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-bold-btn" data-prop="bold" title="<?php esc_attr_e( 'Bold', 'wc-generic-product-designer' ); ?>"><strong>B</strong></button>
-										<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-italic-btn" data-prop="italic" title="<?php esc_attr_e( 'Italic', 'wc-generic-product-designer' ); ?>"><em>I</em></button>
-										<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-underline-btn" data-prop="underline" title="<?php esc_attr_e( 'Underline', 'wc-generic-product-designer' ); ?>"><span class="wc-gpd-u">U</span></button>
+						<div class="wc-gpd-studio-panel-section" data-section="context" id="wc-gpd-section-context" hidden>
+							<p class="wc-gpd-context-empty" id="wc-gpd-context-empty"><?php esc_html_e( 'Select text on the canvas to edit its properties.', 'wc-generic-product-designer' ); ?></p>
+							<div class="wc-gpd-context-pane" id="wc-gpd-context-pane" hidden>
+								<p class="wc-gpd-context-layer-name" id="wc-gpd-context-layer-name"></p>
+								<div class="wc-gpd-tools-panel" id="wc-gpd-tools-panel">
+									<div class="wc-gpd-tools-row wc-gpd-tools-row--type">
+										<select id="wc-gpd-font-family" class="wc-gpd-tool-select" title="<?php esc_attr_e( 'Font family', 'wc-generic-product-designer' ); ?>"></select>
+										<input type="number" id="wc-gpd-font-size" class="wc-gpd-tool-size" min="8" max="400" step="1" value="32" title="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" aria-label="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" />
 									</div>
-									<div class="wc-gpd-tool-group wc-gpd-control-align" role="group" aria-label="<?php esc_attr_e( 'Alignment', 'wc-generic-product-designer' ); ?>">
-										<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="left" aria-pressed="true" title="<?php esc_attr_e( 'Align left', 'wc-generic-product-designer' ); ?>">L</button>
-										<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="center" aria-pressed="false" title="<?php esc_attr_e( 'Align center', 'wc-generic-product-designer' ); ?>">C</button>
-										<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="right" aria-pressed="false" title="<?php esc_attr_e( 'Align right', 'wc-generic-product-designer' ); ?>">R</button>
+									<div class="wc-gpd-tools-row wc-gpd-tools-row--style">
+										<div class="wc-gpd-tool-group" role="group" aria-label="<?php esc_attr_e( 'Text style', 'wc-generic-product-designer' ); ?>">
+											<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-bold-btn" data-prop="bold" title="<?php esc_attr_e( 'Bold', 'wc-generic-product-designer' ); ?>"><strong>B</strong></button>
+											<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-italic-btn" data-prop="italic" title="<?php esc_attr_e( 'Italic', 'wc-generic-product-designer' ); ?>"><em>I</em></button>
+											<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-underline-btn" data-prop="underline" title="<?php esc_attr_e( 'Underline', 'wc-generic-product-designer' ); ?>"><span class="wc-gpd-u">U</span></button>
+										</div>
+										<div class="wc-gpd-tool-group wc-gpd-control-align" role="group" aria-label="<?php esc_attr_e( 'Alignment', 'wc-generic-product-designer' ); ?>">
+											<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="left" aria-pressed="true" title="<?php esc_attr_e( 'Align left', 'wc-generic-product-designer' ); ?>">L</button>
+											<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="center" aria-pressed="false" title="<?php esc_attr_e( 'Align center', 'wc-generic-product-designer' ); ?>">C</button>
+											<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="right" aria-pressed="false" title="<?php esc_attr_e( 'Align right', 'wc-generic-product-designer' ); ?>">R</button>
+										</div>
+										<div class="wc-gpd-tool-group wc-gpd-color-swatches wc-gpd-control-text-color" id="wc-gpd-color-swatches" role="group" aria-label="<?php esc_attr_e( 'Text color', 'wc-generic-product-designer' ); ?>"></div>
+										<input type="color" id="wc-gpd-text-color" class="screen-reader-text" tabindex="-1" aria-hidden="true" value="#000000" />
 									</div>
-									<div class="wc-gpd-tool-group wc-gpd-color-swatches wc-gpd-control-text-color" id="wc-gpd-color-swatches" role="group" aria-label="<?php esc_attr_e( 'Text color', 'wc-generic-product-designer' ); ?>"></div>
-									<input type="color" id="wc-gpd-text-color" class="screen-reader-text" tabindex="-1" aria-hidden="true" value="#000000" />
+									<div class="wc-gpd-tools-row wc-gpd-tools-row--spacing">
+										<label class="wc-gpd-tool-label wc-gpd-control-line-height"><?php esc_html_e( 'Line', 'wc-generic-product-designer' ); ?> <input type="number" id="wc-gpd-line-height" class="wc-gpd-tool-mini" min="0.5" max="3" step="0.05" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" /></label>
+										<label class="wc-gpd-tool-label wc-gpd-control-letter-spacing"><?php esc_html_e( 'Space', 'wc-generic-product-designer' ); ?> <input type="number" id="wc-gpd-letter-spacing" class="wc-gpd-tool-mini" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" /></label>
+									</div>
 								</div>
-								<div class="wc-gpd-tools-row wc-gpd-tools-row--spacing">
-									<label class="wc-gpd-tool-label wc-gpd-control-line-height"><?php esc_html_e( 'Line', 'wc-generic-product-designer' ); ?> <input type="number" id="wc-gpd-line-height" class="wc-gpd-tool-mini" min="0.5" max="3" step="0.05" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" /></label>
-									<label class="wc-gpd-tool-label wc-gpd-control-letter-spacing"><?php esc_html_e( 'Space', 'wc-generic-product-designer' ); ?> <input type="number" id="wc-gpd-letter-spacing" class="wc-gpd-tool-mini" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" /></label>
-								</div>
+								<input type="checkbox" id="wc-gpd-bold" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
+								<input type="checkbox" id="wc-gpd-italic" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
+								<input type="checkbox" id="wc-gpd-underline" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
 							</div>
-							<input type="checkbox" id="wc-gpd-bold" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
-							<input type="checkbox" id="wc-gpd-italic" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
-							<input type="checkbox" id="wc-gpd-underline" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
 						</div>
 						<div class="wc-gpd-studio-panel-section" data-section="layers" hidden>
 							<ul class="wc-gpd-layers-list" id="wc-gpd-layers-list"></ul>

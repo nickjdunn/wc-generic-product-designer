@@ -25,7 +25,10 @@
 	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
 	const textEditorHint = document.getElementById( 'wc-gpd-text-editor-hint' );
 	const layerColorsPanel = document.getElementById( 'wc-gpd-layer-colors-panel' );
-	const colorsHint = document.getElementById( 'wc-gpd-colors-hint' );
+	const contextNavBtn = document.getElementById( 'wc-gpd-nav-context' );
+	const contextEmpty = document.getElementById( 'wc-gpd-context-empty' );
+	const contextPane = document.getElementById( 'wc-gpd-context-pane' );
+	const contextLayerName = document.getElementById( 'wc-gpd-context-layer-name' );
 	const palettesInput = document.getElementById( 'wc_gpd_template_palettes' );
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
@@ -116,14 +119,19 @@
 	};
 
 	const MOCKUP_CHECKBOX_MAP = {
+		free_text: 'wc_gpd_ps_allow_free_text',
 		font: 'wc_gpd_ps_allow_font_family',
 		size: 'wc_gpd_ps_allow_font_size',
+		color: 'wc_gpd_ps_allow_text_color',
 		bold: 'wc_gpd_ps_allow_bold',
 		italic: 'wc_gpd_ps_allow_italic',
 		underline: 'wc_gpd_ps_allow_underline',
+		line_height: 'wc_gpd_ps_allow_line_height',
+		letter_spacing: 'wc_gpd_ps_allow_letter_spacing',
 		align: 'wc_gpd_ps_allow_text_align',
+		details: 'wc_gpd_ps_allow_details_panel',
 		graphics: 'wc_gpd_ps_allow_customer_graphics',
-		free_text: 'wc_gpd_ps_allow_free_text',
+		layers: 'wc_gpd_ps_allow_layers_panel',
 	};
 
 	const UNIT_FACTORS = {
@@ -432,14 +440,10 @@
 	const adminStudioNav = document.getElementById( 'wc-gpd-admin-studio-nav' );
 	const adminDrawerTitle = document.getElementById( 'wc-gpd-admin-drawer-title' );
 	const adminSectionTitles = {
+		add: 'Add',
 		layers: 'Layers',
-		text: 'Text',
-		fonts: 'Fonts',
-		images: 'Images',
-		size: 'Size',
-		colors: 'Colors',
-		guides: 'Guides',
-		shapes: 'Shapes',
+		context: 'Properties',
+		template: 'Template',
 	};
 
 	function syncAdminStudioNav( sectionName ) {
@@ -484,19 +488,61 @@
 		} );
 	}
 
+	function contextTypeForObject( obj ) {
+		if ( ! obj ) {
+			return null;
+		}
+		if ( isTextLayer( obj ) ) {
+			return 'text';
+		}
+		if ( isGraphicSlot( obj ) ) {
+			return 'slot';
+		}
+		if ( isShape( obj ) ) {
+			return 'shape';
+		}
+		if ( isTemplateImage( obj ) ) {
+			return 'image';
+		}
+		return null;
+	}
+
+	function showContextBlocks( active ) {
+		const type = contextTypeForObject( active );
+		const blocks = contextPane ? contextPane.querySelectorAll( '.wc-gpd-context-block' ) : [];
+		blocks.forEach( ( block ) => {
+			const forTypes = ( block.dataset.contextFor || '' ).split( ',' ).map( ( part ) => part.trim() );
+			if ( forTypes.includes( 'all' ) ) {
+				block.hidden = false;
+				return;
+			}
+			if ( ! type ) {
+				block.hidden = true;
+				return;
+			}
+			let show = forTypes.includes( type );
+			if ( block.id === 'wc-gpd-context-block-colors' ) {
+				show = show && objectHasColor( active );
+			}
+			block.hidden = ! show;
+		} );
+	}
+
+	function syncContextNav( active ) {
+		if ( contextNavBtn ) {
+			contextNavBtn.hidden = ! active;
+		}
+	}
+
+	function openContextPane() {
+		openAccordionSection( 'context' );
+	}
+
 	function openAccordionForSelection( active ) {
 		if ( ! active ) {
 			return;
 		}
-		if ( isTextLayer( active ) ) {
-			openAccordionSection( 'text' );
-		} else if ( isMockupImage( active ) || isGraphicImage( active ) || isGraphicSlot( active ) ) {
-			openAccordionSection( 'images' );
-		} else if ( isShape( active ) ) {
-			openAccordionSection( 'shapes' );
-		} else {
-			openAccordionSection( 'size' );
-		}
+		openContextPane();
 	}
 
 	function updateAccordionTitles() {
@@ -653,14 +699,7 @@
 	}
 
 	function syncColorsPanel( obj ) {
-		const hasColor = objectHasColor( obj );
-		if ( layerColorsPanel ) {
-			layerColorsPanel.hidden = ! hasColor;
-		}
-		if ( colorsHint ) {
-			colorsHint.hidden = hasColor;
-		}
-		if ( ! hasColor ) {
+		if ( ! objectHasColor( obj ) ) {
 			return;
 		}
 
@@ -747,14 +786,12 @@
 				chip.hidden = checkbox ? ! checkbox.checked : true;
 			}
 		} );
-		const colorChip = document.querySelector( '.wc-gpd-mockup-chip[data-mockup="color"]' );
-		if ( colorChip ) {
-			colorChip.hidden = false;
-		}
 		const fieldsEl = document.getElementById( 'wc-gpd-mockup-fields' );
 		if ( fieldsEl ) {
 			const hasSidebarFields = canvas.getObjects().some( ( obj ) => isPlaceholder( obj ) );
-			fieldsEl.hidden = ! hasSidebarFields;
+			const detailsCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_details_panel"]' );
+			const detailsOn = ! detailsCheckbox || detailsCheckbox.checked;
+			fieldsEl.hidden = ! hasSidebarFields || ! detailsOn;
 		}
 	}
 
@@ -810,7 +847,7 @@
 		}
 		adminStudioNav.querySelectorAll( '.wc-gpd-studio-nav__btn' ).forEach( ( btn ) => {
 			btn.addEventListener( 'click', () => {
-				openAccordionSection( btn.dataset.section || 'layers' );
+				openAccordionSection( btn.dataset.section || 'add' );
 			} );
 		} );
 	}
@@ -975,11 +1012,29 @@
 			mockupVisibleToggle.checked = active.wcGpdMockupVisible !== false;
 		}
 		if ( active ) {
+			if ( contextEmpty ) {
+				contextEmpty.hidden = true;
+			}
+			if ( contextPane ) {
+				contextPane.hidden = false;
+			}
+			if ( contextLayerName ) {
+				contextLayerName.textContent = layerLabel( active );
+			}
+			showContextBlocks( active );
 			syncSelectionDimsPanel( active );
 			syncColorsPanel( active );
+			syncContextNav( active );
 			openAccordionForSelection( active );
 		} else {
 			syncColorsPanel( null );
+			if ( contextEmpty ) {
+				contextEmpty.hidden = false;
+			}
+			if ( contextPane ) {
+				contextPane.hidden = true;
+			}
+			syncContextNav( null );
 		}
 
 		renderLayersList();
@@ -1526,7 +1581,7 @@
 			sortLayers();
 			canvas.requestRenderAll();
 			updateSelectionPanels();
-			openAccordionSection( 'shapes' );
+			openContextPane();
 		} );
 	}
 
@@ -1619,7 +1674,7 @@
 		if ( freeformHint ) {
 			freeformHint.hidden = false;
 		}
-		openAccordionSection( 'shapes' );
+		openAccordionSection( 'add' );
 	}
 
 	function cancelFreeformMode() {
@@ -1657,7 +1712,7 @@
 		sortLayers();
 		canvas.requestRenderAll();
 		updateSelectionPanels();
-		openAccordionSection( 'text' );
+		openContextPane();
 	}
 
 	function addImageFromLibrary( attachment ) {
@@ -1687,7 +1742,7 @@
 			sortLayers();
 			canvas.requestRenderAll();
 			updateSelectionPanels();
-			openAccordionSection( 'images' );
+			openContextPane();
 		}, { crossOrigin: 'anonymous' } );
 	}
 
@@ -2361,7 +2416,6 @@
 	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', () => {
 		cancelFreeformMode();
 		addGraphicSlot();
-		openAccordionSection( 'images' );
 	} );
 
 	$( '.wc-gpd-add-template-rect' ).on( 'click', () => { cancelFreeformMode(); addRect( false ); } );
@@ -2450,5 +2504,6 @@
 	loadJson();
 	updateRulers();
 	syncCustomerMockup();
+	openAccordionSection( 'add' );
 	applyResponsiveScale();
 }( jQuery ) );
