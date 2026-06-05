@@ -20,6 +20,7 @@ class WC_GPD_Product_Meta {
 	const CART_KEY_DESIGN_SVG  = 'wc_gpd_design_svg';
 	const CART_KEY_DESIGN_JSON = 'wc_gpd_design_json';
 	const CART_KEY_PREVIEW_URL = 'wc_gpd_preview_url';
+	const CART_KEY_PREVIEW_ID  = 'wc_gpd_preview_id';
 
 	const ORDER_META_DESIGN_SVG = '_wc_gpd_design_svg';
 

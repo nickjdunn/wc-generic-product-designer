@@ -18,24 +18,62 @@ class WC_GPD_Preview {
 	 * @param string $svg      Sanitized design SVG (text layers).
 	 * @param array  $settings Product designer settings.
 	 * @param string $alt      Alt text.
+	 * @param string $src_url  Optional direct image URL (attachment or file).
 	 * @return string
 	 */
-	public static function cart_thumbnail_html( $svg, $settings, $alt = '' ) {
+	public static function cart_thumbnail_html( $svg, $settings, $alt = '', $src_url = '' ) {
+		if ( $src_url ) {
+			return sprintf(
+				'<img src="%1$s" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail wc-gpd-cart-thumb-img" width="300" height="225" alt="%2$s" loading="lazy" decoding="async" />',
+				esc_url( $src_url ),
+				esc_attr( $alt )
+			);
+		}
+
 		$data_uri = self::composite_data_uri( $svg, $settings );
 		if ( ! $data_uri ) {
 			return '';
 		}
 
-		$width  = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
-		$height = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
-
 		return sprintf(
-			'<img src="%1$s" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail wc-gpd-cart-thumb-img" width="%2$d" height="%3$d" alt="%4$s" loading="lazy" decoding="async" />',
+			'<img src="%1$s" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail wc-gpd-cart-thumb-img" width="300" height="225" alt="%2$s" loading="lazy" decoding="async" />',
 			esc_attr( $data_uri ),
-			$width,
-			$height,
 			esc_attr( $alt )
 		);
+	}
+
+	/**
+	 * Full composite SVG document for file storage or data URIs.
+	 *
+	 * @param string $svg      Sanitized design SVG.
+	 * @param array  $settings Product designer settings.
+	 * @return string
+	 */
+	public static function build_composite_svg_document( $svg, $settings ) {
+		$svg = WC_GPD_SVG_Sanitizer::sanitize( $svg );
+		if ( ! $svg ) {
+			return '';
+		}
+
+		$width  = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
+		$height = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
+		$inner  = self::extract_svg_inner( $svg );
+
+		$document  = '<?xml version="1.0" encoding="UTF-8"?>';
+		$document .= '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
+		$document .= ' viewBox="0 0 ' . $width . ' ' . $height . '" width="' . $width . '" height="' . $height . '">';
+
+		$template_data = self::template_data_uri( isset( $settings['template_id'] ) ? absint( $settings['template_id'] ) : 0 );
+		if ( $template_data ) {
+			$document .= '<image x="0" y="0" width="' . $width . '" height="' . $height . '" preserveAspectRatio="xMidYMid slice" href="' . $template_data . '" />';
+		} else {
+			$document .= '<rect x="0" y="0" width="100%" height="100%" fill="#f4f4f4" />';
+		}
+
+		$document .= $inner;
+		$document .= '</svg>';
+
+		return $document;
 	}
 
 	/**
@@ -46,29 +84,12 @@ class WC_GPD_Preview {
 	 * @return string
 	 */
 	public static function composite_data_uri( $svg, $settings ) {
-		$svg = WC_GPD_SVG_Sanitizer::sanitize( $svg );
-		if ( ! $svg ) {
+		$document = self::build_composite_svg_document( $svg, $settings );
+		if ( ! $document ) {
 			return '';
 		}
 
-		$width  = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
-		$height = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
-		$inner  = self::extract_svg_inner( $svg );
-
-		$composite  = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"';
-		$composite .= ' viewBox="0 0 ' . $width . ' ' . $height . '" width="' . $width . '" height="' . $height . '">';
-
-		$template_data = self::template_data_uri( isset( $settings['template_id'] ) ? absint( $settings['template_id'] ) : 0 );
-		if ( $template_data ) {
-			$composite .= '<image x="0" y="0" width="' . $width . '" height="' . $height . '" preserveAspectRatio="xMidYMid slice" href="' . $template_data . '" />';
-		} else {
-			$composite .= '<rect x="0" y="0" width="100%" height="100%" fill="#f4f4f4" />';
-		}
-
-		$composite .= $inner;
-		$composite .= '</svg>';
-
-		return 'data:image/svg+xml;base64,' . base64_encode( $composite );
+		return 'data:image/svg+xml;base64,' . base64_encode( $document );
 	}
 
 	/**
@@ -103,7 +124,7 @@ class WC_GPD_Preview {
 		$mime = wp_check_filetype( $path );
 		$type = ! empty( $mime['type'] ) ? $mime['type'] : 'image/png';
 
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 		$contents = file_get_contents( $path );
 		if ( false === $contents ) {
 			return '';

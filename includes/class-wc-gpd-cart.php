@@ -41,6 +41,10 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_add_to_cart' ), 10, 3 );
 		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'remove_replaced_cart_item' ), 20, 3 );
 		add_filter( 'woocommerce_add_cart_item_data', array( $this, 'add_cart_item_data' ), 10, 3 );
+		add_filter( 'woocommerce_get_cart_item_from_session', array( $this, 'get_cart_item_from_session' ), 10, 3 );
+		add_filter( 'woocommerce_add_cart_item', array( $this, 'add_cart_item' ), 10, 2 );
+		add_filter( 'woocommerce_get_cart_contents', array( $this, 'apply_preview_image_ids' ), 20, 1 );
+		add_action( 'woocommerce_before_calculate_totals', array( $this, 'apply_preview_image_ids_on_cart' ), 5 );
 		add_filter( 'woocommerce_get_item_data', array( $this, 'display_cart_item_data' ), 10, 2 );
 		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
 		add_filter( 'woocommerce_widget_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
@@ -95,7 +99,7 @@ class WC_GPD_Cart implements WC_GPD_Module {
 	}
 
 	/**
-	 * Attach sanitized SVG to cart item.
+	 * Attach sanitized SVG and preview file to cart item.
 	 *
 	 * @param array $cart_item_data Cart item data.
 	 * @param int   $product_id     Product ID.
@@ -114,25 +118,115 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		$raw_svg = isset( $_POST['wc_gpd_design_svg'] ) ? wp_unslash( $_POST['wc_gpd_design_svg'] ) : '';
 		$svg     = WC_GPD_SVG_Sanitizer::sanitize( is_string( $raw_svg ) ? $raw_svg : '' );
 
-		if ( $svg ) {
-			$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] = $svg;
+		if ( ! $svg ) {
+			return $cart_item_data;
+		}
 
-			$raw_json = isset( $_POST['wc_gpd_design_json'] ) ? wp_unslash( $_POST['wc_gpd_design_json'] ) : '';
-			$json     = WC_GPD_Design_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
-			if ( $json ) {
-				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] = $json;
+		$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] = $svg;
+
+		$raw_json = isset( $_POST['wc_gpd_design_json'] ) ? wp_unslash( $_POST['wc_gpd_design_json'] ) : '';
+		$json     = WC_GPD_Design_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
+		if ( $json ) {
+			$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] = $json;
+		}
+
+		$cart_item_data['unique_key'] = md5( $svg . ( $json ? $json : '' ) );
+
+		$raw_preview = isset( $_POST['wc_gpd_preview_image'] ) ? wp_unslash( $_POST['wc_gpd_preview_image'] ) : '';
+		$png_result  = WC_GPD_Preview_Storage::save_from_data_url( is_string( $raw_preview ) ? $raw_preview : '', $product_id );
+		if ( ! empty( $png_result['url'] ) ) {
+			$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] = $png_result['url'];
+			if ( ! empty( $png_result['id'] ) ) {
+				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] = (int) $png_result['id'];
 			}
+		}
 
-			$cart_item_data['unique_key'] = md5( $svg . ( $json ? $json : '' ) );
-
-			$raw_preview = isset( $_POST['wc_gpd_preview_image'] ) ? wp_unslash( $_POST['wc_gpd_preview_image'] ) : '';
-			$preview_url = WC_GPD_Preview_Storage::save_from_data_url( is_string( $raw_preview ) ? $raw_preview : '' );
-			if ( $preview_url ) {
-				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] = $preview_url;
+		if ( empty( $cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
+			$settings = WC_GPD_Product_Meta::get_settings( $product_id );
+			$svg_file = WC_GPD_Preview_Storage::save_design_preview( $svg, $settings, $product_id );
+			if ( ! empty( $svg_file['url'] ) ) {
+				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] = $svg_file['url'];
+				if ( ! empty( $svg_file['id'] ) ) {
+					$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] = (int) $svg_file['id'];
+				}
 			}
 		}
 
 		return $cart_item_data;
+	}
+
+	/**
+	 * Restore custom cart keys after session load (required for previews on cart page).
+	 *
+	 * @param array  $cart_item Cart item.
+	 * @param array  $values    Session values.
+	 * @param string $key       Cart item key.
+	 * @return array
+	 */
+	public function get_cart_item_from_session( $cart_item, $values, $key ) {
+		$keys = array(
+			WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG,
+			WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON,
+			WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL,
+			WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID,
+		);
+
+		foreach ( $keys as $meta_key ) {
+			if ( isset( $values[ $meta_key ] ) ) {
+				$cart_item[ $meta_key ] = $values[ $meta_key ];
+			}
+		}
+
+		return $cart_item;
+	}
+
+	/**
+	 * When a cart line is hydrated, point its product image at the design preview.
+	 *
+	 * @param array  $cart_item     Cart item.
+	 * @param string $cart_item_key Cart item key.
+	 * @return array
+	 */
+	public function add_cart_item( $cart_item, $cart_item_key ) {
+		$this->maybe_set_product_image_id( $cart_item, $cart_item_key );
+		return $cart_item;
+	}
+
+	/**
+	 * Blocks / Store API read product image ID from the cart product object.
+	 *
+	 * @param array $cart_contents Cart contents.
+	 * @return array
+	 */
+	public function apply_preview_image_ids( $cart_contents ) {
+		if ( ! is_array( $cart_contents ) ) {
+			return $cart_contents;
+		}
+
+		foreach ( $cart_contents as $cart_item_key => $cart_item ) {
+			$this->maybe_set_product_image_id( $cart_item, $cart_item_key );
+		}
+
+		return $cart_contents;
+	}
+
+	/**
+	 * Set preview attachment on each cart line product (Cart block + mini-cart).
+	 *
+	 * @param WC_Cart $cart Cart object.
+	 */
+	public function apply_preview_image_ids_on_cart( $cart ) {
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
+			return;
+		}
+
+		if ( ! $cart || ! is_a( $cart, 'WC_Cart' ) ) {
+			return;
+		}
+
+		foreach ( $cart->get_cart() as $cart_item_key => $cart_item ) {
+			$this->maybe_set_product_image_id( $cart_item, $cart_item_key );
+		}
 	}
 
 	/**
@@ -182,14 +276,11 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		$product    = $product_id ? wc_get_product( $product_id ) : null;
 		$alt        = $product ? $product->get_name() : __( 'Custom design', 'wc-generic-product-designer' );
 
-		if ( ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
-			$url = esc_url( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] );
-			if ( $url ) {
-				return sprintf(
-					'<img src="%1$s" class="attachment-woocommerce_thumbnail size-woocommerce_thumbnail wc-gpd-cart-thumb-img" width="300" height="225" alt="%2$s" loading="lazy" decoding="async" />',
-					$url,
-					esc_attr( $alt )
-				);
+		$preview = $this->resolve_preview_for_cart_item( $cart_item, $cart_item_key );
+		if ( ! empty( $preview['url'] ) ) {
+			$html = WC_GPD_Preview::cart_thumbnail_html( '', array(), $alt, $preview['url'] );
+			if ( $html ) {
+				return $html;
 			}
 		}
 
@@ -199,13 +290,13 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		}
 
 		$settings = WC_GPD_Product_Meta::get_settings( $product_id );
-		$preview  = WC_GPD_Preview::cart_thumbnail_html( $svg, $settings, $alt );
+		$html     = WC_GPD_Preview::cart_thumbnail_html( $svg, $settings, $alt );
 
-		return $preview ? $preview : $thumbnail;
+		return $html ? $html : $thumbnail;
 	}
 
 	/**
-	 * Block / Store API cart images (mini-cart drawer).
+	 * Block / Store API cart images (Cart block, mini-cart drawer on block themes).
 	 *
 	 * @param array  $product_images Image payloads.
 	 * @param array  $cart_item      Cart item.
@@ -213,24 +304,38 @@ class WC_GPD_Cart implements WC_GPD_Module {
 	 * @return array
 	 */
 	public function store_api_cart_item_images( $product_images, $cart_item, $cart_item_key ) {
-		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
+		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] ) ) {
 			return $product_images;
 		}
 
-		$url = esc_url( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] );
+		$preview = $this->resolve_preview_for_cart_item( $cart_item, $cart_item_key );
+		$url     = ! empty( $preview['url'] ) ? esc_url( $preview['url'] ) : '';
+
+		if ( ! $url ) {
+			$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+			$svg        = WC_GPD_SVG_Sanitizer::sanitize( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] );
+			if ( $svg && $product_id ) {
+				$url = WC_GPD_Preview::composite_data_uri( $svg, WC_GPD_Product_Meta::get_settings( $product_id ) );
+			}
+		}
+
 		if ( ! $url ) {
 			return $product_images;
 		}
 
+		$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+		$product    = $product_id ? wc_get_product( $product_id ) : null;
+		$alt        = $product ? $product->get_name() : __( 'Custom design', 'wc-generic-product-designer' );
+
 		return array(
-			array(
-				'id'        => 0,
+			(object) array(
+				'id'        => ! empty( $preview['id'] ) ? (int) $preview['id'] : 0,
 				'src'       => $url,
 				'thumbnail' => $url,
 				'srcset'    => '',
 				'sizes'     => '',
-				'name'      => '',
-				'alt'       => __( 'Custom design', 'wc-generic-product-designer' ),
+				'name'      => $alt,
+				'alt'       => $alt,
 			),
 		);
 	}
@@ -329,6 +434,93 @@ class WC_GPD_Cart implements WC_GPD_Module {
 	}
 
 	/**
+	 * Resolve preview URL/attachment for a cart line (generate on demand for legacy lines).
+	 *
+	 * @param array  $cart_item     Cart item.
+	 * @param string $cart_item_key Cart item key.
+	 * @return array{url:string,id:int}
+	 */
+	private function resolve_preview_for_cart_item( $cart_item, $cart_item_key ) {
+		$url = ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] )
+			? esc_url( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] )
+			: '';
+		$id  = ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] )
+			? absint( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] )
+			: 0;
+
+		if ( $url ) {
+			return array(
+				'url' => $url,
+				'id'  => $id,
+			);
+		}
+
+		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] ) ) {
+			return array(
+				'url' => '',
+				'id'  => 0,
+			);
+		}
+
+		$product_id = isset( $cart_item['product_id'] ) ? absint( $cart_item['product_id'] ) : 0;
+		$svg        = WC_GPD_SVG_Sanitizer::sanitize( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] );
+		if ( ! $svg || ! $product_id ) {
+			return array(
+				'url' => '',
+				'id'  => 0,
+			);
+		}
+
+		$result = WC_GPD_Preview_Storage::save_design_preview(
+			$svg,
+			WC_GPD_Product_Meta::get_settings( $product_id ),
+			$product_id
+		);
+
+		if ( ! empty( $result['url'] ) && $cart_item_key && WC()->cart && isset( WC()->cart->cart_contents[ $cart_item_key ] ) ) {
+			WC()->cart->cart_contents[ $cart_item_key ][ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] = $result['url'];
+			if ( ! empty( $result['id'] ) ) {
+				WC()->cart->cart_contents[ $cart_item_key ][ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] = (int) $result['id'];
+				$this->maybe_set_product_image_id( WC()->cart->cart_contents[ $cart_item_key ], $cart_item_key );
+			}
+		}
+
+		return array(
+			'url' => ! empty( $result['url'] ) ? $result['url'] : '',
+			'id'  => ! empty( $result['id'] ) ? (int) $result['id'] : 0,
+		);
+	}
+
+	/**
+	 * Point the cart line product at the preview attachment (Cart/Checkout blocks).
+	 *
+	 * @param array  $cart_item     Cart item.
+	 * @param string $cart_item_key Cart item key.
+	 */
+	private function maybe_set_product_image_id( array $cart_item, $cart_item_key ) {
+		if ( empty( $cart_item['data'] ) || ! is_a( $cart_item['data'], 'WC_Product' ) ) {
+			return;
+		}
+
+		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] ) ) {
+			return;
+		}
+
+		$preview_id = ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] )
+			? absint( $cart_item[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_ID ] )
+			: 0;
+
+		if ( ! $preview_id ) {
+			$resolved   = $this->resolve_preview_for_cart_item( $cart_item, $cart_item_key );
+			$preview_id = ! empty( $resolved['id'] ) ? (int) $resolved['id'] : 0;
+		}
+
+		if ( $preview_id ) {
+			$cart_item['data']->set_image_id( $preview_id );
+		}
+	}
+
+	/**
 	 * Cart/checkout thumbnail styles.
 	 */
 	public function enqueue_cart_styles() {
@@ -368,8 +560,8 @@ class WC_GPD_Cart implements WC_GPD_Module {
 			WC_GPD_Logger::info(
 				'Design saved to order line item',
 				array(
-					'order_id' => $order->get_id(),
-					'item_id'  => $item->get_id(),
+					'order_id'  => $order->get_id(),
+					'item_id'   => $item->get_id(),
 					'svg_bytes' => strlen( $svg ),
 				)
 			);
