@@ -96,6 +96,8 @@
 	const ui = {
 		addText: document.getElementById( 'wc-gpd-add-text' ),
 		dock: document.getElementById( 'wc-gpd-dock' ),
+		toolsPanel: document.getElementById( 'wc-gpd-tools-panel' ),
+		toolsHint: document.getElementById( 'wc-gpd-tools-hint' ),
 		fontFamily: document.getElementById( 'wc-gpd-font-family' ),
 		fontSize: document.getElementById( 'wc-gpd-font-size' ),
 		bold: document.getElementById( 'wc-gpd-bold' ),
@@ -104,16 +106,22 @@
 		italicBtn: document.getElementById( 'wc-gpd-italic-btn' ),
 		underlineBtn: document.getElementById( 'wc-gpd-underline-btn' ),
 		textColor: document.getElementById( 'wc-gpd-text-color' ),
+		colorSwatches: document.getElementById( 'wc-gpd-color-swatches' ),
 		underline: document.getElementById( 'wc-gpd-underline' ),
 		lineHeight: document.getElementById( 'wc-gpd-line-height' ),
 		letterSpacing: document.getElementById( 'wc-gpd-letter-spacing' ),
+		lineHeightLabel: designerRoot.querySelector( '.wc-gpd-control-line-height' ),
+		letterSpacingLabel: designerRoot.querySelector( '.wc-gpd-control-letter-spacing' ),
 		alignRow: designerRoot.querySelector( '.wc-gpd-control-align' ),
 		alignButtons: designerRoot.querySelectorAll( '.wc-gpd-align' ),
 		layersList: document.getElementById( 'wc-gpd-layers-list' ),
+		layersToggle: document.getElementById( 'wc-gpd-layers-toggle' ),
+		layersPanel: document.getElementById( 'wc-gpd-layers-panel' ),
 		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
 		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
 		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
 		popoutBtn: document.getElementById( 'wc-gpd-popout-btn' ),
+		fieldsToggle: document.getElementById( 'wc-gpd-fields-toggle' ),
 		viewPhotosBtn: document.getElementById( 'wc-gpd-view-photos-btn' ),
 		galleryModal: document.getElementById( 'wc-gpd-gallery-modal' ),
 		galleryScroll: document.getElementById( 'wc-gpd-gallery-scroll' ),
@@ -178,20 +186,56 @@
 
 	function applyProductToolSettings() {
 		const showColor = textColorAllowed( activeText );
+		setToolVisible( ui.colorSwatches, showColor );
 		setToolVisible( ui.textColor, showColor );
 		setToolVisible( ui.fontFamily, productSettings.allow_font_family !== false );
 		setToolVisible( ui.fontSize, productSettings.allow_font_size !== false );
 		setToolVisible( ui.boldBtn, productSettings.allow_bold !== false );
 		setToolVisible( ui.italicBtn, productSettings.allow_italic !== false );
 		setToolVisible( ui.underlineBtn, productSettings.allow_underline !== false );
-		setToolVisible( ui.lineHeight, productSettings.allow_line_height !== false );
-		setToolVisible( ui.letterSpacing, productSettings.allow_letter_spacing !== false );
+		setToolVisible( ui.lineHeightLabel || ui.lineHeight, productSettings.allow_line_height !== false );
+		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, productSettings.allow_letter_spacing !== false );
 		setToolVisible( ui.alignRow, productSettings.allow_text_align !== false );
 		setToolVisible( ui.popoutBtn, productSettings.enable_popout !== false );
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
 		if ( ui.textColor ) {
 			ui.textColor.value = defaultTextColor( activeText );
 		}
+	}
+
+	function renderColorSwatches( obj ) {
+		if ( ! ui.colorSwatches ) {
+			return;
+		}
+		ui.colorSwatches.innerHTML = '';
+		if ( ! textColorAllowed( obj ) ) {
+			ui.colorSwatches.hidden = true;
+			return;
+		}
+		ui.colorSwatches.hidden = false;
+		const colors = paletteColorsForObject( obj );
+		const current = ( obj && obj.fill ) ? String( obj.fill ).toLowerCase() : defaultTextColor( obj ).toLowerCase();
+		colors.forEach( ( color ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-color-swatch';
+			btn.style.backgroundColor = color;
+			btn.title = color;
+			btn.setAttribute( 'aria-label', color );
+			btn.classList.toggle( 'is-active', color.toLowerCase() === current );
+			btn.addEventListener( 'click', () => {
+				if ( ! activeText ) {
+					return;
+				}
+				activeText.set( 'fill', color );
+				if ( ui.textColor ) {
+					ui.textColor.value = color;
+				}
+				renderColorSwatches( activeText );
+				canvas.requestRenderAll();
+			} );
+			ui.colorSwatches.appendChild( btn );
+		} );
 	}
 
 	const canvas = new fabric.Canvas( 'wc-gpd-canvas', {
@@ -266,8 +310,10 @@
 		}
 
 		const isPopout = designerRoot.classList.contains( 'wc-gpd-is-popout' );
+		const isModal = designerRoot.classList.contains( 'wc-gpd-popout--modal' );
+		const popoutWidth = isModal ? designerRoot.clientWidth : window.innerWidth;
 		const maxWidth = isPopout
-			? Math.min( window.innerWidth - 16, 1200 )
+			? Math.max( 1, Math.min( popoutWidth - 24, 1200 ) )
 			: Math.max( 1, wrap.clientWidth );
 		displayScale = Math.min( 1, maxWidth / PROD_WIDTH );
 		const displayW = Math.max( 1, Math.floor( PROD_WIDTH * displayScale ) );
@@ -361,12 +407,29 @@
 		const slots = view ? getGraphicSlotsFromView( view ) : [];
 		const showFields = placeholders.length > 0 || ( slots.length > 0 && graphicLibrary.length && productSettings.allow_customer_graphics !== false );
 
-		if ( ui.customerFields ) {
-			ui.customerFields.hidden = ! showFields;
-		}
 		const layout = designerRoot.querySelector( '.wc-gpd-designer__layout--compact' );
+		const isMobile = window.matchMedia( '(max-width: 767px)' ).matches;
+
 		if ( layout ) {
 			layout.classList.toggle( 'wc-gpd-has-fields', showFields );
+			if ( ! showFields ) {
+				layout.classList.remove( 'wc-gpd-fields-open' );
+			}
+		}
+
+		if ( ui.customerFields ) {
+			if ( showFields && ! isMobile ) {
+				ui.customerFields.hidden = false;
+			} else if ( ! showFields ) {
+				ui.customerFields.hidden = true;
+			}
+		}
+
+		if ( ui.fieldsToggle ) {
+			ui.fieldsToggle.hidden = ! showFields || ! isMobile;
+			if ( showFields && isMobile ) {
+				ui.customerFields.hidden = ! layout.classList.contains( 'wc-gpd-fields-open' );
+			}
 		}
 
 		if ( ui.placeholderFields ) {
@@ -1103,11 +1166,15 @@
 		activeText = obj;
 		const enabled = !! obj;
 
-		if ( ui.dock ) {
-			ui.dock.classList.toggle( 'is-disabled', ! enabled );
+		if ( ui.toolsPanel ) {
+			ui.toolsPanel.classList.toggle( 'is-disabled', ! enabled );
+		}
+		if ( ui.toolsHint ) {
+			ui.toolsHint.hidden = enabled;
 		}
 
 		if ( ! enabled ) {
+			renderColorSwatches( null );
 			return;
 		}
 
@@ -1138,7 +1205,8 @@
 		if ( ui.textColor ) {
 			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
-		setToolVisible( ui.textColor, textColorAllowed( obj ) );
+		setToolVisible( ui.colorSwatches, textColorAllowed( obj ) );
+		renderColorSwatches( obj );
 		if ( ui.underline ) {
 			ui.underline.checked = !! obj.underline;
 		}
@@ -1660,6 +1728,36 @@
 	} else if ( ui.popoutBtn ) {
 		ui.popoutBtn.hidden = true;
 	}
+
+	if ( ui.layersToggle && ui.layersPanel ) {
+		ui.layersToggle.addEventListener( 'click', () => {
+			const open = ui.layersPanel.hidden;
+			ui.layersPanel.hidden = ! open;
+			ui.layersToggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+		} );
+	}
+
+	if ( ui.fieldsToggle ) {
+		ui.fieldsToggle.addEventListener( 'click', () => {
+			const layout = designerRoot.querySelector( '.wc-gpd-designer__layout--compact' );
+			if ( ! layout ) {
+				return;
+			}
+			const open = ! layout.classList.contains( 'wc-gpd-fields-open' );
+			layout.classList.toggle( 'wc-gpd-fields-open', open );
+			if ( ui.customerFields ) {
+				ui.customerFields.hidden = ! open;
+			}
+			ui.fieldsToggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+			ui.fieldsToggle.textContent = open
+				? ( config.i18n.hideFields || 'Hide fields' )
+				: ( config.i18n.showFields || 'Show fields' );
+		} );
+	}
+
+	window.addEventListener( 'resize', () => {
+		buildCustomerFields();
+	} );
 
 	if ( ui.layerForward ) {
 		ui.layerForward.addEventListener( 'click', () => {

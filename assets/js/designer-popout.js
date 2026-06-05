@@ -1,18 +1,42 @@
 /**
- * Fullscreen pop-out mode for designer canvases (admin + storefront).
+ * Pop-out mode for designer canvases (admin + storefront).
  */
 ( function () {
 	'use strict';
+
+	function getCloseButton( rootEl ) {
+		return rootEl.querySelector( '#wc-gpd-popout-close' )
+			|| rootEl.querySelector( '.wc-gpd-popout-chrome__close' )
+			|| rootEl.querySelector( '.wc-gpd-popout-close' );
+	}
+
+	function getChrome( rootEl ) {
+		return rootEl.querySelector( '#wc-gpd-popout-chrome' )
+			|| rootEl.querySelector( '.wc-gpd-popout-chrome' );
+	}
+
+	function isStorefrontDesigner( rootEl ) {
+		return rootEl && rootEl.id === 'wc-gpd-designer';
+	}
 
 	function closePopout( rootEl, onResize ) {
 		if ( ! rootEl ) {
 			return;
 		}
-		rootEl.classList.remove( 'wc-gpd-is-popout' );
-		const closeBtn = rootEl.querySelector( '.wc-gpd-popout-close' );
-		if ( closeBtn ) {
+		rootEl.classList.remove( 'wc-gpd-is-popout', 'wc-gpd-popout--modal' );
+		rootEl.removeAttribute( 'aria-modal' );
+		rootEl.removeAttribute( 'role' );
+
+		const chrome = getChrome( rootEl );
+		if ( chrome ) {
+			chrome.hidden = true;
+		}
+
+		const closeBtn = getCloseButton( rootEl );
+		if ( closeBtn && closeBtn.classList.contains( 'wc-gpd-popout-close' ) ) {
 			closeBtn.hidden = true;
 		}
+
 		const backdrop = document.querySelector( '.wc-gpd-popout-backdrop' );
 		if ( backdrop ) {
 			backdrop.remove();
@@ -22,6 +46,16 @@
 		if ( typeof onResize === 'function' ) {
 			setTimeout( onResize, 60 );
 		}
+	}
+
+	function bindClose( rootEl, closeBtn, onResize ) {
+		if ( ! closeBtn || closeBtn.dataset.wcGpdPopoutBound ) {
+			return;
+		}
+		closeBtn.dataset.wcGpdPopoutBound = '1';
+		closeBtn.addEventListener( 'click', () => {
+			closePopout( rootEl, onResize );
+		} );
 	}
 
 	window.WcGpdPopout = {
@@ -53,21 +87,32 @@
 				document.body.appendChild( backdrop );
 			}
 
-			let closeBtn = rootEl.querySelector( '.wc-gpd-popout-close' );
+			const chrome = getChrome( rootEl );
+			if ( chrome ) {
+				chrome.hidden = false;
+				bindClose( rootEl, chrome.querySelector( '.wc-gpd-popout-chrome__close' ), onResize );
+			}
+
+			let closeBtn = getCloseButton( rootEl );
 			if ( ! closeBtn ) {
 				closeBtn = document.createElement( 'button' );
 				closeBtn.type = 'button';
 				closeBtn.className = 'button wc-gpd-popout-close';
 				closeBtn.textContent = 'Close expanded designer';
 				closeBtn.hidden = true;
-				closeBtn.addEventListener( 'click', () => {
-					closePopout( rootEl, onResize );
-				} );
 				rootEl.prepend( closeBtn );
 			}
-			closeBtn.hidden = false;
+			if ( closeBtn.classList.contains( 'wc-gpd-popout-close' ) ) {
+				closeBtn.hidden = false;
+			}
+			bindClose( rootEl, closeBtn, onResize );
 
 			rootEl.classList.add( 'wc-gpd-is-popout' );
+			if ( isStorefrontDesigner( rootEl ) && window.matchMedia( '(min-width: 768px)' ).matches ) {
+				rootEl.classList.add( 'wc-gpd-popout--modal' );
+			}
+			rootEl.setAttribute( 'role', 'dialog' );
+			rootEl.setAttribute( 'aria-modal', 'true' );
 			document.body.classList.add( 'wc-gpd-popout-open' );
 
 			if ( typeof onResize === 'function' ) {
