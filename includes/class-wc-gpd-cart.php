@@ -42,8 +42,8 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'remove_replaced_cart_item' ), 20, 3 );
 		add_filter( 'woocommerce_add_cart_item_data', array( $this, 'add_cart_item_data' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( $this, 'display_cart_item_data' ), 10, 2 );
-		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 10, 3 );
-		add_filter( 'woocommerce_widget_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 10, 3 );
+		add_filter( 'woocommerce_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
+		add_filter( 'woocommerce_widget_cart_item_thumbnail', array( $this, 'cart_item_thumbnail' ), 99, 3 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( $this, 'save_order_line_item_meta' ), 10, 4 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_cart_styles' ) );
 	}
@@ -115,8 +115,14 @@ class WC_GPD_Cart implements WC_GPD_Module {
 
 		if ( $svg ) {
 			$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] = $svg;
-			// Distinct cart lines per unique design (WooCommerce core behavior).
-			$cart_item_data['unique_key'] = md5( $svg );
+
+			$raw_json = isset( $_POST['wc_gpd_design_json'] ) ? wp_unslash( $_POST['wc_gpd_design_json'] ) : '';
+			$json     = WC_GPD_Design_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
+			if ( $json ) {
+				$cart_item_data[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] = $json;
+			}
+
+			$cart_item_data['unique_key'] = md5( $svg . ( $json ? $json : '' ) );
 		}
 
 		return $cart_item_data;
@@ -178,11 +184,6 @@ class WC_GPD_Cart implements WC_GPD_Module {
 		$preview = WC_GPD_Preview::cart_thumbnail_html( $svg, $settings, $alt );
 		if ( ! $preview ) {
 			return $thumbnail;
-		}
-
-		$edit_url = self::get_edit_design_url( $cart_item, $cart_item_key );
-		if ( $edit_url ) {
-			return sprintf( '<a href="%s">%s</a>', esc_url( $edit_url ), $preview );
 		}
 
 		return $preview;

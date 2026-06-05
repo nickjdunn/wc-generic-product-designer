@@ -6,12 +6,25 @@
 	--wc-gpd-border: #e2e2e2;
 	--wc-gpd-bg: #fafafa;
 	--wc-gpd-accent: #2271b1;
+	clear: both;
+	width: 100%;
+	max-width: 100%;
 	margin: 1.5rem 0 2rem;
 	padding: 1.25rem;
 	border: 1px solid var(--wc-gpd-border);
 	border-radius: 6px;
 	background: var(--wc-gpd-bg);
 	box-sizing: border-box;
+	overflow: hidden;
+}
+
+.single-product.wc-gpd-product .wc-gpd-designer {
+	max-width: min( 100%, 720px );
+}
+
+.single-product.wc-gpd-product .summary .wc-gpd-designer,
+.single-product.wc-gpd-product .entry-summary .wc-gpd-designer {
+	width: 100%;
 }
 
 .wc-gpd-designer *,
@@ -120,11 +133,19 @@
 	border: 1px solid var(--wc-gpd-border);
 	border-radius: 4px;
 	line-height: 0;
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+}
+
+.wc-gpd-designer__canvas-wrap .canvas-container {
+	max-width: 100% !important;
+	margin: 0 auto !important;
 }
 
 .wc-gpd-designer__canvas-wrap canvas {
 	display: block;
-	max-width: 100%;
+	max-width: 100% !important;
 	height: auto !important;
 	margin: 0 auto;
 }

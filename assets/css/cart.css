@@ -2,52 +2,22 @@
  * Cart / checkout design preview thumbnails.
  */
 
-.wc-gpd-cart-thumb {
-	position: relative;
-	width: 300px;
+.woocommerce-cart-form td.product-thumbnail .wc-gpd-cart-thumb-img,
+.woocommerce-checkout-review-order-table .wc-gpd-cart-thumb-img,
+.widget_shopping_cart .wc-gpd-cart-thumb-img {
+	width: 92px;
+	height: auto;
 	max-width: 100%;
-	aspect-ratio: var(--wc-gpd-thumb-ratio, 4 / 3);
-	overflow: hidden;
+	display: block;
+	object-fit: contain;
 	border-radius: 4px;
 	background: #f4f4f4;
-	box-sizing: border-box;
 }
 
-.woocommerce-cart-form .wc-gpd-cart-thumb,
-.woocommerce-checkout-review-order-table .wc-gpd-cart-thumb {
-	width: 92px;
-}
-
-.wc-gpd-cart-thumb__template,
-.wc-gpd-cart-thumb__placeholder {
-	display: block;
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-}
-
-.wc-gpd-cart-thumb__placeholder {
-	background: #ececec;
-}
-
-.wc-gpd-cart-thumb__design {
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-}
-
-.wc-gpd-cart-thumb__design svg {
-	width: 100%;
-	height: 100%;
-	display: block;
-}
-
-a .wc-gpd-cart-thumb {
-	transition: opacity 0.15s ease;
-}
-
-a:hover .wc-gpd-cart-thumb {
-	opacity: 0.92;
+.woocommerce-cart-form td.product-thumbnail a,
+.woocommerce-checkout-review-order-table .product-thumbnail a {
+	display: inline-block;
+	max-width: 92px;
 }
 
 .wc-gpd-edit-design {
@@ -59,13 +29,4 @@ a:hover .wc-gpd-cart-thumb {
 .woocommerce-checkout-review-order-table .wc-gpd-edit-design {
 	display: inline-block;
 	margin-top: 0.35rem;
-}
-
-.wc-gpd-designer__notice {
-	margin: 0 0 1rem;
-	padding: 0.65rem 0.85rem;
-	background: #eef6fc;
-	border-left: 4px solid #2271b1;
-	border-radius: 2px;
-	font-size: 0.925rem;
 }

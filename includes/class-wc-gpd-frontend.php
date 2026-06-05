@@ -148,6 +148,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'nonceName'    => self::NONCE_NAME,
 				'editCartKey'  => $edit_context ? $edit_context['cart_item_key'] : '',
 				'existingDesignSvg' => $edit_context ? $edit_context['svg'] : '',
+				'existingDesignJson' => $edit_context && ! empty( $edit_context['json'] ) ? $edit_context['json'] : '',
 				'isEditing'    => (bool) $edit_context,
 				'i18n'         => array(
 					'addText'       => __( 'Add text layer', 'wc-generic-product-designer' ),
@@ -268,6 +269,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</div>
 			</div>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
+			<input type="hidden" name="wc_gpd_design_json" id="wc-gpd-design-json" value="" />
 			<?php if ( $edit_context ) : ?>
 				<input type="hidden" name="wc_gpd_edit_cart_key" id="wc-gpd-edit-cart-key" value="<?php echo esc_attr( $edit_context['cart_item_key'] ); ?>" />
 			<?php endif; ?>
@@ -280,7 +282,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 * Load cart design for editing when ?wc_gpd_edit= cart key is present.
 	 *
 	 * @param int $product_id Product ID.
-	 * @return array{cart_item_key:string,svg:string}|null
+	 * @return array{cart_item_key:string,svg:string,json:string}|null
 	 */
 	private function get_edit_cart_context( $product_id ) {
 		if ( ! $product_id || ! isset( $_GET['wc_gpd_edit'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -313,6 +315,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		return array(
 			'cart_item_key' => $cart_item_key,
 			'svg'           => $svg,
+			'json'          => ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] )
+				? $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ]
+				: '',
 		);
 	}
 }

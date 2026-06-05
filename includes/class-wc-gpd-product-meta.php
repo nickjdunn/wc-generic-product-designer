@@ -17,7 +17,8 @@ class WC_GPD_Product_Meta {
 	const META_CANVAS_HEIGHT = '_wc_gpd_canvas_height';
 	const META_TEMPLATE_ID   = '_wc_gpd_template_image_id';
 
-	const CART_KEY_DESIGN_SVG = 'wc_gpd_design_svg';
+	const CART_KEY_DESIGN_SVG  = 'wc_gpd_design_svg';
+	const CART_KEY_DESIGN_JSON = 'wc_gpd_design_json';
 
 	const ORDER_META_DESIGN_SVG = '_wc_gpd_design_svg';
 

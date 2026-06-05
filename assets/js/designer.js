@@ -16,6 +16,7 @@
 	const canvasEl = document.getElementById( 'wc-gpd-canvas' );
 	const designerRoot = document.getElementById( 'wc-gpd-designer' );
 	let svgInput = document.getElementById( 'wc-gpd-design-svg' );
+	let jsonInput = document.getElementById( 'wc-gpd-design-json' );
 
 	/**
 	 * Find the add-to-cart form (theme-safe).
@@ -67,6 +68,11 @@
 			form.appendChild( editKey );
 			log.debug( 'Moved edit cart key into cart form' );
 		}
+
+		if ( jsonInput && ! form.contains( jsonInput ) ) {
+			form.appendChild( jsonInput );
+			log.debug( 'Moved design JSON into cart form' );
+		}
 	}
 
 	ensureFieldsInForm();
@@ -111,7 +117,7 @@
 	}
 
 	/**
-	 * Scale canvas element for responsive layout (production pixels unchanged).
+	 * Scale canvas via CSS only (keeps coordinates accurate for edit/export).
 	 */
 	function applyResponsiveScale() {
 		const wrap = designerRoot.querySelector( '.wc-gpd-designer__canvas-wrap' );
@@ -119,31 +125,53 @@
 			return;
 		}
 
-		const maxWidth = wrap.clientWidth;
+		const maxWidth = Math.max( 1, wrap.clientWidth );
 		displayScale = Math.min( 1, maxWidth / PROD_WIDTH );
-		const displayW = Math.floor( PROD_WIDTH * displayScale );
-		const displayH = Math.floor( PROD_HEIGHT * displayScale );
+		const displayW = Math.max( 1, Math.floor( PROD_WIDTH * displayScale ) );
+		const displayH = Math.max( 1, Math.floor( PROD_HEIGHT * displayScale ) );
 
-		canvasEl.width = PROD_WIDTH;
-		canvasEl.height = PROD_HEIGHT;
+		canvas.setZoom( 1 );
+		canvas.viewportTransform = [ 1, 0, 0, 1, 0, 0 ];
+		canvas.setDimensions( { width: PROD_WIDTH, height: PROD_HEIGHT } );
+
+		if ( typeof canvas.setDimensions === 'function' ) {
+			canvas.setDimensions( { width: displayW, height: displayH }, { cssOnly: true } );
+		}
+
+		canvasEl.style.maxWidth = '100%';
 		canvasEl.style.width = `${ displayW }px`;
 		canvasEl.style.height = `${ displayH }px`;
 
-		const lower = canvas.lowerCanvasEl;
-		const upper = canvas.upperCanvasEl;
-		if ( lower ) {
-			lower.style.width = `${ displayW }px`;
-			lower.style.height = `${ displayH }px`;
-		}
-		if ( upper ) {
-			upper.style.width = `${ displayW }px`;
-			upper.style.height = `${ displayH }px`;
+		if ( canvas.wrapperEl ) {
+			canvas.wrapperEl.style.maxWidth = '100%';
+			canvas.wrapperEl.style.width = `${ displayW }px`;
+			canvas.wrapperEl.style.height = `${ displayH }px`;
+			canvas.wrapperEl.style.margin = '0 auto';
 		}
 
-		canvas.setZoom( displayScale );
-		canvas.setDimensions( { width: PROD_WIDTH, height: PROD_HEIGHT } );
+		refreshObjectCoords();
 		canvas.calcOffset();
 		canvas.requestRenderAll();
+	}
+
+	/**
+	 * Recalculate object coordinates after layout changes.
+	 */
+	function refreshObjectCoords() {
+		canvas.getObjects().forEach( ( obj ) => {
+			obj.setCoords();
+		} );
+	}
+
+	/**
+	 * Remove editable text layers from the canvas.
+	 */
+	function clearTextLayers() {
+		canvas.getObjects().slice().forEach( ( obj ) => {
+			if ( isTextLayer( obj ) ) {
+				canvas.remove( obj );
+			}
+		} );
 	}
 
 	/**
@@ -188,6 +216,7 @@
 
 				canvas.backgroundImage = img;
 				canvas.requestRenderAll();
+				applyResponsiveScale();
 			},
 			{ crossOrigin: 'anonymous' }
 		);
@@ -358,6 +387,7 @@
 		canvas.backgroundImage = null;
 		canvas.setZoom( 1 );
 		canvas.viewportTransform = [ 1, 0, 0, 1, 0, 0 ];
+		canvas.setDimensions( { width: PROD_WIDTH, height: PROD_HEIGHT } );
 
 		canvas.getObjects().forEach( ( o ) => {
 			o._wcGpdWasVisible = o.visible;
@@ -385,9 +415,9 @@
 		} );
 
 		canvas.backgroundImage = prevBg;
-		canvas.setZoom( prevZoom );
-		canvas.viewportTransform = prevVpt;
-		canvas.requestRenderAll();
+		canvas.setZoom( 1 );
+		canvas.viewportTransform = [ 1, 0, 0, 1, 0, 0 ];
+		applyResponsiveScale();
 
 		if ( svg && ! /width\s*=/.test( svg ) ) {
 			svg = svg.replace( '<svg ', `<svg width="${ PROD_WIDTH }" height="${ PROD_HEIGHT }" ` );
@@ -398,7 +428,23 @@
 	}
 
 	/**
-	 * Export SVG and write to hidden input.
+	 * Serialize text layers for accurate cart edit round-trip.
+	 *
+	 * @returns {string}
+	 */
+	function exportDesignJson() {
+		const objects = canvas.getObjects()
+			.filter( ( obj ) => isTextLayer( obj ) )
+			.map( ( obj ) => obj.toObject( [ 'wcGpdTextLayer' ] ) );
+
+		return JSON.stringify( {
+			version: fabric.version,
+			objects,
+		} );
+	}
+
+	/**
+	 * Export SVG and JSON, write to hidden inputs.
 	 *
 	 * @returns {boolean}
 	 */
@@ -418,7 +464,64 @@
 
 		ensureFieldsInForm();
 		svgInput.value = svg;
+
+		if ( jsonInput ) {
+			jsonInput.value = exportDesignJson();
+		}
+
 		return true;
+	}
+
+	/**
+	 * Restore text layers from Fabric JSON (preferred for edit mode).
+	 *
+	 * @param {string} jsonString Saved canvas JSON.
+	 * @returns {Promise<void>}
+	 */
+	function loadDesignFromJson( jsonString ) {
+		return new Promise( ( resolve, reject ) => {
+			let data;
+			try {
+				data = JSON.parse( jsonString );
+			} catch ( error ) {
+				reject( error );
+				return;
+			}
+
+			if ( ! data.objects || ! data.objects.length ) {
+				reject( new Error( 'empty' ) );
+				return;
+			}
+
+			fabric.util.enlivenObjects(
+				data.objects,
+				( objects ) => {
+					if ( ! objects || ! objects.length ) {
+						reject( new Error( 'empty' ) );
+						return;
+					}
+
+					clearTextLayers();
+
+					objects.forEach( ( obj ) => {
+						obj.wcGpdTextLayer = true;
+						canvas.add( obj );
+						obj.setCoords();
+					} );
+
+					applyResponsiveScale();
+					const first = objects[ 0 ];
+					if ( first ) {
+						canvas.setActiveObject( first );
+						syncToolbar( first );
+					}
+
+					log.info( 'Loaded design from JSON', { layers: objects.length } );
+					resolve();
+				},
+				'fabric'
+			);
+		} );
 	}
 
 	/**
@@ -435,18 +538,15 @@
 					return;
 				}
 
-				canvas.getObjects().slice().forEach( ( obj ) => {
-					if ( isTextLayer( obj ) ) {
-						canvas.remove( obj );
-					}
-				} );
+				clearTextLayers();
 
 				objects.forEach( ( obj ) => {
 					obj.wcGpdTextLayer = true;
 					canvas.add( obj );
+					obj.setCoords();
 				} );
 
-				canvas.requestRenderAll();
+				applyResponsiveScale();
 				const first = objects[ 0 ];
 				if ( first ) {
 					canvas.setActiveObject( first );
@@ -632,14 +732,44 @@
 	} );
 
 	let resizeTimer;
-	window.addEventListener( 'resize', () => {
-		clearTimeout( resizeTimer );
-		resizeTimer = setTimeout( applyResponsiveScale, 150 );
-	} );
+	const canvasWrap = designerRoot.querySelector( '.wc-gpd-designer__canvas-wrap' );
+	if ( canvasWrap && typeof ResizeObserver !== 'undefined' ) {
+		const resizeObserver = new ResizeObserver( () => {
+			clearTimeout( resizeTimer );
+			resizeTimer = setTimeout( applyResponsiveScale, 100 );
+		} );
+		resizeObserver.observe( canvasWrap );
+	} else {
+		window.addEventListener( 'resize', () => {
+			clearTimeout( resizeTimer );
+			resizeTimer = setTimeout( applyResponsiveScale, 150 );
+		} );
+	}
+
+	function startWithNewTextLayer() {
+		addTextLayer();
+		applyResponsiveScale();
+	}
+
+	function loadExistingDesign() {
+		if ( config.existingDesignJson ) {
+			return loadDesignFromJson( config.existingDesignJson ).catch( () => {
+				if ( config.existingDesignSvg ) {
+					return loadDesignFromSvg( config.existingDesignSvg );
+				}
+				throw new Error( 'json-failed' );
+			} );
+		}
+
+		if ( config.existingDesignSvg ) {
+			return loadDesignFromSvg( config.existingDesignSvg );
+		}
+
+		return Promise.reject( new Error( 'no-design' ) );
+	}
 
 	initFontSelect();
 	loadBackground();
-	applyResponsiveScale();
 	bindAddToCart();
 
 	if ( config.isEditing && config.i18n.updateCart ) {
@@ -649,15 +779,29 @@
 		}
 	}
 
-	if ( config.existingDesignSvg ) {
-		loadDesignFromSvg( config.existingDesignSvg ).catch( () => {
-			log.warn( 'Failed to load cart design; starting fresh' );
-			window.alert( config.i18n.loadDesignError );
-			addTextLayer();
-		} );
-	} else {
-		addTextLayer();
-	}
+	const bootDesigner = () => {
+		requestAnimationFrame( () => {
+			applyResponsiveScale();
 
-	log.info( 'Designer ready' );
+			if ( config.isEditing || config.existingDesignJson || config.existingDesignSvg ) {
+				loadExistingDesign().catch( () => {
+					log.warn( 'Failed to load cart design; starting fresh' );
+					if ( config.isEditing ) {
+						window.alert( config.i18n.loadDesignError );
+					}
+					startWithNewTextLayer();
+				} );
+			} else {
+				startWithNewTextLayer();
+			}
+
+			log.info( 'Designer ready' );
+		} );
+	};
+
+	if ( document.readyState === 'complete' ) {
+		bootDesigner();
+	} else {
+		window.addEventListener( 'load', bootDesigner, { once: true } );
+	}
 } )();
