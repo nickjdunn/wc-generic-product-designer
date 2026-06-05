@@ -1,5 +1,5 @@
 /**
- * Admin template editor — mockups, text, placeholders, graphics, outlines.
+ * Admin template editor — mockups, text, placeholders, graphics, shapes.
  */
 ( function ( $ ) {
 	'use strict';
@@ -25,12 +25,12 @@
 	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
 	const textEditorHint = document.getElementById( 'wc-gpd-text-editor-hint' );
 	const placeholderMeta = document.getElementById( 'wc-gpd-placeholder-meta' );
-	const graphicPropsPanel = document.getElementById( 'wc-gpd-graphic-props' );
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
 	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
-	const uploadImageBtn = document.getElementById( 'wc-gpd-template-upload-image' );
-	const imageBinEl = document.getElementById( 'wc-gpd-template-image-bin' );
+	const unitsSelect = document.getElementById( 'wc_gpd_tpl_units' );
+	const freeformHint = document.getElementById( 'wc-gpd-freeform-hint' );
+	const shapeLibraryGrid = document.getElementById( 'wc-gpd-shape-library-grid' );
 	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
 	const templateFontsInput = document.getElementById( 'wc_gpd_template_fonts' );
@@ -46,7 +46,7 @@
 	const SERIALIZE_PROPS = [
 		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
-		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable',
+		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
@@ -82,8 +82,39 @@
 	let width = dims.width;
 	let height = dims.height;
 	let graphicLibraries = [];
-	let uploadedImages = [];
 	let lockAspectRatio = false;
+	let displayUnit = 'px';
+	let freeformMode = false;
+	let freeformPoints = [];
+	let freeformPreview = null;
+
+	const UNIT_FACTORS = {
+		px: 1,
+		in: 96,
+		mm: 96 / 25.4,
+		cm: 96 / 2.54,
+	};
+
+	function pxToDisplay( px ) {
+		const factor = UNIT_FACTORS[ displayUnit ] || 1;
+		const value = px / factor;
+		return displayUnit === 'px' ? Math.round( value ) : Math.round( value * 100 ) / 100;
+	}
+
+	function displayToPx( value ) {
+		const factor = UNIT_FACTORS[ displayUnit ] || 1;
+		return Math.round( parseFloat( value ) * factor ) || 0;
+	}
+
+	function updateUnitSuffixes() {
+		const suffix = displayUnit;
+		[ 'wc_gpd_unit_suffix_w', 'wc_gpd_unit_suffix_h', 'wc_gpd_unit_suffix_x', 'wc_gpd_unit_suffix_y' ].forEach( ( id ) => {
+			const el = document.getElementById( id );
+			if ( el ) {
+				el.textContent = suffix;
+			}
+		} );
+	}
 
 	function initFontSelect() {
 		const fontSelect = document.getElementById( 'wc_gpd_tpl_font_family' );
@@ -172,7 +203,15 @@
 	}
 
 	function isShape( obj ) {
-		return obj && ( obj.type === 'rect' || obj.type === 'circle' || obj.type === 'ellipse' ) && obj.wcGpdLayerType !== 'graphic_slot';
+		if ( ! obj || obj.wcGpdLayerType === 'graphic_slot' || obj.wcGpdGraphicSlot ) {
+			return false;
+		}
+		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline' ];
+		return shapeTypes.indexOf( obj.type ) >= 0 && obj.wcGpdTemplateLayer;
+	}
+
+	function isTemplateImage( obj ) {
+		return isMockupImage( obj ) || isGraphicImage( obj );
 	}
 
 	function isMockupImage( obj ) {
@@ -206,7 +245,10 @@
 			return 'Mockup background';
 		}
 		if ( isGraphicImage( obj ) ) {
-			return 'Graphic';
+			if ( obj.wcGpdLockMove && obj.wcGpdLockScale ) {
+				return 'Fixed graphic';
+			}
+			return 'Repositionable graphic';
 		}
 		if ( isGraphicSlot( obj ) ) {
 			return 'Graphic pick area';
@@ -306,7 +348,7 @@
 	}
 
 	function hideAllPropPanels() {
-		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
+		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
 			if ( el ) {
 				el.hidden = true;
 			}
@@ -355,7 +397,7 @@
 		} else if ( isMockupImage( active ) || isGraphicImage( active ) || isGraphicSlot( active ) ) {
 			openAccordionSection( 'images' );
 		} else if ( isShape( active ) ) {
-			openAccordionSection( 'outlines' );
+			openAccordionSection( 'shapes' );
 		} else {
 			openAccordionSection( 'size' );
 		}
@@ -409,16 +451,16 @@
 		const tEl = document.getElementById( 'wc_gpd_sel_top' );
 		const lockEl = document.getElementById( 'wc_gpd_lock_aspect' );
 		if ( wEl ) {
-			wEl.value = String( dims.width );
+			wEl.value = String( pxToDisplay( dims.width ) );
 		}
 		if ( hEl ) {
-			hEl.value = String( dims.height );
+			hEl.value = String( pxToDisplay( dims.height ) );
 		}
 		if ( lEl ) {
-			lEl.value = String( dims.left );
+			lEl.value = String( pxToDisplay( dims.left ) );
 		}
 		if ( tEl ) {
-			tEl.value = String( dims.top );
+			tEl.value = String( pxToDisplay( dims.top ) );
 		}
 		if ( lockEl ) {
 			lockEl.checked = lockAspectRatio;
@@ -434,10 +476,10 @@
 		const hEl = document.getElementById( 'wc_gpd_sel_height' );
 		const lEl = document.getElementById( 'wc_gpd_sel_left' );
 		const tEl = document.getElementById( 'wc_gpd_sel_top' );
-		const newW = parseInt( wEl ? wEl.value : '0', 10 );
-		const newH = parseInt( hEl ? hEl.value : '0', 10 );
-		const newL = parseInt( lEl ? lEl.value : '0', 10 );
-		const newT = parseInt( tEl ? tEl.value : '0', 10 );
+		const newW = displayToPx( wEl ? wEl.value : '0' );
+		const newH = displayToPx( hEl ? hEl.value : '0' );
+		const newL = displayToPx( lEl ? lEl.value : '0' );
+		const newT = displayToPx( tEl ? tEl.value : '0' );
 		if ( ! newW || ! newH ) {
 			return;
 		}
@@ -473,16 +515,15 @@
 	function updateSelectionPanels() {
 		const active = canvas.getActiveObject();
 		const shapeSelected = isShape( active );
-		const imageSelected = isMockupImage( active );
+		const imageSelected = isTemplateImage( active );
 		const textSelected = isTemplateText( active );
 		const placeholderSelected = isPlaceholder( active );
-		const graphicSelected = isGraphicImage( active );
 		const slotSelected = isGraphicSlot( active );
 
 		hideAllPropPanels();
 
 		if ( shapePropsHint ) {
-			shapePropsHint.hidden = shapeSelected || imageSelected || textSelected || placeholderSelected || graphicSelected || slotSelected;
+			shapePropsHint.hidden = shapeSelected || imageSelected || textSelected || placeholderSelected || slotSelected;
 		}
 
 		if ( shapeSelected && shapePropsFields ) {
@@ -490,6 +531,7 @@
 		}
 		if ( imageSelected && imagePropsPanel ) {
 			imagePropsPanel.hidden = false;
+			syncImagePropsPanel( active );
 		}
 		if ( ( textSelected || placeholderSelected ) && textEditorPanel ) {
 			textEditorPanel.hidden = false;
@@ -500,10 +542,6 @@
 				placeholderMeta.hidden = ! placeholderSelected;
 			}
 			syncTextEditorPanel( active, placeholderSelected );
-		}
-		if ( graphicSelected && graphicPropsPanel ) {
-			graphicPropsPanel.hidden = false;
-			syncGraphicPropsPanel( active );
 		}
 		if ( slotSelected && graphicSlotPropsPanel ) {
 			graphicSlotPropsPanel.hidden = false;
@@ -618,31 +656,96 @@
 		} );
 	}
 
-	function syncGraphicPropsPanel( obj ) {
+	function imageRoleForObject( obj ) {
+		if ( isMockupImage( obj ) ) {
+			return 'mockup';
+		}
+		if ( obj.wcGpdLockMove && obj.wcGpdLockScale ) {
+			return 'fixed';
+		}
+		return 'repositionable';
+	}
+
+	function applyImageRole( obj, role ) {
+		if ( ! obj || obj.type !== 'image' ) {
+			return;
+		}
+		if ( role === 'mockup' ) {
+			obj.wcGpdMockupImage = true;
+			obj.wcGpdMockupVisible = obj.wcGpdMockupVisible !== false;
+			obj.wcGpdGraphicLayer = false;
+			obj.wcGpdLayerType = 'mockup';
+			obj.wcGpdExportGraphic = false;
+			obj.wcGpdLockMove = true;
+			obj.wcGpdLockScale = true;
+			obj.wcGpdLockAspect = false;
+		} else if ( role === 'fixed' ) {
+			obj.wcGpdMockupImage = false;
+			obj.wcGpdGraphicLayer = true;
+			obj.wcGpdLayerType = 'graphic';
+			obj.wcGpdExportGraphic = obj.wcGpdExportGraphic !== false;
+			obj.wcGpdLockMove = true;
+			obj.wcGpdLockScale = true;
+			obj.wcGpdCustomerMovable = false;
+			obj.wcGpdCustomerResizable = false;
+			obj.wcGpdLockAspect = false;
+		} else {
+			obj.wcGpdMockupImage = false;
+			obj.wcGpdGraphicLayer = true;
+			obj.wcGpdLayerType = 'graphic';
+			obj.wcGpdExportGraphic = obj.wcGpdExportGraphic !== false;
+			obj.wcGpdLockMove = false;
+			obj.wcGpdLockScale = false;
+			obj.wcGpdCustomerMovable = true;
+			obj.wcGpdCustomerResizable = true;
+		}
+		if ( canvas.getObjects().indexOf( obj ) >= 0 ) {
+			sortLayers();
+			canvas.requestRenderAll();
+			renderLayersList();
+		}
+	}
+
+	function syncImagePropsPanel( obj ) {
+		const role = imageRoleForObject( obj );
+		document.querySelectorAll( 'input[name="wc_gpd_image_role"]' ).forEach( ( input ) => {
+			input.checked = input.value === role;
+		} );
+		const mockupOpts = document.getElementById( 'wc-gpd-image-mockup-options' );
+		const graphicOpts = document.getElementById( 'wc-gpd-image-graphic-options' );
+		const customerOpts = document.getElementById( 'wc-gpd-image-customer-options' );
+		if ( mockupOpts ) {
+			mockupOpts.hidden = role !== 'mockup';
+		}
+		if ( graphicOpts ) {
+			graphicOpts.hidden = role === 'mockup';
+		}
+		if ( customerOpts ) {
+			customerOpts.hidden = role !== 'repositionable';
+		}
 		const exp = document.getElementById( 'wc_gpd_graphic_export' );
-		const move = document.getElementById( 'wc_gpd_graphic_lock_move' );
-		const scale = document.getElementById( 'wc_gpd_graphic_lock_scale' );
+		const allowMove = document.getElementById( 'wc_gpd_graphic_allow_move' );
+		const allowResize = document.getElementById( 'wc_gpd_graphic_allow_resize' );
+		const lockAspect = document.getElementById( 'wc_gpd_graphic_lock_aspect' );
 		if ( exp ) {
 			exp.checked = obj.wcGpdExportGraphic !== false;
 		}
-		if ( move ) {
-			move.checked = !! obj.wcGpdLockMove || obj.wcGpdCustomerMovable === false;
+		if ( mockupVisibleToggle ) {
+			mockupVisibleToggle.checked = obj.wcGpdMockupVisible !== false;
 		}
-		if ( scale ) {
-			scale.checked = !! obj.wcGpdLockScale || obj.wcGpdCustomerResizable === false;
+		if ( allowMove ) {
+			allowMove.checked = ! obj.wcGpdLockMove;
+		}
+		if ( allowResize ) {
+			allowResize.checked = ! obj.wcGpdLockScale;
+		}
+		if ( lockAspect ) {
+			lockAspect.checked = !! obj.wcGpdLockAspect;
 		}
 	}
 
 	function syncGraphicSlotPropsPanel( obj ) {
-		const move = document.getElementById( 'wc_gpd_slot_lock_move' );
-		const scale = document.getElementById( 'wc_gpd_slot_lock_scale' );
 		const librarySelect = document.getElementById( 'wc_gpd_slot_library_id' );
-		if ( move ) {
-			move.checked = ! obj.wcGpdCustomerMovable;
-		}
-		if ( scale ) {
-			scale.checked = ! obj.wcGpdCustomerResizable;
-		}
 		if ( librarySelect ) {
 			librarySelect.innerHTML = '<option value="">— Select library —</option>';
 			graphicLibraries.forEach( ( lib ) => {
@@ -910,6 +1013,197 @@
 		updateSelectionPanels();
 	}
 
+	function regularPolygonPoints( sides, radius ) {
+		const points = [];
+		for ( let i = 0; i < sides; i++ ) {
+			const angle = ( 2 * Math.PI * i ) / sides - Math.PI / 2;
+			points.push( {
+				x: radius * Math.cos( angle ),
+				y: radius * Math.sin( angle ),
+			} );
+		}
+		return points;
+	}
+
+	function addPolygonShape( sides ) {
+		const radius = 70;
+		const points = regularPolygonPoints( sides, radius );
+		const poly = new fabric.Polygon( points, {
+			left: width / 2,
+			top: height / 2,
+			originX: 'center',
+			originY: 'center',
+			fill: 'transparent',
+			stroke: defaultOutlineColor(),
+			strokeWidth: defaultOutlineWidth(),
+			wcGpdUid: uid(),
+		} );
+		syncShapeFlags( poly );
+		canvas.add( poly );
+		canvas.setActiveObject( poly );
+		sortLayers();
+		canvas.requestRenderAll();
+		updateSelectionPanels();
+	}
+
+	function addHeartShape() {
+		const path = new fabric.Path(
+			'M 12 21.35 L 10.55 20.03 C 5.4 15.36 2 12.28 2 8.5 C 2 5.42 4.42 3 7.5 3 C 9.24 3 10.91 3.81 12 5.09 C 13.09 3.81 14.76 3 16.5 3 C 19.58 3 22 5.42 22 8.5 C 22 12.28 18.6 15.36 13.45 20.03 L 12 21.35 Z',
+			{
+				left: width / 2,
+				top: height / 2,
+				originX: 'center',
+				originY: 'center',
+				scaleX: 4,
+				scaleY: 4,
+				fill: 'transparent',
+				stroke: defaultOutlineColor(),
+				strokeWidth: defaultOutlineWidth(),
+				wcGpdUid: uid(),
+			}
+		);
+		syncShapeFlags( path );
+		canvas.add( path );
+		canvas.setActiveObject( path );
+		sortLayers();
+		canvas.requestRenderAll();
+		updateSelectionPanels();
+	}
+
+	function addLibraryShape( shapeDef ) {
+		if ( ! shapeDef || ! shapeDef.path ) {
+			return;
+		}
+		const path = new fabric.Path( shapeDef.path, {
+			left: width / 2,
+			top: height / 2,
+			originX: 'center',
+			originY: 'center',
+			scaleX: 6,
+			scaleY: 6,
+			fill: 'transparent',
+			stroke: defaultOutlineColor(),
+			strokeWidth: defaultOutlineWidth(),
+			wcGpdUid: uid(),
+			wcGpdLayerLabel: shapeDef.label || shapeDef.id,
+		} );
+		syncShapeFlags( path );
+		canvas.add( path );
+		canvas.setActiveObject( path );
+		sortLayers();
+		canvas.requestRenderAll();
+		updateSelectionPanels();
+		openAccordionSection( 'shapes' );
+	}
+
+	function clearFreeformPreview() {
+		if ( freeformPreview ) {
+			canvas.remove( freeformPreview );
+			freeformPreview = null;
+		}
+	}
+
+	function updateFreeformPreview( closeLoop ) {
+		clearFreeformPreview();
+		if ( freeformPoints.length < 2 ) {
+			canvas.requestRenderAll();
+			return;
+		}
+		const points = freeformPoints.slice();
+		if ( closeLoop && points.length >= 3 ) {
+			freeformPreview = new fabric.Polygon( points, {
+				fill: 'rgba(34,113,177,0.08)',
+				stroke: '#2271b1',
+				strokeWidth: 1,
+				strokeDashArray: [ 4, 4 ],
+				selectable: false,
+				evented: false,
+			} );
+		} else {
+			freeformPreview = new fabric.Polyline( points, {
+				fill: 'transparent',
+				stroke: '#2271b1',
+				strokeWidth: 1,
+				strokeDashArray: [ 4, 4 ],
+				selectable: false,
+				evented: false,
+			} );
+		}
+		canvas.add( freeformPreview );
+		canvas.requestRenderAll();
+	}
+
+	function finishFreeformShape() {
+		if ( freeformPoints.length < 3 ) {
+			return;
+		}
+		const poly = new fabric.Polygon( freeformPoints.slice(), {
+			fill: 'transparent',
+			stroke: defaultOutlineColor(),
+			strokeWidth: defaultOutlineWidth(),
+			wcGpdUid: uid(),
+			wcGpdLayerLabel: 'Freeform',
+		} );
+		syncShapeFlags( poly );
+		clearFreeformPreview();
+		freeformMode = false;
+		freeformPoints = [];
+		if ( freeformHint ) {
+			freeformHint.hidden = true;
+		}
+		canvas.selection = true;
+		canvas.defaultCursor = 'default';
+		canvas.add( poly );
+		canvas.setActiveObject( poly );
+		sortLayers();
+		canvas.requestRenderAll();
+		updateSelectionPanels();
+	}
+
+	function startFreeformMode() {
+		cancelFreeformMode();
+		freeformMode = true;
+		freeformPoints = [];
+		canvas.discardActiveObject();
+		canvas.selection = false;
+		canvas.defaultCursor = 'crosshair';
+		if ( freeformHint ) {
+			freeformHint.hidden = false;
+		}
+		openAccordionSection( 'shapes' );
+	}
+
+	function cancelFreeformMode() {
+		freeformMode = false;
+		freeformPoints = [];
+		clearFreeformPreview();
+		canvas.selection = true;
+		canvas.defaultCursor = 'default';
+		if ( freeformHint ) {
+			freeformHint.hidden = true;
+		}
+	}
+
+	function initShapeLibraryGrid() {
+		if ( ! shapeLibraryGrid ) {
+			return;
+		}
+		const shapes = window.wcGpdTemplateShapes || [];
+		shapeLibraryGrid.innerHTML = '';
+		shapes.forEach( ( shape ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-shape-library-btn';
+			btn.title = shape.label || shape.id;
+			btn.innerHTML = `<svg viewBox="${ shape.viewBox || '0 0 24 24' }" aria-hidden="true"><path d="${ shape.path }" fill="currentColor"/></svg><span>${ shape.label || shape.id }</span>`;
+			btn.addEventListener( 'click', () => {
+				cancelFreeformMode();
+				addLibraryShape( shape );
+			} );
+			shapeLibraryGrid.appendChild( btn );
+		} );
+	}
+
 	function addTemplateText() {
 		const text = new fabric.IText( 'Your text here', {
 			left: width / 2,
@@ -965,32 +1259,7 @@
 		updateSelectionPanels();
 	}
 
-	function addMockupImage( attachment ) {
-		const url = attachment.url;
-		if ( ! url ) {
-			return;
-		}
-		trackUploadedImage( attachment );
-		fabric.Image.fromURL( url, ( img ) => {
-			if ( ! img ) {
-				return;
-			}
-			const scale = Math.min( width / img.width, height / img.height ) * 0.75;
-			img.set( {
-				left: width / 2, top: height / 2, originX: 'center', originY: 'center',
-				scaleX: scale, scaleY: scale,
-				wcGpdUid: uid(), wcGpdTemplateLayer: true, wcGpdMockupImage: true,
-				wcGpdMockupVisible: true, wcGpdLayerType: 'mockup', wcGpdAttachmentId: attachment.id,
-			} );
-			canvas.add( img );
-			canvas.setActiveObject( img );
-			sortLayers();
-			canvas.requestRenderAll();
-			updateSelectionPanels();
-		}, { crossOrigin: 'anonymous' } );
-	}
-
-	function addGraphicImage( attachment ) {
+	function addImageFromLibrary( attachment ) {
 		const url = attachment.url;
 		if ( ! url ) {
 			return;
@@ -999,19 +1268,25 @@
 			if ( ! img ) {
 				return;
 			}
-			const scale = Math.min( 120 / img.width, 120 / img.height, 1 );
+			const scale = Math.min( 160 / img.width, 160 / img.height, 1 );
 			img.set( {
-				left: width / 2, top: height / 2, originX: 'center', originY: 'center',
-				scaleX: scale, scaleY: scale,
-				wcGpdUid: uid(), wcGpdTemplateLayer: true, wcGpdGraphicLayer: true,
-				wcGpdLayerType: 'graphic', wcGpdExportGraphic: true,
-				wcGpdAttachmentId: attachment.id, wcGpdLockMove: true, wcGpdLockScale: true,
+				left: width / 2,
+				top: height / 2,
+				originX: 'center',
+				originY: 'center',
+				scaleX: scale,
+				scaleY: scale,
+				wcGpdUid: uid(),
+				wcGpdTemplateLayer: true,
+				wcGpdAttachmentId: attachment.id,
 			} );
 			canvas.add( img );
+			applyImageRole( img, 'fixed' );
 			canvas.setActiveObject( img );
 			sortLayers();
 			canvas.requestRenderAll();
 			updateSelectionPanels();
+			openAccordionSection( 'images' );
 		}, { crossOrigin: 'anonymous' } );
 	}
 
@@ -1059,40 +1334,6 @@
 		templateFontsInput.value = JSON.stringify( keys );
 	}
 
-	function trackUploadedImage( attachment ) {
-		if ( ! attachment || ! attachment.id ) {
-			return;
-		}
-		if ( ! uploadedImages.some( ( row ) => row.id === attachment.id ) ) {
-			uploadedImages.push( { id: attachment.id, url: attachment.url, title: attachment.title || '' } );
-		}
-		renderImageBin();
-	}
-
-	function renderImageBin() {
-		if ( ! imageBinEl ) {
-			return;
-		}
-		imageBinEl.innerHTML = '';
-		uploadedImages.forEach( ( row ) => {
-			const li = document.createElement( 'li' );
-			li.className = 'wc-gpd-image-bin-item';
-			const btn = document.createElement( 'button' );
-			btn.type = 'button';
-			btn.className = 'wc-gpd-image-bin-thumb';
-			btn.title = row.title || 'Uploaded image';
-			const img = document.createElement( 'img' );
-			img.src = row.url;
-			img.alt = row.title || '';
-			btn.appendChild( img );
-			btn.addEventListener( 'click', () => {
-				addMockupImage( row );
-			} );
-			li.appendChild( btn );
-			imageBinEl.appendChild( li );
-		} );
-	}
-
 	function setMockupBackground() {
 		const active = canvas.getActiveObject();
 		if ( ! active || ! isMockupImage( active ) ) {
@@ -1113,9 +1354,17 @@
 		renderLayersList();
 	}
 
+	function formatRulerValue( px ) {
+		if ( displayUnit === 'px' ) {
+			return String( Math.round( px ) );
+		}
+		return String( pxToDisplay( px ) );
+	}
+
 	function updateRulers() {
 		const showRuler = showRulerToggle && showRulerToggle.checked;
 		const showMeasure = showMeasurementsToggle && showMeasurementsToggle.checked;
+		const unitLabel = displayUnit;
 		if ( rulerTopEl ) {
 			rulerTopEl.hidden = ! showRuler;
 		}
@@ -1124,44 +1373,26 @@
 		}
 		if ( measureBottomEl ) {
 			measureBottomEl.hidden = ! showMeasure;
-			measureBottomEl.textContent = showMeasure ? `${ width } px` : '';
+			measureBottomEl.textContent = showMeasure ? `${ formatRulerValue( width ) } ${ unitLabel }` : '';
 		}
 		if ( measureRightEl ) {
 			measureRightEl.hidden = ! showMeasure;
-			measureRightEl.textContent = showMeasure ? `${ height } px` : '';
+			measureRightEl.textContent = showMeasure ? `${ formatRulerValue( height ) } ${ unitLabel }` : '';
 		}
 		if ( ! showRuler || ! rulerTopEl || ! rulerLeftEl ) {
 			return;
 		}
-		const step = width > 1200 ? 100 : 50;
+		const stepPx = width > 1200 ? 100 : 50;
 		let topMarks = '';
 		let leftMarks = '';
-		for ( let x = 0; x <= width; x += step ) {
-			topMarks += `<span class="wc-gpd-tpl-ruler-mark" style="left:${ ( x / width ) * 100 }%">${ x }</span>`;
+		for ( let x = 0; x <= width; x += stepPx ) {
+			topMarks += `<span class="wc-gpd-tpl-ruler-mark" style="left:${ ( x / width ) * 100 }%">${ formatRulerValue( x ) }</span>`;
 		}
-		for ( let y = 0; y <= height; y += step ) {
-			leftMarks += `<span class="wc-gpd-tpl-ruler-mark wc-gpd-tpl-ruler-mark--v" style="top:${ ( y / height ) * 100 }%">${ y }</span>`;
+		for ( let y = 0; y <= height; y += stepPx ) {
+			leftMarks += `<span class="wc-gpd-tpl-ruler-mark wc-gpd-tpl-ruler-mark--v" style="top:${ ( y / height ) * 100 }%">${ formatRulerValue( y ) }</span>`;
 		}
 		rulerTopEl.innerHTML = topMarks;
 		rulerLeftEl.innerHTML = leftMarks;
-	}
-
-	function collectUploadedImagesFromCanvas() {
-		const seen = {};
-		uploadedImages = [];
-		documentData.views.forEach( ( view ) => {
-			( view.objects || [] ).forEach( ( obj ) => {
-				if ( obj.type === 'image' && obj.wcGpdAttachmentId && ! seen[ obj.wcGpdAttachmentId ] ) {
-					seen[ obj.wcGpdAttachmentId ] = true;
-					uploadedImages.push( {
-						id: obj.wcGpdAttachmentId,
-						url: obj.src || '',
-						title: '',
-					} );
-				}
-			} );
-		} );
-		renderImageBin();
 	}
 
 	function addView() {
@@ -1255,7 +1486,6 @@
 			documentData.views = documentData.views.slice( 0, MAX_VIEWS );
 		}
 		syncMaxViewsField();
-		collectUploadedImagesFromCanvas();
 		loadView( documentData.views[ 0 ].id );
 	}
 
@@ -1493,12 +1723,22 @@
 		} );
 	}
 
-	function bindGraphicPropInputs() {
+	function bindImagePropInputs() {
+		document.querySelectorAll( 'input[name="wc_gpd_image_role"]' ).forEach( ( input ) => {
+			input.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( ! isTemplateImage( obj ) || ! input.checked ) {
+					return;
+				}
+				applyImageRole( obj, input.value );
+				syncImagePropsPanel( obj );
+			} );
+		} );
+
 		const exp = document.getElementById( 'wc_gpd_graphic_export' );
-		const move = document.getElementById( 'wc_gpd_graphic_lock_move' );
-		const scale = document.getElementById( 'wc_gpd_graphic_lock_scale' );
-		const slotMove = document.getElementById( 'wc_gpd_slot_lock_move' );
-		const slotScale = document.getElementById( 'wc_gpd_slot_lock_scale' );
+		const allowMove = document.getElementById( 'wc_gpd_graphic_allow_move' );
+		const allowResize = document.getElementById( 'wc_gpd_graphic_allow_resize' );
+		const lockAspect = document.getElementById( 'wc_gpd_graphic_lock_aspect' );
 
 		if ( exp ) {
 			exp.addEventListener( 'change', () => {
@@ -1508,40 +1748,33 @@
 				}
 			} );
 		}
-		if ( move ) {
-			move.addEventListener( 'change', () => {
+		if ( allowMove ) {
+			allowMove.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();
 				if ( isGraphicImage( obj ) ) {
-					obj.wcGpdLockMove = move.checked;
-					obj.wcGpdCustomerMovable = ! move.checked;
+					obj.wcGpdLockMove = ! allowMove.checked;
+					obj.wcGpdCustomerMovable = allowMove.checked;
 				}
 			} );
 		}
-		if ( scale ) {
-			scale.addEventListener( 'change', () => {
+		if ( allowResize ) {
+			allowResize.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();
 				if ( isGraphicImage( obj ) ) {
-					obj.wcGpdLockScale = scale.checked;
-					obj.wcGpdCustomerResizable = ! scale.checked;
+					obj.wcGpdLockScale = ! allowResize.checked;
+					obj.wcGpdCustomerResizable = allowResize.checked;
 				}
 			} );
 		}
-		if ( slotMove ) {
-			slotMove.addEventListener( 'change', () => {
+		if ( lockAspect ) {
+			lockAspect.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();
-				if ( isGraphicSlot( obj ) ) {
-					obj.wcGpdCustomerMovable = ! slotMove.checked;
+				if ( isGraphicImage( obj ) ) {
+					obj.wcGpdLockAspect = lockAspect.checked;
 				}
 			} );
 		}
-		if ( slotScale ) {
-			slotScale.addEventListener( 'change', () => {
-				const obj = canvas.getActiveObject();
-				if ( isGraphicSlot( obj ) ) {
-					obj.wcGpdCustomerResizable = ! slotScale.checked;
-				}
-			} );
-		}
+
 		const slotLibrary = document.getElementById( 'wc_gpd_slot_library_id' );
 		if ( slotLibrary ) {
 			slotLibrary.addEventListener( 'change', () => {
@@ -1639,17 +1872,20 @@
 	if ( deleteImageBtn ) {
 		deleteImageBtn.addEventListener( 'click', deleteActiveLayer );
 	}
-	document.getElementById( 'wc-gpd-template-delete-graphic' )?.addEventListener( 'click', deleteActiveLayer );
 	document.getElementById( 'wc-gpd-template-delete-slot' )?.addEventListener( 'click', deleteActiveLayer );
 
-	if ( uploadImageBtn && window.wp && wp.media ) {
-		uploadImageBtn.addEventListener( 'click', () => {
-			const frame = wp.media( { title: 'Upload image', button: { text: 'Add to library' }, multiple: true, library: { type: [ 'image' ] } } );
+	const addImageBtn = document.getElementById( 'wc-gpd-template-add-image' );
+	if ( addImageBtn && window.wp && wp.media ) {
+		addImageBtn.addEventListener( 'click', () => {
+			const frame = wp.media( {
+				title: 'Add image',
+				button: { text: 'Add to template' },
+				multiple: false,
+				library: { type: [ 'image' ] },
+			} );
 			frame.on( 'select', () => {
-				frame.state().get( 'selection' ).each( ( att ) => {
-					const attachment = att.toJSON();
-					trackUploadedImage( attachment );
-				} );
+				const attachment = frame.state().get( 'selection' ).first().toJSON();
+				addImageFromLibrary( attachment );
 			} );
 			frame.open();
 		} );
@@ -1676,23 +1912,54 @@
 
 	document.getElementById( 'wc-gpd-template-add-text' )?.addEventListener( 'click', addTemplateText );
 	document.getElementById( 'wc-gpd-template-add-placeholder' )?.addEventListener( 'click', addPlaceholder );
-	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', addGraphicSlot );
+	document.getElementById( 'wc-gpd-template-add-graphic-slot' )?.addEventListener( 'click', () => {
+		cancelFreeformMode();
+		addGraphicSlot();
+		openAccordionSection( 'images' );
+	} );
 
-	const addGraphicBtn = document.getElementById( 'wc-gpd-template-add-graphic' );
-	if ( addGraphicBtn && window.wp && wp.media ) {
-		addGraphicBtn.addEventListener( 'click', () => {
-			const frame = wp.media( { title: 'Add fixed graphic', button: { text: 'Add to canvas' }, multiple: false, library: { type: [ 'image' ] } } );
-			frame.on( 'select', () => {
-				const attachment = frame.state().get( 'selection' ).first().toJSON();
-				addGraphicImage( attachment );
-			} );
-			frame.open();
+	$( '.wc-gpd-add-template-rect' ).on( 'click', () => { cancelFreeformMode(); addRect( false ); } );
+	$( '.wc-gpd-add-template-square' ).on( 'click', () => { cancelFreeformMode(); addRect( true ); } );
+	$( '.wc-gpd-add-template-circle' ).on( 'click', () => { cancelFreeformMode(); addCircle(); } );
+	$( '.wc-gpd-add-template-hexagon' ).on( 'click', () => { cancelFreeformMode(); addPolygonShape( 6 ); } );
+	$( '.wc-gpd-add-template-octagon' ).on( 'click', () => { cancelFreeformMode(); addPolygonShape( 8 ); } );
+	$( '.wc-gpd-add-template-heart' ).on( 'click', () => { cancelFreeformMode(); addHeartShape(); } );
+	document.getElementById( 'wc-gpd-add-template-freeform' )?.addEventListener( 'click', startFreeformMode );
+
+	if ( unitsSelect ) {
+		unitsSelect.addEventListener( 'change', () => {
+			displayUnit = unitsSelect.value || 'px';
+			updateUnitSuffixes();
+			const active = canvas.getActiveObject();
+			if ( active ) {
+				syncSelectionDimsPanel( active );
+			}
+			updateRulers();
 		} );
 	}
 
-	$( '.wc-gpd-add-template-rect' ).on( 'click', () => addRect( false ) );
-	$( '.wc-gpd-add-template-square' ).on( 'click', () => addRect( true ) );
-	$( '.wc-gpd-add-template-circle' ).on( 'click', addCircle );
+	canvas.on( 'mouse:down', ( event ) => {
+		if ( ! freeformMode ) {
+			return;
+		}
+		const pointer = canvas.getPointer( event.e );
+		if ( freeformPoints.length >= 3 ) {
+			const first = freeformPoints[ 0 ];
+			const dist = Math.hypot( pointer.x - first.x, pointer.y - first.y );
+			if ( dist < 12 ) {
+				finishFreeformShape();
+				return;
+			}
+		}
+		freeformPoints.push( { x: pointer.x, y: pointer.y } );
+		updateFreeformPreview( false );
+	} );
+
+	canvas.on( 'mouse:dblclick', () => {
+		if ( freeformMode ) {
+			finishFreeformShape();
+		}
+	} );
 	$( '#wc-gpd-template-add-view' ).on( 'click', addView );
 	$( '#wc-gpd-template-rename-view' ).on( 'click', renameView );
 	$( '#wc-gpd-template-delete-view' ).on( 'click', deleteView );
@@ -1717,8 +1984,10 @@
 
 	initFontSelect();
 	initAccordion();
+	initShapeLibraryGrid();
+	updateUnitSuffixes();
 	bindTextEditor();
-	bindGraphicPropInputs();
+	bindImagePropInputs();
 	loadGraphicLibraries();
 	loadJson();
 	updateRulers();

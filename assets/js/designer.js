@@ -126,6 +126,7 @@
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockMove',
+		'wcGpdLockScale', 'wcGpdLockAspect',
 	];
 
 	function defaultTextColor() {
@@ -857,13 +858,22 @@
 	}
 
 	function applyGraphicInteractivity( obj ) {
-		const slotUid = obj.wcGpdGraphicSlotUid;
-		let slot = null;
-		if ( slotUid ) {
-			slot = canvas.getObjects().find( ( o ) => o.wcGpdUid === slotUid );
+		if ( obj.wcGpdGraphicSlotUid ) {
+			obj.set( {
+				selectable: true,
+				evented: true,
+				hasControls: true,
+				hasBorders: true,
+				lockMovementX: false,
+				lockMovementY: false,
+				lockScalingX: false,
+				lockScalingY: false,
+				lockUniScaling: !! obj.wcGpdLockAspect,
+			} );
+			return;
 		}
-		const lockMove = slot ? ! slot.wcGpdCustomerMovable : !! obj.wcGpdLockMove;
-		const lockScale = slot ? ! slot.wcGpdCustomerResizable : !! obj.wcGpdLockScale;
+		const lockMove = !! obj.wcGpdLockMove;
+		const lockScale = !! obj.wcGpdLockScale;
 		obj.set( {
 			selectable: ! lockMove,
 			evented: ! lockMove,
@@ -873,6 +883,7 @@
 			lockMovementY: lockMove,
 			lockScalingX: lockScale,
 			lockScalingY: lockScale,
+			lockUniScaling: ! lockScale && !! obj.wcGpdLockAspect,
 		} );
 	}
 

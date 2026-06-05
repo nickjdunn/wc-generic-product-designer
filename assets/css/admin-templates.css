@@ -663,6 +663,73 @@
 	width: 100%;
 }
 
+.wc-gpd-tpl-fieldset {
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	margin: 0 0 10px;
+	padding: 8px 10px 10px;
+}
+
+.wc-gpd-tpl-fieldset legend {
+	font-size: 11px;
+	font-weight: 600;
+	padding: 0 4px;
+}
+
+.wc-gpd-tpl-subheading {
+	margin: 10px 0 6px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.wc-gpd-unit-suffix {
+	margin-left: 4px;
+	font-size: 11px;
+	color: #646970;
+}
+
+.wc-gpd-shape-library-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 72px, 1fr ) );
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.wc-gpd-shape-library-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 4px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+	font-size: 10px;
+	line-height: 1.2;
+	color: #1d2327;
+}
+
+.wc-gpd-shape-library-btn:hover {
+	border-color: #2271b1;
+	color: #2271b1;
+}
+
+.wc-gpd-shape-library-btn svg {
+	width: 28px;
+	height: 28px;
+	color: #50575e;
+}
+
+.wc-gpd-shape-library-btn:hover svg {
+	color: #2271b1;
+}
+
+.wc-gpd-freeform-hint {
+	color: #2271b1;
+	font-style: normal;
+}
+
 .wc-gpd-tpl-font-picks {
 	display: flex;
 	flex-direction: column;
