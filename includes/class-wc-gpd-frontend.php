@@ -47,7 +47,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 */
 	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
-		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer' ), 5 );
+		add_action( 'woocommerce_before_single_product_summary', array( $this, 'render_designer_in_gallery' ), 25 );
+		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer_in_summary' ), 5 );
 		add_filter( 'body_class', array( $this, 'add_body_class' ) );
 		add_filter( 'woocommerce_product_supports', array( $this, 'disable_ajax_add_to_cart' ), 10, 3 );
 	}
@@ -74,8 +75,15 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 * @return array
 	 */
 	public function add_body_class( $classes ) {
-		if ( $this->is_designer_context() ) {
-			$classes[] = 'wc-gpd-product';
+		if ( ! $this->is_designer_context() ) {
+			return $classes;
+		}
+
+		$classes[] = 'wc-gpd-product';
+		$product_id = get_queried_object_id();
+		$settings   = WC_GPD_Product_Meta::get_settings( $product_id );
+		if ( ! empty( $settings['product_settings']['replace_product_gallery'] ) ) {
+			$classes[] = 'wc-gpd-replace-gallery';
 		}
 		return $classes;
 	}
@@ -159,6 +167,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'templateViews'      => self::template_views_for_js( $settings ),
 				'maxViews'           => $settings['max_views'],
 				'productSettings'    => ! empty( $settings['product_settings'] ) ? $settings['product_settings'] : WC_GPD_Product_Settings::get( $product_id ),
+				'replaceGallery'     => ! empty( $settings['product_settings']['replace_product_gallery'] ),
+				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'          => self::NONCE_NAME,
@@ -203,6 +213,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'lineHeight'      => __( 'Line height', 'wc-generic-product-designer' ),
 					'letterSpacing'   => __( 'Letter spacing', 'wc-generic-product-designer' ),
 					'expandDesigner'  => __( 'Expand designer', 'wc-generic-product-designer' ),
+					'viewPhotos'      => __( 'View listing photos', 'wc-generic-product-designer' ),
+					'closePhotos'     => __( 'Close', 'wc-generic-product-designer' ),
+					'addTextShort'    => __( 'Add text', 'wc-generic-product-designer' ),
+					'layers'          => __( 'Layers', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => array(
 					'Arial, Helvetica, sans-serif',
@@ -225,9 +239,41 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	}
 
 	/**
-	 * Output designer markup before add to cart.
+	 * Render designer in the product gallery column when enabled.
 	 */
-	public function render_designer() {
+	public function render_designer_in_gallery() {
+		if ( ! $this->is_designer_context() ) {
+			return;
+		}
+		$product_id = get_queried_object_id();
+		$settings   = WC_GPD_Product_Meta::get_settings( $product_id );
+		if ( empty( $settings['product_settings']['replace_product_gallery'] ) ) {
+			return;
+		}
+		$this->render_designer( 'gallery' );
+	}
+
+	/**
+	 * Render designer in the summary column (default placement).
+	 */
+	public function render_designer_in_summary() {
+		if ( ! $this->is_designer_context() ) {
+			return;
+		}
+		$product_id = get_queried_object_id();
+		$settings   = WC_GPD_Product_Meta::get_settings( $product_id );
+		if ( ! empty( $settings['product_settings']['replace_product_gallery'] ) ) {
+			return;
+		}
+		$this->render_designer( 'summary' );
+	}
+
+	/**
+	 * Output designer markup.
+	 *
+	 * @param string $placement gallery|summary.
+	 */
+	public function render_designer( $placement = 'summary' ) {
 		if ( $this->designer_rendered || ! $this->is_designer_context() ) {
 			return;
 		}
@@ -244,6 +290,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			$edit_context = $order_edit;
 		}
 		$this->designer_rendered = true;
+		$replace_gallery         = ! empty( $settings['product_settings']['replace_product_gallery'] );
 
 		WC_GPD_Logger::debug(
 			'Designer UI rendered',
@@ -256,7 +303,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 
 		?>
 		<div
-			class="wc-gpd-designer"
+			class="wc-gpd-designer wc-gpd-designer--<?php echo esc_attr( $placement ); ?><?php echo $replace_gallery ? ' wc-gpd-designer--replaces-gallery' : ''; ?>"
 			id="wc-gpd-designer"
 			data-canvas-width="<?php echo esc_attr( (string) $settings['width'] ); ?>"
 			data-canvas-height="<?php echo esc_attr( (string) $settings['height'] ); ?>"
@@ -278,87 +325,63 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					<?php esc_html_e( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ); ?>
 				</p>
 			<?php endif; ?>
-			<div class="wc-gpd-designer__layout">
-				<div class="wc-gpd-designer__sidebar">
-				<div class="wc-gpd-designer__toolbar" aria-label="<?php esc_attr_e( 'Design tools', 'wc-generic-product-designer' ); ?>">
-					<div class="wc-gpd-designer__toolbar-row">
-						<button type="button" class="button wc-gpd-btn-add-text" id="wc-gpd-add-text">
-							<?php esc_html_e( 'Add text layer', 'wc-generic-product-designer' ); ?>
-						</button>
-					</div>
-					<p class="wc-gpd-designer__hint" id="wc-gpd-hint">
-						<?php esc_html_e( 'Select a text layer on the canvas to edit it.', 'wc-generic-product-designer' ); ?>
-					</p>
-					<fieldset class="wc-gpd-designer__controls" id="wc-gpd-controls" disabled>
-						<legend class="screen-reader-text"><?php esc_html_e( 'Text layer properties', 'wc-generic-product-designer' ); ?></legend>
-						<label for="wc-gpd-font-family">
-							<?php esc_html_e( 'Font family', 'wc-generic-product-designer' ); ?>
-							<select id="wc-gpd-font-family" name="wc_gpd_font_family"></select>
-						</label>
-						<label for="wc-gpd-font-size">
-							<?php esc_html_e( 'Font size', 'wc-generic-product-designer' ); ?>
-							<input type="number" id="wc-gpd-font-size" min="8" max="400" step="1" value="32" />
-						</label>
-						<div class="wc-gpd-designer__style-row">
-							<label>
-								<input type="checkbox" id="wc-gpd-bold" />
-								<?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?>
-							</label>
-							<label>
-								<input type="checkbox" id="wc-gpd-italic" />
-								<?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?>
-							</label>
+			<div class="wc-gpd-designer__layout wc-gpd-designer__layout--compact">
+				<div class="wc-gpd-designer__main">
+					<div class="wc-gpd-designer__topbar">
+						<div class="wc-gpd-view-switcher" id="wc-gpd-view-switcher" role="tablist" aria-label="<?php esc_attr_e( 'Switch design area', 'wc-generic-product-designer' ); ?>"></div>
+						<div class="wc-gpd-designer__topbar-actions">
+							<?php if ( $replace_gallery ) : ?>
+								<button type="button" class="button button-small" id="wc-gpd-view-photos-btn"><?php esc_html_e( 'View listing photos', 'wc-generic-product-designer' ); ?></button>
+							<?php endif; ?>
+							<button type="button" class="button button-small wc-gpd-popout-trigger" id="wc-gpd-popout-btn"><?php esc_html_e( 'Expand', 'wc-generic-product-designer' ); ?></button>
 						</div>
-						<label for="wc-gpd-text-color" class="wc-gpd-control-text-color" id="wc-gpd-text-color-wrap">
-							<?php esc_html_e( 'Text color', 'wc-generic-product-designer' ); ?>
-							<input type="color" id="wc-gpd-text-color" value="#000000" />
-						</label>
-						<label for="wc-gpd-line-height" class="wc-gpd-control-line-height">
-							<?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?>
-							<input type="number" id="wc-gpd-line-height" min="0.5" max="3" step="0.05" value="1.16" />
-						</label>
-						<label for="wc-gpd-letter-spacing" class="wc-gpd-control-letter-spacing">
-							<?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>
-							<input type="number" id="wc-gpd-letter-spacing" min="-50" max="200" step="1" value="0" />
-						</label>
-						<label class="wc-gpd-control-underline">
-							<input type="checkbox" id="wc-gpd-underline" />
-							<?php esc_html_e( 'Underline', 'wc-generic-product-designer' ); ?>
-						</label>
-						<div class="wc-gpd-designer__align-row wc-gpd-control-align" role="group" aria-label="<?php esc_attr_e( 'Text alignment', 'wc-generic-product-designer' ); ?>">
-							<button type="button" class="button wc-gpd-align" data-align="left" aria-pressed="true"><?php esc_html_e( 'Left', 'wc-generic-product-designer' ); ?></button>
-							<button type="button" class="button wc-gpd-align" data-align="center" aria-pressed="false"><?php esc_html_e( 'Center', 'wc-generic-product-designer' ); ?></button>
-							<button type="button" class="button wc-gpd-align" data-align="right" aria-pressed="false"><?php esc_html_e( 'Right', 'wc-generic-product-designer' ); ?></button>
-						</div>
-					</fieldset>
-				</div>
-				<div class="wc-gpd-designer__layers" aria-label="<?php esc_attr_e( 'Design layers', 'wc-generic-product-designer' ); ?>">
-					<h3 class="wc-gpd-designer__layers-title"><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></h3>
-					<ul class="wc-gpd-layers-list" id="wc-gpd-layers-list"></ul>
-					<div class="wc-gpd-layers-actions">
-						<button type="button" class="button button-small" id="wc-gpd-layer-forward"><?php esc_html_e( 'Bring forward', 'wc-generic-product-designer' ); ?></button>
-						<button type="button" class="button button-small" id="wc-gpd-layer-backward"><?php esc_html_e( 'Send backward', 'wc-generic-product-designer' ); ?></button>
-						<button type="button" class="button button-small" id="wc-gpd-layer-delete"><?php esc_html_e( 'Delete layer', 'wc-generic-product-designer' ); ?></button>
-					</div>
-				</div>
-				</div>
-				<div class="wc-gpd-designer__canvas-column">
-					<div class="wc-gpd-designer__canvas-header">
-						<div
-							class="wc-gpd-view-switcher"
-							id="wc-gpd-view-switcher"
-							role="tablist"
-							aria-label="<?php esc_attr_e( 'Switch design area', 'wc-generic-product-designer' ); ?>"
-						></div>
-						<button type="button" class="button wc-gpd-popout-trigger" id="wc-gpd-popout-btn">
-							<?php esc_html_e( 'Expand designer', 'wc-generic-product-designer' ); ?>
-						</button>
 					</div>
 					<div class="wc-gpd-designer__canvas-wrap">
 						<canvas id="wc-gpd-canvas" aria-label="<?php esc_attr_e( 'Design canvas', 'wc-generic-product-designer' ); ?>"></canvas>
 					</div>
+					<div class="wc-gpd-designer__dock" id="wc-gpd-dock">
+						<div class="wc-gpd-text-bar" aria-label="<?php esc_attr_e( 'Design tools', 'wc-generic-product-designer' ); ?>">
+							<button type="button" class="button wc-gpd-btn-add-text" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+							<select id="wc-gpd-font-family" class="wc-gpd-bar-font" title="<?php esc_attr_e( 'Font family', 'wc-generic-product-designer' ); ?>"></select>
+							<input type="number" id="wc-gpd-font-size" class="wc-gpd-bar-size" min="8" max="400" step="1" value="32" title="<?php esc_attr_e( 'Font size', 'wc-generic-product-designer' ); ?>" />
+							<div class="wc-gpd-bar-toggles">
+								<button type="button" class="wc-gpd-toggle-btn" id="wc-gpd-bold-btn" data-prop="bold" title="<?php esc_attr_e( 'Bold', 'wc-generic-product-designer' ); ?>"><strong>B</strong></button>
+								<button type="button" class="wc-gpd-toggle-btn" id="wc-gpd-italic-btn" data-prop="italic" title="<?php esc_attr_e( 'Italic', 'wc-generic-product-designer' ); ?>"><em>I</em></button>
+								<button type="button" class="wc-gpd-toggle-btn" id="wc-gpd-underline-btn" data-prop="underline" title="<?php esc_attr_e( 'Underline', 'wc-generic-product-designer' ); ?>"><span style="text-decoration:underline">U</span></button>
+							</div>
+							<input type="color" id="wc-gpd-text-color" class="wc-gpd-bar-color wc-gpd-control-text-color" value="#000000" title="<?php esc_attr_e( 'Text color', 'wc-generic-product-designer' ); ?>" />
+							<input type="number" id="wc-gpd-line-height" class="wc-gpd-bar-mini wc-gpd-control-line-height" min="0.5" max="3" step="0.05" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" />
+							<input type="number" id="wc-gpd-letter-spacing" class="wc-gpd-bar-mini wc-gpd-control-letter-spacing" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" />
+							<div class="wc-gpd-bar-align wc-gpd-control-align" role="group">
+								<button type="button" class="wc-gpd-align wc-gpd-toggle-btn" data-align="left" aria-pressed="true">L</button>
+								<button type="button" class="wc-gpd-align wc-gpd-toggle-btn" data-align="center" aria-pressed="false">C</button>
+								<button type="button" class="wc-gpd-align wc-gpd-toggle-btn" data-align="right" aria-pressed="false">R</button>
+							</div>
+							<input type="checkbox" id="wc-gpd-bold" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
+							<input type="checkbox" id="wc-gpd-italic" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
+							<input type="checkbox" id="wc-gpd-underline" class="screen-reader-text" tabindex="-1" aria-hidden="true" />
+						</div>
+						<details class="wc-gpd-layers-drawer">
+							<summary><?php esc_html_e( 'Layers', 'wc-generic-product-designer' ); ?></summary>
+							<ul class="wc-gpd-layers-list" id="wc-gpd-layers-list"></ul>
+							<div class="wc-gpd-layers-actions">
+								<button type="button" class="button button-small" id="wc-gpd-layer-forward">↑</button>
+								<button type="button" class="button button-small" id="wc-gpd-layer-backward">↓</button>
+								<button type="button" class="button button-small" id="wc-gpd-layer-delete"><?php esc_html_e( 'Delete', 'wc-generic-product-designer' ); ?></button>
+							</div>
+						</details>
+					</div>
 				</div>
 			</div>
+			<?php if ( $replace_gallery ) : ?>
+				<div class="wc-gpd-gallery-modal" id="wc-gpd-gallery-modal" hidden>
+					<div class="wc-gpd-gallery-modal__backdrop" id="wc-gpd-gallery-backdrop"></div>
+					<div class="wc-gpd-gallery-modal__panel" role="dialog" aria-label="<?php esc_attr_e( 'Product photos', 'wc-generic-product-designer' ); ?>">
+						<button type="button" class="button wc-gpd-gallery-modal__close" id="wc-gpd-gallery-close"><?php esc_html_e( 'Close', 'wc-generic-product-designer' ); ?></button>
+						<div class="wc-gpd-gallery-modal__scroll" id="wc-gpd-gallery-scroll"></div>
+					</div>
+				</div>
+			<?php endif; ?>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
 			<input type="hidden" name="wc_gpd_design_json" id="wc-gpd-design-json" value="" />
 			<input type="hidden" name="wc_gpd_preview_image" id="wc-gpd-preview-image" value="" />
@@ -458,6 +481,45 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			'svg'      => $svg,
 			'json'     => $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true ),
 		);
+	}
+
+	/**
+	 * Product listing/gallery images for the photos modal.
+	 *
+	 * @param WC_Product|false $product Product.
+	 * @return array<int,array{src:string,thumb:string,alt:string}>
+	 */
+	public static function get_listing_gallery_images( $product ) {
+		if ( ! $product instanceof WC_Product ) {
+			return array();
+		}
+
+		$ids = array();
+		if ( $product->get_image_id() ) {
+			$ids[] = absint( $product->get_image_id() );
+		}
+		foreach ( $product->get_gallery_image_ids() as $gallery_id ) {
+			$gallery_id = absint( $gallery_id );
+			if ( $gallery_id && ! in_array( $gallery_id, $ids, true ) ) {
+				$ids[] = $gallery_id;
+			}
+		}
+
+		$images = array();
+		foreach ( $ids as $image_id ) {
+			$src   = wp_get_attachment_image_url( $image_id, 'full' );
+			$thumb = wp_get_attachment_image_url( $image_id, 'woocommerce_single' );
+			if ( ! $src ) {
+				continue;
+			}
+			$images[] = array(
+				'src'   => $src,
+				'thumb' => $thumb ? $thumb : $src,
+				'alt'   => trim( (string) get_post_meta( $image_id, '_wp_attachment_image_alt', true ) ),
+			);
+		}
+
+		return $images;
 	}
 
 	/**

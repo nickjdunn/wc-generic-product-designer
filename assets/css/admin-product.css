@@ -1,5 +1,5 @@
 /**
- * WooCommerce product editor — Product Designer sub-tabs and template editor.
+ * WooCommerce product editor — Product Designer UI.
  */
 
 .wc-gpd-product-subtabs-nav {
@@ -30,46 +30,182 @@
 	font-weight: 600;
 }
 
-.wc-gpd-template-area-photo {
-	margin: 0.75rem 0;
-	padding: 0.75rem;
+.wc-gpd-settings-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 220px, 1fr ) );
+	gap: 12px;
+	padding: 8px 12px 16px;
+}
+
+.wc-gpd-settings-card {
 	background: #f6f7f7;
 	border: 1px solid #dcdcde;
 	border-radius: 4px;
+	padding: 12px 14px;
 }
 
-.wc-gpd-template-view-image-preview img {
-	display: block;
-	max-width: 160px;
-	height: auto;
-	margin: 0.5rem 0;
-	border: 1px solid #c3c4c7;
+.wc-gpd-settings-card h4 {
+	margin: 0 0 10px;
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	color: #1d2327;
 }
 
-.wc-gpd-template-shape-props {
-	margin: 0.75rem 0;
-	padding: 0.75rem 1rem;
-	border: 1px solid #c3c4c7;
-	border-radius: 4px;
-	background: #fff;
+.wc-gpd-settings-check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0 0 6px;
+	font-size: 13px;
 }
 
-.wc-gpd-template-shape-props legend {
-	font-weight: 600;
-	padding: 0 0.25rem;
+.wc-gpd-settings-color,
+.wc-gpd-settings-card label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 0 0 8px;
+	font-size: 13px;
 }
 
-.wc-gpd-shape-props-fields {
+.wc-gpd-settings-card input[type="number"] {
+	width: 72px;
+}
+
+/* Template editor */
+.wc-gpd-template-editor-wrap {
+	padding: 8px 12px 16px;
+}
+
+.wc-gpd-tpl-header {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.75rem 1.25rem;
 	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 12px;
 }
 
-.wc-gpd-shape-props-fields label {
-	display: inline-flex;
+.wc-gpd-tpl-header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.wc-gpd-tpl-layout {
+	display: grid;
+	grid-template-columns: 220px 1fr;
+	gap: 14px;
+	align-items: start;
+}
+
+@media ( max-width: 960px ) {
+	.wc-gpd-tpl-layout {
+		grid-template-columns: 1fr;
+	}
+}
+
+.wc-gpd-tpl-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.wc-gpd-tpl-panel {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 10px 12px;
+}
+
+.wc-gpd-tpl-panel h4 {
+	margin: 0 0 6px;
+	font-size: 13px;
+}
+
+.wc-gpd-tpl-panel-desc {
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: #646970;
+}
+
+.wc-gpd-tpl-btn-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.wc-gpd-tpl-selection {
+	margin-top: 10px;
+	padding-top: 10px;
+	border-top: 1px solid #eee;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.wc-gpd-tpl-selection label {
+	display: flex;
 	align-items: center;
-	gap: 0.35rem;
+	justify-content: space-between;
+	gap: 6px;
+	font-size: 12px;
+	margin: 0;
+}
+
+.wc-gpd-tpl-check {
+	justify-content: flex-start !important;
+}
+
+.wc-gpd-tpl-hint {
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: #646970;
+	font-style: italic;
+}
+
+.wc-gpd-tpl-hint[hidden],
+.wc-gpd-tpl-selection[hidden] {
+	display: none !important;
+}
+
+.wc-gpd-tpl-canvas-col {
+	min-width: 0;
+	background: #e8e8e8;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 8px;
+	display: flex;
+	justify-content: center;
+}
+
+#wc-gpd-template-canvas {
+	display: block;
+	max-width: 100%;
+}
+
+.wc-gpd-template-view-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.wc-gpd-template-view-tab {
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	border-radius: 999px;
+	padding: 4px 12px;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.wc-gpd-template-view-tab.is-active {
+	background: #2271b1;
+	color: #fff;
+	border-color: #2271b1;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-is-popout {
@@ -78,15 +214,16 @@
 	z-index: 100000;
 	background: #fff;
 	overflow: auto;
-	padding: 1rem 1.5rem 2rem;
+	padding: 12px 16px 24px;
 }
 
-.wc-gpd-template-editor-wrap.wc-gpd-is-popout #wc-gpd-template-canvas {
-	max-width: min( 100%, 1100px );
+.wc-gpd-template-editor-wrap.wc-gpd-is-popout .wc-gpd-tpl-layout {
+	grid-template-columns: 200px 1fr;
+	min-height: calc( 100vh - 80px );
 }
 
 .wc-gpd-popout-close {
-	margin-bottom: 0.75rem;
+	margin-bottom: 8px;
 }
 
 .wc-gpd-popout-backdrop {

@@ -15,12 +15,17 @@ class WC_GPD_Product_Settings {
 	const META_KEY = '_wc_gpd_product_settings';
 
 	const DEFAULTS = array(
+		'replace_product_gallery' => false,
+		'canvas_bg_color'         => '#f0f0f0',
 		'enable_popout'           => true,
 		'allow_text_color'        => true,
 		'single_color_only'       => false,
 		'forced_text_color'       => '#000000',
 		'allow_bold'              => true,
 		'allow_italic'            => true,
+		'allow_underline'         => true,
+		'allow_line_height'       => true,
+		'allow_letter_spacing'    => true,
 		'allow_font_family'       => true,
 		'allow_font_size'         => true,
 		'allow_text_align'        => true,
@@ -44,6 +49,7 @@ class WC_GPD_Product_Settings {
 		}
 
 		$merged = wp_parse_args( $stored, self::DEFAULTS );
+		$merged['canvas_bg_color']      = self::sanitize_color( $merged['canvas_bg_color'], '#f0f0f0' );
 		$merged['forced_text_color']    = self::sanitize_color( $merged['forced_text_color'], '#000000' );
 		$merged['outline_color']        = self::sanitize_color( $merged['outline_color'], '#ff0000' );
 		$merged['bbox_stroke_color']    = self::sanitize_color( $merged['bbox_stroke_color'], '#ff0000' );
@@ -66,12 +72,17 @@ class WC_GPD_Product_Settings {
 		}
 
 		$clean = array(
+			'replace_product_gallery' => ! empty( $settings['replace_product_gallery'] ),
+			'canvas_bg_color'         => self::sanitize_color( $settings['canvas_bg_color'] ?? '', '#f0f0f0' ),
 			'enable_popout'           => ! empty( $settings['enable_popout'] ),
 			'allow_text_color'        => ! empty( $settings['allow_text_color'] ),
 			'single_color_only'       => ! empty( $settings['single_color_only'] ),
 			'forced_text_color'       => self::sanitize_color( $settings['forced_text_color'] ?? '', '#000000' ),
 			'allow_bold'              => ! empty( $settings['allow_bold'] ),
 			'allow_italic'            => ! empty( $settings['allow_italic'] ),
+			'allow_underline'         => ! empty( $settings['allow_underline'] ),
+			'allow_line_height'       => ! empty( $settings['allow_line_height'] ),
+			'allow_letter_spacing'    => ! empty( $settings['allow_letter_spacing'] ),
 			'allow_font_family'       => ! empty( $settings['allow_font_family'] ),
 			'allow_font_size'         => ! empty( $settings['allow_font_size'] ),
 			'allow_text_align'        => ! empty( $settings['allow_text_align'] ),
@@ -95,12 +106,17 @@ class WC_GPD_Product_Settings {
 	 */
 	public static function from_post( array $post ) {
 		return array(
+			'replace_product_gallery' => ! empty( $post['wc_gpd_ps_replace_gallery'] ),
+			'canvas_bg_color'         => $post['wc_gpd_ps_canvas_bg_color'] ?? '#f0f0f0',
 			'enable_popout'           => ! empty( $post['wc_gpd_ps_enable_popout'] ),
 			'allow_text_color'        => ! empty( $post['wc_gpd_ps_allow_text_color'] ),
 			'single_color_only'       => ! empty( $post['wc_gpd_ps_single_color_only'] ),
 			'forced_text_color'       => $post['wc_gpd_ps_forced_text_color'] ?? '#000000',
 			'allow_bold'              => ! empty( $post['wc_gpd_ps_allow_bold'] ),
 			'allow_italic'            => ! empty( $post['wc_gpd_ps_allow_italic'] ),
+			'allow_underline'         => ! empty( $post['wc_gpd_ps_allow_underline'] ),
+			'allow_line_height'       => ! empty( $post['wc_gpd_ps_allow_line_height'] ),
+			'allow_letter_spacing'    => ! empty( $post['wc_gpd_ps_allow_letter_spacing'] ),
 			'allow_font_family'       => ! empty( $post['wc_gpd_ps_allow_font_family'] ),
 			'allow_font_size'         => ! empty( $post['wc_gpd_ps_allow_font_size'] ),
 			'allow_text_align'        => ! empty( $post['wc_gpd_ps_allow_text_align'] ),

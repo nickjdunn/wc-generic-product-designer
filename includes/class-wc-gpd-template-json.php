@@ -22,6 +22,7 @@ class WC_GPD_Template_Json {
 		'rect',
 		'circle',
 		'ellipse',
+		'image',
 	);
 
 	/**
@@ -184,6 +185,26 @@ class WC_GPD_Template_Json {
 			}
 
 			$uid = ! empty( $object['wcGpdUid'] ) ? sanitize_text_field( (string) $object['wcGpdUid'] ) : 'gpd-' . wp_generate_password( 10, false );
+
+			if ( 'image' === $type ) {
+				$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
+				if ( ! $src ) {
+					continue;
+				}
+				$object['type']               = 'image';
+				$object['src']                = $src;
+				$object['wcGpdUid']           = $uid;
+				$object['wcGpdTemplateLayer'] = true;
+				$object['wcGpdMockupImage']   = true;
+				$object['wcGpdMockupVisible'] = ! isset( $object['wcGpdMockupVisible'] ) || ! empty( $object['wcGpdMockupVisible'] );
+				$object['wcGpdLayerType']     = 'mockup';
+				$object['wcGpdAttachmentId']  = isset( $object['wcGpdAttachmentId'] ) ? absint( $object['wcGpdAttachmentId'] ) : 0;
+				$object['wcGpdOutlineLayer']  = false;
+				$object['wcGpdBoundingBox']   = false;
+				$clean[] = $object;
+				continue;
+			}
+
 			$is_outline = ! empty( $object['wcGpdOutlineLayer'] );
 			$is_bbox    = $is_outline && ! empty( $object['wcGpdBoundingBox'] );
 

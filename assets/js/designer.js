@@ -90,13 +90,15 @@
 
 	const ui = {
 		addText: document.getElementById( 'wc-gpd-add-text' ),
-		controls: document.getElementById( 'wc-gpd-controls' ),
+		dock: document.getElementById( 'wc-gpd-dock' ),
 		fontFamily: document.getElementById( 'wc-gpd-font-family' ),
 		fontSize: document.getElementById( 'wc-gpd-font-size' ),
 		bold: document.getElementById( 'wc-gpd-bold' ),
 		italic: document.getElementById( 'wc-gpd-italic' ),
+		boldBtn: document.getElementById( 'wc-gpd-bold-btn' ),
+		italicBtn: document.getElementById( 'wc-gpd-italic-btn' ),
+		underlineBtn: document.getElementById( 'wc-gpd-underline-btn' ),
 		textColor: document.getElementById( 'wc-gpd-text-color' ),
-		textColorWrap: document.getElementById( 'wc-gpd-text-color-wrap' ),
 		underline: document.getElementById( 'wc-gpd-underline' ),
 		lineHeight: document.getElementById( 'wc-gpd-line-height' ),
 		letterSpacing: document.getElementById( 'wc-gpd-letter-spacing' ),
@@ -107,6 +109,11 @@
 		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
 		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
 		popoutBtn: document.getElementById( 'wc-gpd-popout-btn' ),
+		viewPhotosBtn: document.getElementById( 'wc-gpd-view-photos-btn' ),
+		galleryModal: document.getElementById( 'wc-gpd-gallery-modal' ),
+		galleryScroll: document.getElementById( 'wc-gpd-gallery-scroll' ),
+		galleryClose: document.getElementById( 'wc-gpd-gallery-close' ),
+		galleryBackdrop: document.getElementById( 'wc-gpd-gallery-backdrop' ),
 	};
 
 	function defaultTextColor() {
@@ -127,29 +134,24 @@
 	/**
 	 * Show/hide customer tools based on per-product settings.
 	 */
+	function setToolVisible( el, visible ) {
+		if ( el ) {
+			el.hidden = ! visible;
+		}
+	}
+
 	function applyProductToolSettings() {
 		const showColor = textColorAllowed();
-		if ( ui.textColorWrap ) {
-			ui.textColorWrap.hidden = ! showColor;
-		}
-		if ( ui.fontFamily && ui.fontFamily.closest( 'label' ) ) {
-			ui.fontFamily.closest( 'label' ).hidden = productSettings.allow_font_family === false;
-		}
-		if ( ui.fontSize && ui.fontSize.closest( 'label' ) ) {
-			ui.fontSize.closest( 'label' ).hidden = productSettings.allow_font_size === false;
-		}
-		if ( ui.bold && ui.bold.closest( 'label' ) ) {
-			ui.bold.closest( 'label' ).hidden = productSettings.allow_bold === false;
-		}
-		if ( ui.italic && ui.italic.closest( 'label' ) ) {
-			ui.italic.closest( 'label' ).hidden = productSettings.allow_italic === false;
-		}
-		if ( ui.alignRow ) {
-			ui.alignRow.hidden = productSettings.allow_text_align === false;
-		}
-		if ( ui.popoutBtn ) {
-			ui.popoutBtn.hidden = productSettings.enable_popout === false;
-		}
+		setToolVisible( ui.textColor, showColor );
+		setToolVisible( ui.fontFamily, productSettings.allow_font_family !== false );
+		setToolVisible( ui.fontSize, productSettings.allow_font_size !== false );
+		setToolVisible( ui.boldBtn, productSettings.allow_bold !== false );
+		setToolVisible( ui.italicBtn, productSettings.allow_italic !== false );
+		setToolVisible( ui.underlineBtn, productSettings.allow_underline !== false );
+		setToolVisible( ui.lineHeight, productSettings.allow_line_height !== false );
+		setToolVisible( ui.letterSpacing, productSettings.allow_letter_spacing !== false );
+		setToolVisible( ui.alignRow, productSettings.allow_text_align !== false );
+		setToolVisible( ui.popoutBtn, productSettings.enable_popout !== false );
 		if ( ui.textColor ) {
 			ui.textColor.value = defaultTextColor();
 		}
@@ -160,6 +162,7 @@
 		preserveObjectStacking: true,
 		width: PROD_WIDTH,
 		height: PROD_HEIGHT,
+		backgroundColor: productSettings.canvas_bg_color || '#f0f0f0',
 	} );
 
 	const templateViews = Array.isArray( config.templateViews ) && config.templateViews.length
@@ -207,7 +210,7 @@
 
 		const isPopout = designerRoot.classList.contains( 'wc-gpd-is-popout' );
 		const maxWidth = isPopout
-			? Math.min( window.innerWidth - 320, 1200 )
+			? Math.min( window.innerWidth - 16, 1200 )
 			: Math.max( 1, wrap.clientWidth );
 		displayScale = Math.min( 1, maxWidth / PROD_WIDTH );
 		const displayW = Math.max( 1, Math.floor( PROD_WIDTH * displayScale ) );
@@ -331,58 +334,14 @@
 		} );
 	}
 
-	/**
-	 * Load background image for the active design area.
-	 *
-	 * @param {string} templateUrl Image URL.
-	 * @returns {Promise<void>}
-	 */
-	function loadBackground( templateUrl ) {
-		return new Promise( ( resolve ) => {
-			canvas.backgroundImage = null;
-			if ( ! templateUrl ) {
-				canvas.backgroundColor = '#f4f4f4';
-				canvas.requestRenderAll();
-				resolve();
-				return;
-			}
+	function setCanvasBackground() {
+		canvas.backgroundImage = null;
+		canvas.backgroundColor = productSettings.canvas_bg_color || '#f0f0f0';
+		canvas.requestRenderAll();
+	}
 
-			fabric.Image.fromURL(
-				templateUrl,
-				( img ) => {
-					if ( ! img ) {
-						canvas.backgroundColor = '#f4f4f4';
-						canvas.requestRenderAll();
-						resolve();
-						return;
-					}
-					const scaleX = PROD_WIDTH / img.width;
-					const scaleY = PROD_HEIGHT / img.height;
-					const scale = Math.max( scaleX, scaleY );
-
-					img.set( {
-						originX: 'center',
-						originY: 'center',
-						left: PROD_WIDTH / 2,
-						top: PROD_HEIGHT / 2,
-						scaleX: scale,
-						scaleY: scale,
-						selectable: false,
-						evented: false,
-						hasControls: false,
-						hasBorders: false,
-						lockMovementX: true,
-						lockMovementY: true,
-						wcGpdBackground: true,
-					} );
-
-					canvas.backgroundImage = img;
-					canvas.requestRenderAll();
-					resolve();
-				},
-				{ crossOrigin: 'anonymous' }
-			);
-		} );
+	function isMockupImage( obj ) {
+		return !! obj && obj.type === 'image' && ( obj.wcGpdMockupImage || obj.wcGpdLayerType === 'mockup' );
 	}
 
 	/**
@@ -404,12 +363,12 @@
 			return Promise.resolve();
 		}
 
-		return loadBackground( view.templateUrl || config.templateUrl || '' ).then( () => {
-			const templateObjects = Array.isArray( view.objects ) ? view.objects : [];
-			const designObjects = viewDesigns[ viewId ] || [];
+		setCanvasBackground();
+		const templateObjects = Array.isArray( view.objects ) ? view.objects : [];
+		const designObjects = viewDesigns[ viewId ] || [];
 
-			return new Promise( ( resolve ) => {
-				const afterTemplate = () => {
+		return new Promise( ( resolve ) => {
+			const afterTemplate = () => {
 					if ( ! designObjects.length ) {
 						applyResponsiveScale();
 						renderViewSwitcher();
@@ -445,18 +404,38 @@
 					( objects ) => {
 						objects.forEach( ( obj ) => {
 							obj.wcGpdTemplateLayer = true;
+							if ( isMockupImage( obj ) ) {
+								if ( obj.wcGpdMockupVisible === false ) {
+									return;
+								}
+								obj.set( {
+									selectable: false,
+									evented: false,
+									hasControls: false,
+									hasBorders: false,
+								} );
+								canvas.add( obj );
+								canvas.sendToBack( obj );
+								return;
+							}
 							obj.wcGpdOutlineLayer = !! obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline';
 							obj.wcGpdBoundingBox = view.boundingBoxUid && obj.wcGpdUid === view.boundingBoxUid;
 							if ( obj.wcGpdBoundingBox ) {
 								obj.stroke = obj.stroke || '#2b6cb0';
 								obj.strokeDashArray = [ 8, 6 ];
 							}
-							obj.selectable = false;
-							obj.evented = false;
-							obj.hasControls = false;
-							obj.hasBorders = false;
+							obj.set( {
+								selectable: false,
+								evented: false,
+								hasControls: false,
+								hasBorders: false,
+							} );
 							canvas.add( obj );
-							canvas.sendToBack( obj );
+						} );
+						canvas.getObjects().forEach( ( obj ) => {
+							if ( isMockupImage( obj ) ) {
+								canvas.sendToBack( obj );
+							}
 						} );
 						canvas.requestRenderAll();
 						afterTemplate();
@@ -464,7 +443,6 @@
 					'fabric'
 				);
 			} );
-		} );
 	}
 
 	function switchDesignView( viewId ) {
@@ -549,7 +527,7 @@
 	 * @returns {boolean}
 	 */
 	function isTemplateLayer( obj ) {
-		return !! obj && ( obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer || obj.wcGpdBoundingBox );
+		return !! obj && ( obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer || obj.wcGpdBoundingBox || isMockupImage( obj ) );
 	}
 
 	function isTextLayer( obj ) {
@@ -711,8 +689,8 @@
 		activeText = obj;
 		const enabled = !! obj;
 
-		if ( ui.controls ) {
-			ui.controls.disabled = ! enabled;
+		if ( ui.dock ) {
+			ui.dock.classList.toggle( 'is-disabled', ! enabled );
 		}
 
 		if ( ! enabled ) {
@@ -725,11 +703,23 @@
 		if ( ui.fontSize ) {
 			ui.fontSize.value = String( Math.round( obj.fontSize || 32 ) );
 		}
+		const isBold = obj.fontWeight === 'bold';
+		const isItalic = obj.fontStyle === 'italic';
+		const isUnderline = !! obj.underline;
 		if ( ui.bold ) {
-			ui.bold.checked = obj.fontWeight === 'bold';
+			ui.bold.checked = isBold;
 		}
 		if ( ui.italic ) {
-			ui.italic.checked = obj.fontStyle === 'italic';
+			ui.italic.checked = isItalic;
+		}
+		if ( ui.boldBtn ) {
+			ui.boldBtn.classList.toggle( 'is-active', isBold );
+		}
+		if ( ui.italicBtn ) {
+			ui.italicBtn.classList.toggle( 'is-active', isItalic );
+		}
+		if ( ui.underlineBtn ) {
+			ui.underlineBtn.classList.toggle( 'is-active', isUnderline );
 		}
 		if ( ui.textColor ) {
 			ui.textColor.value = obj.fill || defaultTextColor();
@@ -1165,25 +1155,36 @@
 		} );
 	}
 
-	if ( ui.bold ) {
-		ui.bold.addEventListener( 'change', () => {
-			if ( ! activeText ) {
+	function bindStyleToggle( btn, checkbox, apply ) {
+		if ( ! btn || ! checkbox ) {
+			return;
+		}
+		btn.addEventListener( 'click', () => {
+			if ( ! activeText || ui.dock?.classList.contains( 'is-disabled' ) ) {
 				return;
 			}
-			activeText.set( 'fontWeight', ui.bold.checked ? 'bold' : 'normal' );
+			checkbox.checked = ! checkbox.checked;
+			apply( checkbox.checked );
+			btn.classList.toggle( 'is-active', checkbox.checked );
 			canvas.requestRenderAll();
 		} );
 	}
 
-	if ( ui.italic ) {
-		ui.italic.addEventListener( 'change', () => {
-			if ( ! activeText ) {
-				return;
-			}
-			activeText.set( 'fontStyle', ui.italic.checked ? 'italic' : 'normal' );
-			canvas.requestRenderAll();
-		} );
-	}
+	bindStyleToggle( ui.boldBtn, ui.bold, ( on ) => {
+		if ( activeText ) {
+			activeText.set( 'fontWeight', on ? 'bold' : 'normal' );
+		}
+	} );
+	bindStyleToggle( ui.italicBtn, ui.italic, ( on ) => {
+		if ( activeText ) {
+			activeText.set( 'fontStyle', on ? 'italic' : 'normal' );
+		}
+	} );
+	bindStyleToggle( ui.underlineBtn, ui.underline, ( on ) => {
+		if ( activeText ) {
+			activeText.set( 'underline', on );
+		}
+	} );
 
 	ui.alignButtons.forEach( ( btn ) => {
 		btn.addEventListener( 'click', () => {
@@ -1207,16 +1208,6 @@
 				return;
 			}
 			activeText.set( 'fill', ui.textColor.value );
-			canvas.requestRenderAll();
-		} );
-	}
-
-	if ( ui.underline ) {
-		ui.underline.addEventListener( 'change', () => {
-			if ( ! activeText ) {
-				return;
-			}
-			activeText.set( 'underline', ui.underline.checked );
 			canvas.requestRenderAll();
 		} );
 	}
@@ -1341,8 +1332,48 @@
 		return Promise.reject( new Error( 'no-design' ) );
 	}
 
+	function bindGalleryModal() {
+		if ( ! ui.galleryModal || ! Array.isArray( config.galleryImages ) ) {
+			return;
+		}
+
+		const images = config.galleryImages;
+		if ( ui.galleryScroll && images.length ) {
+			ui.galleryScroll.innerHTML = '';
+			images.forEach( ( image ) => {
+				const img = document.createElement( 'img' );
+				img.src = image.src;
+				img.alt = image.alt || '';
+				img.loading = 'lazy';
+				ui.galleryScroll.appendChild( img );
+			} );
+		}
+
+		const open = () => {
+			ui.galleryModal.hidden = false;
+			document.body.classList.add( 'wc-gpd-gallery-open' );
+		};
+		const close = () => {
+			ui.galleryModal.hidden = true;
+			document.body.classList.remove( 'wc-gpd-gallery-open' );
+		};
+
+		if ( ui.viewPhotosBtn && images.length ) {
+			ui.viewPhotosBtn.addEventListener( 'click', open );
+		} else if ( ui.viewPhotosBtn ) {
+			ui.viewPhotosBtn.hidden = true;
+		}
+		if ( ui.galleryClose ) {
+			ui.galleryClose.addEventListener( 'click', close );
+		}
+		if ( ui.galleryBackdrop ) {
+			ui.galleryBackdrop.addEventListener( 'click', close );
+		}
+	}
+
 	initFontSelect();
 	applyProductToolSettings();
+	bindGalleryModal();
 	bindAddToCart();
 
 	if ( config.isEditing && config.i18n.updateCart ) {

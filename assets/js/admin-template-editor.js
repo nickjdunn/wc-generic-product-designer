@@ -1,5 +1,5 @@
 /**
- * Admin multi-view template editor (Fabric.js).
+ * Admin template editor — mockup photos + outlines.
  */
 ( function ( $ ) {
 	'use strict';
@@ -9,16 +9,17 @@
 	const widthInput = document.getElementById( 'wc_gpd_template_canvas_width' );
 	const heightInput = document.getElementById( 'wc_gpd_template_canvas_height' );
 	const maxViewsInput = document.getElementById( 'wc_gpd_template_max_views' );
-	const defaultImageInput = document.getElementById( 'wc_gpd_template_default_image_id' );
 	const viewTabsEl = document.getElementById( 'wc-gpd-template-view-tabs' );
-	const viewImageInput = document.getElementById( 'wc_gpd_template_view_image_id' );
-	const viewImagePreview = document.getElementById( 'wc-gpd-template-view-image-preview' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
 	const bboxToggle = document.getElementById( 'wc_gpd_template_is_bbox' );
 	const strokeColorInput = document.getElementById( 'wc_gpd_template_stroke_color' );
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
 	const shapePropsHint = document.getElementById( 'wc-gpd-shape-props-hint' );
+	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
+	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
+	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
+	const addImageBtn = document.getElementById( 'wc-gpd-template-add-image' );
 	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
 
@@ -35,36 +36,32 @@
 		return el && el.value ? el.value : fallback;
 	}
 
-	function defaultOutlineColor() {
-		const settingsField = document.getElementById( 'wc_gpd_ps_outline_color' );
+	function canvasBgColor() {
+		const settingsField = document.querySelector( '[name="wc_gpd_ps_canvas_bg_color"]' );
 		if ( settingsField && settingsField.value ) {
 			return settingsField.value;
 		}
-		return readDefault( 'wc_gpd_tpl_default_outline_color', '#ff0000' );
+		return readDefault( 'wc_gpd_tpl_canvas_bg', '#f0f0f0' );
+	}
+
+	function defaultOutlineColor() {
+		const el = document.getElementById( 'wc_gpd_ps_outline_color' );
+		return el && el.value ? el.value : readDefault( 'wc_gpd_tpl_default_outline_color', '#ff0000' );
 	}
 
 	function defaultOutlineWidth() {
-		const settingsField = document.getElementById( 'wc_gpd_ps_outline_stroke_width' );
-		if ( settingsField && settingsField.value ) {
-			return parseFloat( settingsField.value ) || 1;
-		}
-		return parseFloat( readDefault( 'wc_gpd_tpl_default_outline_width', '1' ) ) || 1;
+		const el = document.getElementById( 'wc_gpd_ps_outline_stroke_width' );
+		return el && el.value ? parseFloat( el.value ) : parseFloat( readDefault( 'wc_gpd_tpl_default_outline_width', '1' ) ) || 1;
 	}
 
 	function defaultBboxColor() {
-		const settingsField = document.getElementById( 'wc_gpd_ps_bbox_stroke_color' );
-		if ( settingsField && settingsField.value ) {
-			return settingsField.value;
-		}
-		return readDefault( 'wc_gpd_tpl_default_bbox_color', '#ff0000' );
+		const el = document.getElementById( 'wc_gpd_ps_bbox_stroke_color' );
+		return el && el.value ? el.value : readDefault( 'wc_gpd_tpl_default_bbox_color', '#ff0000' );
 	}
 
 	function defaultBboxWidth() {
-		const settingsField = document.getElementById( 'wc_gpd_ps_bbox_stroke_width' );
-		if ( settingsField && settingsField.value ) {
-			return parseFloat( settingsField.value ) || 1;
-		}
-		return parseFloat( readDefault( 'wc_gpd_tpl_default_bbox_width', '1' ) ) || 1;
+		const el = document.getElementById( 'wc_gpd_ps_bbox_stroke_width' );
+		return el && el.value ? parseFloat( el.value ) : parseFloat( readDefault( 'wc_gpd_tpl_default_bbox_width', '1' ) ) || 1;
 	}
 
 	const canvas = new fabric.Canvas( 'wc-gpd-template-canvas', {
@@ -91,19 +88,19 @@
 		return documentData.views.find( ( view ) => view.id === activeViewId ) || documentData.views[ 0 ];
 	}
 
+	function isShape( obj ) {
+		return obj && ( obj.type === 'rect' || obj.type === 'circle' || obj.type === 'ellipse' );
+	}
+
+	function isMockupImage( obj ) {
+		return obj && obj.type === 'image' && obj.wcGpdMockupImage;
+	}
+
 	function ensureDocument() {
 		if ( ! documentData.views.length ) {
 			documentData = {
 				version: 2,
-				views: [
-					{
-						id: 'view_front',
-						label: 'Front',
-						template_image_id: 0,
-						bounding_box_uid: '',
-						objects: [],
-					},
-				],
+				views: [ { id: 'view_front', label: 'Front', template_image_id: 0, bounding_box_uid: '', objects: [] } ],
 			};
 		}
 		if ( ! activeViewId ) {
@@ -111,26 +108,16 @@
 		}
 	}
 
-	function isShape( obj ) {
-		return obj && ( obj.type === 'rect' || obj.type === 'circle' || obj.type === 'ellipse' );
-	}
-
 	function applyStrokeToObject( obj, isBbox ) {
-		if ( ! obj ) {
+		if ( ! obj || ! isShape( obj ) ) {
 			return;
 		}
-		const color = isBbox ? defaultBboxColor() : ( strokeColorInput ? strokeColorInput.value : defaultOutlineColor() );
-		const strokeWidth = isBbox ? defaultBboxWidth() : ( strokeWidthInput ? parseFloat( strokeWidthInput.value ) : defaultOutlineWidth() );
 		obj.set( {
-			stroke: color,
-			strokeWidth: strokeWidth || 1,
+			stroke: isBbox ? defaultBboxColor() : ( strokeColorInput ? strokeColorInput.value : defaultOutlineColor() ),
+			strokeWidth: isBbox ? defaultBboxWidth() : ( strokeWidthInput ? parseFloat( strokeWidthInput.value ) : defaultOutlineWidth() ),
 			fill: 'transparent',
+			strokeDashArray: isBbox ? [ 6, 4 ] : null,
 		} );
-		if ( isBbox ) {
-			obj.strokeDashArray = [ 6, 4 ];
-		} else {
-			obj.strokeDashArray = null;
-		}
 	}
 
 	function persistCanvasToActiveView() {
@@ -139,14 +126,11 @@
 			return;
 		}
 		view.objects = canvas.getObjects().map( ( obj ) => obj.toObject( [
-			'wcGpdUid',
-			'wcGpdOutlineLayer',
-			'wcGpdBoundingBox',
-			'wcGpdLayerType',
-			'wcGpdTemplateLayer',
-			'strokeDashArray',
+			'wcGpdUid', 'wcGpdOutlineLayer', 'wcGpdBoundingBox', 'wcGpdLayerType',
+			'wcGpdTemplateLayer', 'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'strokeDashArray',
 		] ) );
 		view.bounding_box_uid = '';
+		view.template_image_id = 0;
 		view.objects.forEach( ( obj ) => {
 			if ( obj.wcGpdBoundingBox && obj.wcGpdUid ) {
 				view.bounding_box_uid = obj.wcGpdUid;
@@ -155,7 +139,7 @@
 	}
 
 	function syncShapeFlags( obj ) {
-		if ( ! obj ) {
+		if ( ! obj || ! isShape( obj ) ) {
 			return;
 		}
 		obj.wcGpdTemplateLayer = true;
@@ -167,15 +151,13 @@
 			obj.wcGpdLayerType = outlineToggle.checked ? 'outline' : 'shape';
 		}
 		if ( bboxToggle && bboxToggle.checked ) {
-			if ( ! obj.wcGpdOutlineLayer ) {
-				obj.wcGpdOutlineLayer = true;
-				obj.wcGpdLayerType = 'outline';
-				if ( outlineToggle ) {
-					outlineToggle.checked = true;
-				}
+			obj.wcGpdOutlineLayer = true;
+			obj.wcGpdLayerType = 'outline';
+			if ( outlineToggle ) {
+				outlineToggle.checked = true;
 			}
 			canvas.getObjects().forEach( ( other ) => {
-				if ( other !== obj ) {
+				if ( other !== obj && isShape( other ) ) {
 					other.wcGpdBoundingBox = false;
 					if ( other.wcGpdOutlineLayer ) {
 						applyStrokeToObject( other, false );
@@ -192,18 +174,22 @@
 			obj.wcGpdBoundingBox = false;
 			applyStrokeToObject( obj, false );
 		}
-		updateBboxToggleState();
+		updateSelectionPanels();
 	}
 
-	function updateBboxToggleState() {
+	function updateSelectionPanels() {
 		const active = canvas.getActiveObject();
 		const shapeSelected = isShape( active );
+		const imageSelected = isMockupImage( active );
 
 		if ( shapePropsFields ) {
 			shapePropsFields.hidden = ! shapeSelected;
 		}
+		if ( imagePropsPanel ) {
+			imagePropsPanel.hidden = ! imageSelected;
+		}
 		if ( shapePropsHint ) {
-			shapePropsHint.hidden = shapeSelected;
+			shapePropsHint.hidden = shapeSelected || imageSelected;
 		}
 
 		if ( bboxToggle ) {
@@ -221,71 +207,72 @@
 		if ( shapeSelected && strokeWidthInput ) {
 			strokeWidthInput.value = String( active.strokeWidth || defaultOutlineWidth() );
 		}
+		if ( imageSelected && mockupVisibleToggle ) {
+			mockupVisibleToggle.checked = active.wcGpdMockupVisible !== false;
+		}
 	}
 
 	function clearCanvas() {
 		canvas.getObjects().slice().forEach( ( obj ) => canvas.remove( obj ) );
 		canvas.discardActiveObject();
+		canvas.backgroundImage = null;
+		canvas.backgroundColor = canvasBgColor();
 		canvas.requestRenderAll();
 	}
 
-	function updateViewImagePreview( imageId ) {
-		if ( ! viewImagePreview ) {
-			return;
-		}
-		viewImagePreview.innerHTML = '';
-		if ( ! imageId || ! window.wp || ! wp.media ) {
-			return;
-		}
-		wp.media.attachment( imageId ).fetch().then( () => {
-			const attachment = wp.media.attachment( imageId );
-			const url = attachment.get( 'url' );
-			if ( url ) {
-				const img = document.createElement( 'img' );
-				img.src = url;
-				img.alt = '';
-				viewImagePreview.appendChild( img );
+	function sortLayers() {
+		canvas.getObjects().forEach( ( obj ) => {
+			if ( isMockupImage( obj ) ) {
+				canvas.sendToBack( obj );
+			} else if ( isShape( obj ) ) {
+				canvas.bringToFront( obj );
 			}
 		} );
 	}
 
-	function loadBackgroundForView( view ) {
-		const imageId = view.template_image_id || parseInt( defaultImageInput ? defaultImageInput.value : '0', 10 ) || 0;
-		updateViewImagePreview( imageId );
-		canvas.backgroundImage = null;
-		canvas.backgroundColor = '#f8f8f8';
-		if ( ! imageId || ! window.wp || ! wp.media ) {
-			canvas.requestRenderAll();
-			return;
+	function migrateLegacyImage( view ) {
+		if ( ! view.template_image_id || ! window.wp || ! wp.media ) {
+			return Promise.resolve();
 		}
-		wp.media.attachment( imageId ).fetch().then( () => {
-			const attachment = wp.media.attachment( imageId );
+		const hasImage = ( view.objects || [] ).some( ( obj ) => obj.type === 'image' );
+		if ( hasImage ) {
+			return Promise.resolve();
+		}
+		return wp.media.attachment( view.template_image_id ).fetch().then( () => {
+			const attachment = wp.media.attachment( view.template_image_id );
 			const url = attachment.get( 'url' );
 			if ( ! url ) {
-				canvas.requestRenderAll();
 				return;
 			}
-			fabric.Image.fromURL( url, ( img ) => {
-				if ( ! img ) {
-					canvas.requestRenderAll();
-					return;
-				}
-				const scaleX = width / img.width;
-				const scaleY = height / img.height;
-				const scale = Math.max( scaleX, scaleY );
-				img.set( {
-					originX: 'center',
-					originY: 'center',
-					left: width / 2,
-					top: height / 2,
-					scaleX: scale,
-					scaleY: scale,
-					selectable: false,
-					evented: false,
-				} );
-				canvas.backgroundImage = img;
-				canvas.requestRenderAll();
-			}, { crossOrigin: 'anonymous' } );
+			return new Promise( ( resolve ) => {
+				fabric.Image.fromURL( url, ( img ) => {
+					if ( ! img ) {
+						resolve();
+						return;
+					}
+					const scale = Math.min( width / img.width, height / img.height ) * 0.85;
+					img.set( {
+						left: width / 2,
+						top: height / 2,
+						originX: 'center',
+						originY: 'center',
+						scaleX: scale,
+						scaleY: scale,
+						wcGpdUid: uid(),
+						wcGpdTemplateLayer: true,
+						wcGpdMockupImage: true,
+						wcGpdMockupVisible: true,
+						wcGpdLayerType: 'mockup',
+						wcGpdAttachmentId: view.template_image_id,
+					} );
+					view.objects = view.objects || [];
+					view.objects.unshift( img.toObject( [
+						'wcGpdUid', 'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdLayerType', 'wcGpdTemplateLayer',
+					] ) );
+					view.template_image_id = 0;
+					resolve();
+				}, { crossOrigin: 'anonymous' } );
+			} );
 		} );
 	}
 
@@ -298,24 +285,30 @@
 			renderTabs();
 			return;
 		}
-		if ( viewImageInput ) {
-			viewImageInput.value = String( view.template_image_id || 0 );
-		}
-		loadBackgroundForView( view );
-		if ( ! view.objects || ! view.objects.length ) {
-			renderTabs();
-			updateBboxToggleState();
-			return;
-		}
-		fabric.util.enlivenObjects( view.objects, ( objects ) => {
-			objects.forEach( ( obj ) => {
-				obj.wcGpdTemplateLayer = true;
-				canvas.add( obj );
-			} );
-			canvas.requestRenderAll();
-			renderTabs();
-			updateBboxToggleState();
-		}, 'fabric' );
+
+		migrateLegacyImage( view ).then( () => {
+			const objects = view.objects || [];
+			if ( ! objects.length ) {
+				renderTabs();
+				updateSelectionPanels();
+				return;
+			}
+			fabric.util.enlivenObjects( objects, ( enlivened ) => {
+				enlivened.forEach( ( obj ) => {
+					obj.wcGpdTemplateLayer = true;
+					if ( isMockupImage( obj ) ) {
+						obj.set( { selectable: true, evented: true, hasControls: true, hasBorders: true } );
+					} else if ( isShape( obj ) ) {
+						obj.set( { selectable: true, evented: true, hasControls: true, hasBorders: true } );
+					}
+					canvas.add( obj );
+				} );
+				sortLayers();
+				canvas.requestRenderAll();
+				renderTabs();
+				updateSelectionPanels();
+			}, 'fabric' );
+		} );
 	}
 
 	function renderTabs() {
@@ -328,8 +321,6 @@
 			btn.type = 'button';
 			btn.className = 'wc-gpd-template-view-tab' + ( view.id === activeViewId ? ' is-active' : '' );
 			btn.textContent = view.label || view.id;
-			btn.setAttribute( 'role', 'tab' );
-			btn.setAttribute( 'aria-selected', view.id === activeViewId ? 'true' : 'false' );
 			btn.addEventListener( 'click', () => loadView( view.id ) );
 			viewTabsEl.appendChild( btn );
 		} );
@@ -338,41 +329,53 @@
 	function addRect( square ) {
 		const size = square ? 120 : 180;
 		const rect = new fabric.Rect( {
-			left: width / 2,
-			top: height / 2,
-			originX: 'center',
-			originY: 'center',
-			width: size,
-			height: square ? size : 90,
-			fill: 'transparent',
-			stroke: defaultOutlineColor(),
-			strokeWidth: defaultOutlineWidth(),
+			left: width / 2, top: height / 2, originX: 'center', originY: 'center',
+			width: size, height: square ? size : 90,
+			fill: 'transparent', stroke: defaultOutlineColor(), strokeWidth: defaultOutlineWidth(),
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( rect );
 		canvas.add( rect );
 		canvas.setActiveObject( rect );
+		sortLayers();
 		canvas.requestRenderAll();
-		updateBboxToggleState();
 	}
 
 	function addCircle() {
 		const circle = new fabric.Circle( {
-			left: width / 2,
-			top: height / 2,
-			originX: 'center',
-			originY: 'center',
-			radius: 60,
-			fill: 'transparent',
-			stroke: defaultOutlineColor(),
-			strokeWidth: defaultOutlineWidth(),
+			left: width / 2, top: height / 2, originX: 'center', originY: 'center',
+			radius: 60, fill: 'transparent', stroke: defaultOutlineColor(), strokeWidth: defaultOutlineWidth(),
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( circle );
 		canvas.add( circle );
 		canvas.setActiveObject( circle );
+		sortLayers();
 		canvas.requestRenderAll();
-		updateBboxToggleState();
+	}
+
+	function addMockupImage( attachment ) {
+		const url = attachment.url;
+		if ( ! url ) {
+			return;
+		}
+		fabric.Image.fromURL( url, ( img ) => {
+			if ( ! img ) {
+				return;
+			}
+			const scale = Math.min( width / img.width, height / img.height ) * 0.75;
+			img.set( {
+				left: width / 2, top: height / 2, originX: 'center', originY: 'center',
+				scaleX: scale, scaleY: scale,
+				wcGpdUid: uid(), wcGpdTemplateLayer: true, wcGpdMockupImage: true,
+				wcGpdMockupVisible: true, wcGpdLayerType: 'mockup', wcGpdAttachmentId: attachment.id,
+			} );
+			canvas.add( img );
+			canvas.setActiveObject( img );
+			sortLayers();
+			canvas.requestRenderAll();
+			updateSelectionPanels();
+		}, { crossOrigin: 'anonymous' } );
 	}
 
 	function addView() {
@@ -383,16 +386,12 @@
 		persistCanvasToActiveView();
 		const index = documentData.views.length + 1;
 		const presets = [ 'Front', 'Back', 'Left sleeve', 'Right sleeve', 'Inside', 'Custom' ];
-		const label = presets[ index - 1 ] || `Area ${ index }`;
-		const id = `view_${ index }`;
 		documentData.views.push( {
-			id,
-			label,
-			template_image_id: 0,
-			bounding_box_uid: '',
-			objects: [],
+			id: `view_${ index }`,
+			label: presets[ index - 1 ] || `Area ${ index }`,
+			template_image_id: 0, bounding_box_uid: '', objects: [],
 		} );
-		loadView( id );
+		loadView( `view_${ index }` );
 	}
 
 	function renameView() {
@@ -401,11 +400,10 @@
 			return;
 		}
 		const next = window.prompt( 'Design area name', view.label || view.id );
-		if ( ! next ) {
-			return;
+		if ( next ) {
+			view.label = next.trim();
+			renderTabs();
 		}
-		view.label = next.trim();
-		renderTabs();
 	}
 
 	function saveJson() {
@@ -423,7 +421,7 @@
 		}
 		try {
 			documentData = JSON.parse( jsonInput.value );
-		} catch ( error ) {
+		} catch ( e ) {
 			ensureDocument();
 		}
 		if ( ! documentData.views || ! documentData.views.length ) {
@@ -434,31 +432,30 @@
 	}
 
 	function applyResponsiveScale() {
-		const wrap = editorRoot || canvasEl.parentElement;
-		if ( ! wrap ) {
+		const col = editorRoot ? editorRoot.querySelector( '.wc-gpd-tpl-canvas-col' ) : null;
+		if ( ! col ) {
 			return;
 		}
 		const isPopout = editorRoot && editorRoot.classList.contains( 'wc-gpd-is-popout' );
-		const maxWidth = isPopout ? Math.min( window.innerWidth - 80, 1100 ) : Math.max( 1, wrap.clientWidth );
-		const scale = Math.min( 1, maxWidth / width );
+		const maxW = isPopout ? Math.min( window.innerWidth - 260, 1100 ) : Math.max( 1, col.clientWidth - 16 );
+		const scale = Math.min( 1, maxW / width );
 		const displayW = Math.max( 1, Math.floor( width * scale ) );
 		const displayH = Math.max( 1, Math.floor( height * scale ) );
 		canvas.setDimensions( { width, height } );
-		if ( typeof canvas.setDimensions === 'function' ) {
-			canvas.setDimensions( { width: displayW, height: displayH }, { cssOnly: true } );
-		}
+		canvas.setDimensions( { width: displayW, height: displayH }, { cssOnly: true } );
 		canvas.calcOffset();
 		canvas.requestRenderAll();
 	}
 
-	canvas.on( 'selection:created', updateBboxToggleState );
-	canvas.on( 'selection:updated', updateBboxToggleState );
-	canvas.on( 'selection:cleared', updateBboxToggleState );
+	canvas.on( 'selection:created', updateSelectionPanels );
+	canvas.on( 'selection:updated', updateSelectionPanels );
+	canvas.on( 'selection:cleared', updateSelectionPanels );
+	canvas.on( 'object:modified', sortLayers );
 
 	if ( outlineToggle ) {
 		outlineToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active ) {
+			if ( ! active || ! isShape( active ) ) {
 				return;
 			}
 			active.wcGpdOutlineLayer = outlineToggle.checked;
@@ -471,14 +468,13 @@
 			}
 			applyStrokeToObject( active, active.wcGpdBoundingBox );
 			canvas.requestRenderAll();
-			updateBboxToggleState();
 		} );
 	}
 
 	if ( bboxToggle ) {
 		bboxToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active ) {
+			if ( ! active || ! isShape( active ) ) {
 				return;
 			}
 			if ( bboxToggle.checked ) {
@@ -486,10 +482,6 @@
 			} else {
 				active.wcGpdBoundingBox = false;
 				applyStrokeToObject( active, false );
-				const view = getActiveView();
-				if ( view ) {
-					view.bounding_box_uid = '';
-				}
 			}
 			canvas.requestRenderAll();
 		} );
@@ -498,7 +490,7 @@
 	if ( strokeColorInput ) {
 		strokeColorInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
 				return;
 			}
 			active.set( 'stroke', strokeColorInput.value );
@@ -509,11 +501,47 @@
 	if ( strokeWidthInput ) {
 		strokeWidthInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
 				return;
 			}
 			active.set( 'strokeWidth', parseFloat( strokeWidthInput.value ) || 1 );
 			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( mockupVisibleToggle ) {
+		mockupVisibleToggle.addEventListener( 'change', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || ! isMockupImage( active ) ) {
+				return;
+			}
+			active.wcGpdMockupVisible = mockupVisibleToggle.checked;
+			active.set( 'opacity', mockupVisibleToggle.checked ? 1 : 0.35 );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( deleteImageBtn ) {
+		deleteImageBtn.addEventListener( 'click', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || ! isMockupImage( active ) ) {
+				return;
+			}
+			canvas.remove( active );
+			canvas.discardActiveObject();
+			updateSelectionPanels();
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( addImageBtn && window.wp && wp.media ) {
+		addImageBtn.addEventListener( 'click', () => {
+			const frame = wp.media( { title: 'Add mockup photo', button: { text: 'Add to canvas' }, multiple: false } );
+			frame.on( 'select', () => {
+				const attachment = frame.state().get( 'selection' ).first().toJSON();
+				addMockupImage( attachment );
+			} );
+			frame.open();
 		} );
 	}
 
@@ -530,49 +558,12 @@
 	} );
 
 	if ( popoutBtn && editorRoot && window.WcGpdPopout ) {
-		popoutBtn.addEventListener( 'click', () => {
-			window.WcGpdPopout.toggle( editorRoot, applyResponsiveScale );
-		} );
+		popoutBtn.addEventListener( 'click', () => window.WcGpdPopout.toggle( editorRoot, applyResponsiveScale ) );
 		editorRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
 	}
 
-	if ( window.wp && wp.media ) {
-		$( '#wc-gpd-template-view-image-select' ).on( 'click', ( event ) => {
-			event.preventDefault();
-			const frame = wp.media( {
-				title: 'Select area background photo',
-				button: { text: 'Use photo' },
-				multiple: false,
-			} );
-			frame.on( 'select', () => {
-				const attachment = frame.state().get( 'selection' ).first().toJSON();
-				const view = getActiveView();
-				if ( view ) {
-					view.template_image_id = attachment.id;
-					if ( viewImageInput ) {
-						viewImageInput.value = String( attachment.id );
-					}
-					loadBackgroundForView( view );
-				}
-			} );
-			frame.open();
-		} );
-	}
-
-	$( '#wc-gpd-template-view-image-clear' ).on( 'click', () => {
-		const view = getActiveView();
-		if ( view ) {
-			view.template_image_id = 0;
-			if ( viewImageInput ) {
-				viewImageInput.value = '0';
-			}
-			loadBackgroundForView( view );
-		}
-	} );
-
 	$( '#post' ).on( 'submit', saveJson );
 	$( document ).on( 'click', '#publish, #save-post', saveJson );
-
 	window.addEventListener( 'resize', applyResponsiveScale );
 
 	loadJson();

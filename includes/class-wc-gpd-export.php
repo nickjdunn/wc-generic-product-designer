@@ -157,10 +157,13 @@ class WC_GPD_Export {
 			$view_id = sanitize_key( (string) $view['id'] );
 			$parts[] = '<g data-wc-gpd-view="' . esc_attr( $view_id ) . '">';
 
-			if ( ! empty( $options['include_background'] ) ) {
-				$image_id = ! empty( $view['template_image_id'] ) ? absint( $view['template_image_id'] ) : absint( $settings['template_id'] );
-				if ( $image_id ) {
-					$href = WC_GPD_Preview::template_href_for_export( $image_id );
+			if ( ! empty( $options['include_background'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
+				$mockup_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'mockup' );
+				$mockup_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $mockup_objects );
+				if ( $mockup_markup ) {
+					$parts[] = '<g data-wc-gpd-layer="mockup">' . $mockup_markup . '</g>';
+				} elseif ( ! empty( $view['template_image_id'] ) ) {
+					$href = WC_GPD_Preview::template_href_for_export( absint( $view['template_image_id'] ) );
 					if ( $href ) {
 						$parts[] = '<image x="0" y="0" width="' . $width . '" height="' . $height . '" preserveAspectRatio="xMidYMid slice" href="' . esc_attr( $href ) . '" />';
 					}

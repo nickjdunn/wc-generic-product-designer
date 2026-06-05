@@ -112,11 +112,17 @@ class WC_GPD_Fabric_Svg {
 		if ( ! empty( $object['wcGpdBoundingBox'] ) || ! empty( $object['wcGpdOutlineLayer'] ) ) {
 			return 'outline';
 		}
+		if ( ! empty( $object['wcGpdMockupImage'] ) || ( ! empty( $object['wcGpdLayerType'] ) && 'mockup' === $object['wcGpdLayerType'] ) ) {
+			return 'mockup';
+		}
 		if ( ! empty( $object['wcGpdTextLayer'] ) ) {
 			return 'text';
 		}
 
 		$type = isset( $object['type'] ) ? strtolower( (string) $object['type'] ) : '';
+		if ( 'image' === $type && ! empty( $object['wcGpdTemplateLayer'] ) ) {
+			return 'mockup';
+		}
 		if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
 			return 'text';
 		}
@@ -147,6 +153,8 @@ class WC_GPD_Fabric_Svg {
 			case 'text':
 			case 'textbox':
 				return self::text_markup( $object );
+			case 'image':
+				return self::image_markup( $object );
 			default:
 				return '';
 		}
@@ -213,6 +221,47 @@ class WC_GPD_Fabric_Svg {
 			esc_attr( self::fill( $object ) ),
 			esc_attr( self::stroke( $object ) ),
 			esc_attr( (string) self::stroke_width( $object ) )
+		);
+	}
+
+	/**
+	 * @param array $object Fabric image.
+	 * @return string
+	 */
+	private static function image_markup( $object ) {
+		if ( empty( $object['wcGpdMockupVisible'] ) && array_key_exists( 'wcGpdMockupVisible', $object ) ) {
+			return '';
+		}
+
+		$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
+		if ( ! $src && ! empty( $object['wcGpdAttachmentId'] ) ) {
+			$src = wp_get_attachment_image_url( absint( $object['wcGpdAttachmentId'] ), 'full' );
+		}
+		if ( ! $src ) {
+			return '';
+		}
+
+		$width  = self::dimension( $object, 'width' );
+		$height = self::dimension( $object, 'height' );
+		$left   = self::position( $object, 'left' );
+		$top    = self::position( $object, 'top' );
+		$angle  = isset( $object['angle'] ) ? (float) $object['angle'] : 0;
+
+		$transform = '';
+		if ( 0.0 !== $angle ) {
+			$cx = $left;
+			$cy = $top;
+			$transform = sprintf( ' transform="rotate(%1$s %2$s %3$s)"', esc_attr( (string) round( $angle, 2 ) ), esc_attr( (string) round( $cx, 2 ) ), esc_attr( (string) round( $cy, 2 ) ) );
+		}
+
+		return sprintf(
+			'<image x="%1$s" y="%2$s" width="%3$s" height="%4$s" href="%5$s" preserveAspectRatio="none"%6$s />',
+			esc_attr( (string) round( $left - ( $width / 2 ), 2 ) ),
+			esc_attr( (string) round( $top - ( $height / 2 ), 2 ) ),
+			esc_attr( (string) round( $width, 2 ) ),
+			esc_attr( (string) round( $height, 2 ) ),
+			esc_attr( $src ),
+			$transform
 		);
 	}
 
