@@ -29,18 +29,25 @@ class WC_GPD_Autoloader {
 			return;
 		}
 
-		$relative = strtolower( str_replace( '_', '-', $class ) );
-		$file     = $relative . '.php';
+		$slug = strtolower( str_replace( '_', '-', $class ) );
 
-		$paths = array(
-			WC_GPD_PLUGIN_DIR . 'includes/core/' . $file,
-			WC_GPD_PLUGIN_DIR . 'includes/' . $file,
+		$candidates = array(
+			'class-' . $slug . '.php',
+			'interface-' . $slug . '.php',
 		);
 
-		foreach ( $paths as $path ) {
-			if ( is_readable( $path ) ) {
-				require_once $path;
-				return;
+		$dirs = array(
+			WC_GPD_PLUGIN_DIR . 'includes/core/',
+			WC_GPD_PLUGIN_DIR . 'includes/',
+		);
+
+		foreach ( $dirs as $dir ) {
+			foreach ( $candidates as $file ) {
+				$path = $dir . $file;
+				if ( is_readable( $path ) ) {
+					require_once $path;
+					return;
+				}
 			}
 		}
 	}
