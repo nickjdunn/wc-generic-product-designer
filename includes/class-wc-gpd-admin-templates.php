@@ -258,7 +258,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<a href="<?php echo esc_url( $list_url ); ?>" class="page-title-action"><?php esc_html_e( 'All templates', 'wc-generic-product-designer' ); ?></a>
 			</h1>
 
-			<form method="post" id="wc-gpd-template-form" class="wc-gpd-template-form">
+			<form method="post" id="wc-gpd-template-form" class="wc-gpd-template-form" novalidate>
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 				<input type="hidden" name="wc_gpd_template_save" value="1" />
 
@@ -369,7 +369,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 									<button type="button" class="wc-gpd-tpl-style-btn wc-gpd-tpl-align" data-align="right" title="<?php esc_attr_e( 'Align right', 'wc-generic-product-designer' ); ?>">R</button>
 								</span>
 								<input type="color" id="wc_gpd_tpl_text_color" class="wc-gpd-tpl-toolbar-color" value="#000000" title="<?php esc_attr_e( 'Text color', 'wc-generic-product-designer' ); ?>" />
-								<input type="number" id="wc_gpd_tpl_line_height" class="wc-gpd-tpl-toolbar-mini" min="0.5" max="3" step="0.05" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" />
+								<input type="number" id="wc_gpd_tpl_line_height" class="wc-gpd-tpl-toolbar-mini" min="0.5" max="3" step="0.01" value="1.16" title="<?php esc_attr_e( 'Line height', 'wc-generic-product-designer' ); ?>" />
 								<input type="number" id="wc_gpd_tpl_letter_spacing" class="wc-gpd-tpl-toolbar-mini" min="-50" max="200" step="1" value="0" title="<?php esc_attr_e( 'Letter spacing', 'wc-generic-product-designer' ); ?>" />
 							</div>
 							<p id="wc-gpd-shrink-fit-row" hidden><label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_shrink_fit" /> <?php esc_html_e( 'Shrink text to fit box', 'wc-generic-product-designer' ); ?></label></p>
@@ -391,13 +391,28 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						</div>
 						<p class="wc-gpd-tpl-hint" id="wc-gpd-text-editor-hint"><?php esc_html_e( 'Add text or select a text layer to edit.', 'wc-generic-product-designer' ); ?></p>
 					</div>
+				</aside>
+				<div class="wc-gpd-tpl-main">
+				<div class="wc-gpd-tpl-canvas-col" id="wc-gpd-tpl-canvas-col">
+					<div class="wc-gpd-tpl-canvas-frame" id="wc-gpd-tpl-canvas-frame">
+						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--top" id="wc-gpd-tpl-ruler-top" hidden></div>
+						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--left" id="wc-gpd-tpl-ruler-left" hidden></div>
+						<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) $settings['width'] ); ?>" height="<?php echo esc_attr( (string) $settings['height'] ); ?>"></canvas>
+						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--bottom" id="wc-gpd-tpl-measure-bottom" hidden></div>
+						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--right" id="wc-gpd-tpl-measure-right" hidden></div>
+					</div>
+				</div>
+				<div class="wc-gpd-tpl-panels-grid">
 					<div class="wc-gpd-tpl-panel">
 						<h4><?php esc_html_e( 'Template fonts', 'wc-generic-product-designer' ); ?> <span class="wc-gpd-help-tip" title="<?php esc_attr_e( 'Choose which fonts appear in this template. Manage the site font list under Template Designer → Fonts.', 'wc-generic-product-designer' ); ?>">?</span></h4>
 						<div class="wc-gpd-tpl-font-picks" id="wc-gpd-template-font-picks">
 							<?php foreach ( $font_options as $font ) : ?>
-								<label class="wc-gpd-tpl-check" style="font-family:<?php echo esc_attr( $font['css'] ); ?>">
+								<label class="wc-gpd-tpl-check wc-gpd-tpl-font-pick-row" style="font-family:<?php echo esc_attr( $font['css'] ); ?>" title="<?php echo esc_attr( ! empty( $font['admin_label'] ) && $font['admin_label'] !== $font['label'] ? sprintf( __( 'Original: %s', 'wc-generic-product-designer' ), $font['admin_label'] ) : '' ); ?>">
 									<input type="checkbox" class="wc-gpd-template-font-pick" value="<?php echo esc_attr( $font['key'] ); ?>" <?php checked( empty( $settings['template_fonts'] ) || in_array( $font['key'], $settings['template_fonts'], true ) ); ?> />
 									<?php echo esc_html( $font['label'] ); ?>
+									<?php if ( ! empty( $font['admin_label'] ) && $font['admin_label'] !== $font['label'] ) : ?>
+										<span class="wc-gpd-font-admin-name">(<?php echo esc_html( $font['admin_label'] ); ?>)</span>
+									<?php endif; ?>
 								</label>
 							<?php endforeach; ?>
 						</div>
@@ -460,15 +475,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<p class="wc-gpd-tpl-hint" id="wc-gpd-shape-props-hint"><?php esc_html_e( 'Select a layer on the canvas to edit it.', 'wc-generic-product-designer' ); ?></p>
 						<button type="button" class="button button-link-delete" id="wc-gpd-template-delete-layer"><?php esc_html_e( 'Delete selected layer', 'wc-generic-product-designer' ); ?></button>
 					</div>
-				</aside>
-				<div class="wc-gpd-tpl-canvas-col" id="wc-gpd-tpl-canvas-col">
-					<div class="wc-gpd-tpl-canvas-frame" id="wc-gpd-tpl-canvas-frame">
-						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--top" id="wc-gpd-tpl-ruler-top" hidden></div>
-						<div class="wc-gpd-tpl-ruler wc-gpd-tpl-ruler--left" id="wc-gpd-tpl-ruler-left" hidden></div>
-						<canvas id="wc-gpd-template-canvas" width="<?php echo esc_attr( (string) $settings['width'] ); ?>" height="<?php echo esc_attr( (string) $settings['height'] ); ?>"></canvas>
-						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--bottom" id="wc-gpd-tpl-measure-bottom" hidden></div>
-						<div class="wc-gpd-tpl-measure wc-gpd-tpl-measure--right" id="wc-gpd-tpl-measure-right" hidden></div>
-					</div>
+				</div>
 				</div>
 			</div>
 		</div>

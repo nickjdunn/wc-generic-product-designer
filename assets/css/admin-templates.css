@@ -295,16 +295,37 @@
 	width: 120px;
 }
 
-/* Template canvas area — full width */
+/* Template canvas area — sidebar + main column with panels grid below canvas */
 .wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
-	grid-template-columns: 240px 1fr;
+	grid-template-columns: minmax( 200px, 260px ) minmax( 0, 1fr );
+	gap: 14px;
+	align-items: start;
 	min-height: 480px;
+}
+
+.wc-gpd-tpl-main {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	min-width: 0;
+}
+
+.wc-gpd-tpl-panels-grid {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 280px, 1fr ) );
+	gap: 10px;
+	align-items: start;
+}
+
+.wc-gpd-tpl-panels-grid .wc-gpd-tpl-panel {
+	height: 100%;
 }
 
 .wc-gpd-template-designer-panel .wc-gpd-tpl-canvas-col {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	width: 100%;
 }
 
 .wc-gpd-template-designer-panel #wc-gpd-template-canvas {
@@ -516,8 +537,81 @@
 	opacity: 0;
 }
 
+.wc-gpd-font-admin-name {
+	font-size: 11px;
+	color: #646970;
+	font-family: inherit;
+	margin-left: 4px;
+}
+
+.wc-gpd-fonts-layout {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+	margin-top: 16px;
+}
+
+.wc-gpd-fonts-installed {
+	grid-column: 1 / -1;
+}
+
+.wc-gpd-fonts-table .wc-gpd-font-preview {
+	font-size: 18px;
+	min-width: 160px;
+}
+
+.wc-gpd-fonts-table .wc-gpd-font-original {
+	color: #646970;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.wc-gpd-fonts-search-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.wc-gpd-google-font-results {
+	list-style: none;
+	margin: 12px 0 0;
+	padding: 0;
+	max-height: 420px;
+	overflow-y: auto;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+}
+
+.wc-gpd-google-font-result {
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	gap: 10px;
+	align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.wc-gpd-google-font-result:last-child {
+	border-bottom: none;
+}
+
+.wc-gpd-google-font-name {
+	font-size: 20px;
+}
+
+.wc-gpd-google-font-meta {
+	font-size: 11px;
+	color: #646970;
+	text-transform: capitalize;
+}
+
 @media ( max-width: 1100px ) {
 	.wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.wc-gpd-fonts-layout {
 		grid-template-columns: 1fr;
 	}
 }

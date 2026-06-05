@@ -103,6 +103,9 @@
 			option.value = font.family || font.css;
 			option.textContent = font.label || option.value;
 			option.style.fontFamily = font.css || font.family;
+			if ( font.admin_label && font.admin_label !== font.label ) {
+				option.title = font.admin_label;
+			}
 			fontSelect.appendChild( option );
 		} );
 	}
@@ -1298,6 +1301,31 @@
 		applyResponsiveScale();
 	}
 
+	function roundLineHeightInput() {
+		const lineHeight = document.getElementById( 'wc_gpd_tpl_line_height' );
+		if ( ! lineHeight || lineHeight.value === '' ) {
+			return;
+		}
+		const parsed = parseFloat( lineHeight.value );
+		if ( Number.isNaN( parsed ) ) {
+			lineHeight.value = '1.16';
+			return;
+		}
+		const clamped = Math.min( 3, Math.max( 0.5, parsed ) );
+		lineHeight.value = String( Math.round( clamped * 100 ) / 100 );
+	}
+
+	function sanitizeFormNumbersBeforeSave() {
+		roundLineHeightInput();
+		const strokeWidth = document.getElementById( 'wc_gpd_template_stroke_width' );
+		if ( strokeWidth && strokeWidth.value !== '' ) {
+			const parsed = parseFloat( strokeWidth.value );
+			if ( ! Number.isNaN( parsed ) ) {
+				strokeWidth.value = String( Math.round( parsed * 10 ) / 10 );
+			}
+		}
+	}
+
 	function applyResponsiveScale() {
 		const col = editorRoot ? editorRoot.querySelector( '.wc-gpd-tpl-canvas-col' ) : null;
 		if ( ! col ) {
@@ -1371,13 +1399,17 @@
 			} );
 		}
 		if ( lineHeight ) {
-			lineHeight.addEventListener( 'input', () => {
+			const applyLineHeight = () => {
+				roundLineHeightInput();
 				const obj = activeTextObject();
 				if ( obj ) {
 					obj.set( 'lineHeight', parseFloat( lineHeight.value ) || 1.16 );
 					applyAndRender( obj );
 				}
-			} );
+			};
+			lineHeight.addEventListener( 'input', applyLineHeight );
+			lineHeight.addEventListener( 'change', applyLineHeight );
+			lineHeight.addEventListener( 'blur', roundLineHeightInput );
 		}
 		if ( letterSpacing ) {
 			letterSpacing.addEventListener( 'input', () => {
@@ -1691,8 +1723,16 @@
 		editorRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
 	}
 
-	$( '#wc-gpd-template-form, #post' ).on( 'submit', saveJson );
-	$( document ).on( 'click', '#publish, #save-post', saveJson );
+	function handleFormSave( event ) {
+		sanitizeFormNumbersBeforeSave();
+		saveJson();
+	}
+
+	const templateForm = document.getElementById( 'wc-gpd-template-form' );
+	if ( templateForm ) {
+		templateForm.addEventListener( 'submit', handleFormSave );
+	}
+	$( '#post' ).on( 'submit', handleFormSave );
 	window.addEventListener( 'resize', applyResponsiveScale );
 
 	initFontSelect();
