@@ -263,9 +263,12 @@ class WC_GPD_Template_Json {
 		$object['wcGpdLockColor']     = ! empty( $object['wcGpdLockColor'] );
 		$object['wcGpdLockBold']      = ! empty( $object['wcGpdLockBold'] );
 		$object['wcGpdLockItalic']    = ! empty( $object['wcGpdLockItalic'] );
-		$object['wcGpdLockAlign']     = ! empty( $object['wcGpdLockAlign'] );
-		$object['wcGpdLockMove']      = ! empty( $object['wcGpdLockMove'] );
-		$object['wcGpdLockScale']     = ! empty( $object['wcGpdLockScale'] );
+		$object['wcGpdLockAlign']          = ! empty( $object['wcGpdLockAlign'] );
+		$object['wcGpdLockUnderline']      = ! empty( $object['wcGpdLockUnderline'] );
+		$object['wcGpdLockLineHeight']     = ! empty( $object['wcGpdLockLineHeight'] );
+		$object['wcGpdLockLetterSpacing']  = ! empty( $object['wcGpdLockLetterSpacing'] );
+		$object['wcGpdLockMove']           = ! empty( $object['wcGpdLockMove'] );
+		$object['wcGpdLockScale']          = ! empty( $object['wcGpdLockScale'] );
 
 		if ( 'placeholder' === $layer_type ) {
 			$key = ! empty( $object['wcGpdPlaceholderKey'] ) ? sanitize_key( (string) $object['wcGpdPlaceholderKey'] ) : sanitize_key( $uid );

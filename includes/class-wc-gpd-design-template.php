@@ -178,15 +178,21 @@ class WC_GPD_Design_Template {
 		update_post_meta( $template_id, self::META_CANVAS_WIDTH, $width );
 		update_post_meta( $template_id, self::META_CANVAS_HEIGHT, $height );
 
-		$max_views = isset( $_POST['wc_gpd_max_design_views'] ) ? absint( $_POST['wc_gpd_max_design_views'] ) : WC_GPD_Product_Meta::MIN_VIEWS;
-		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
-		update_post_meta( $template_id, self::META_MAX_DESIGN_VIEWS, $max_views );
-
 		$raw_json = isset( $_POST['wc_gpd_template_json'] ) ? wp_unslash( $_POST['wc_gpd_template_json'] ) : '';
 		$json     = WC_GPD_Template_Json::sanitize( is_string( $raw_json ) ? $raw_json : '' );
 		if ( false !== $json ) {
 			update_post_meta( $template_id, self::META_TEMPLATE_JSON, $json );
 		}
+
+		$max_views = WC_GPD_Product_Meta::MIN_VIEWS;
+		if ( false !== $json ) {
+			$parsed = json_decode( $json, true );
+			if ( is_array( $parsed ) && ! empty( $parsed['views'] ) && is_array( $parsed['views'] ) ) {
+				$max_views = count( $parsed['views'] );
+			}
+		}
+		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
+		update_post_meta( $template_id, self::META_MAX_DESIGN_VIEWS, $max_views );
 
 		$library_raw = isset( $_POST['wc_gpd_graphic_library'] ) ? wp_unslash( $_POST['wc_gpd_graphic_library'] ) : '';
 		$library     = self::sanitize_graphic_library( is_string( $library_raw ) ? $library_raw : '' );

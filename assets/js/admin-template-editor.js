@@ -8,8 +8,10 @@
 	const jsonInput = document.getElementById( 'wc_gpd_template_json' );
 	const widthInput = document.getElementById( 'wc_gpd_template_canvas_width' );
 	const heightInput = document.getElementById( 'wc_gpd_template_canvas_height' );
-	const maxViewsInput = document.getElementById( 'wc_gpd_template_max_views' );
+	const maxViewsHidden = document.getElementById( 'wc_gpd_max_design_views' );
 	const viewTabsEl = document.getElementById( 'wc-gpd-template-view-tabs' );
+	const editorConfig = window.wcGpdTemplateEditor || { maxViews: 6, fonts: [ 'Arial, Helvetica, sans-serif' ] };
+	const MAX_VIEWS = editorConfig.maxViews || 6;
 	const layersListEl = document.getElementById( 'wc-gpd-template-layers-list' );
 	const layersEmptyHint = document.getElementById( 'wc-gpd-layers-empty-hint' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
@@ -19,8 +21,9 @@
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
 	const shapePropsHint = document.getElementById( 'wc-gpd-shape-props-hint' );
 	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
-	const textPropsPanel = document.getElementById( 'wc-gpd-text-props' );
-	const placeholderPropsPanel = document.getElementById( 'wc-gpd-placeholder-props' );
+	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
+	const textEditorHint = document.getElementById( 'wc-gpd-text-editor-hint' );
+	const placeholderMeta = document.getElementById( 'wc-gpd-placeholder-meta' );
 	const graphicPropsPanel = document.getElementById( 'wc-gpd-graphic-props' );
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
@@ -37,8 +40,22 @@
 		'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
+		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'strokeDashArray',
 	];
+
+	const CUSTOMER_ALLOW_MAP = {
+		font: 'wcGpdLockFont',
+		size: 'wcGpdLockSize',
+		color: 'wcGpdLockColor',
+		bold: 'wcGpdLockBold',
+		italic: 'wcGpdLockItalic',
+		underline: 'wcGpdLockUnderline',
+		align: 'wcGpdLockAlign',
+		line_height: 'wcGpdLockLineHeight',
+		letter_spacing: 'wcGpdLockLetterSpacing',
+		move: 'wcGpdLockMove',
+	};
 
 	if ( ! canvasEl || typeof fabric === 'undefined' ) {
 		return;
@@ -55,8 +72,21 @@
 	let dims = readCanvasDimensions();
 	let width = dims.width;
 	let height = dims.height;
-	const maxViews = parseInt( maxViewsInput ? maxViewsInput.value : '1', 10 ) || 1;
 	let graphicLibraryIds = [];
+
+	function initFontSelect() {
+		const fontSelect = document.getElementById( 'wc_gpd_tpl_font_family' );
+		if ( ! fontSelect ) {
+			return;
+		}
+		fontSelect.innerHTML = '';
+		( editorConfig.fonts || [] ).forEach( ( font ) => {
+			const option = document.createElement( 'option' );
+			option.value = font;
+			option.textContent = font.split( ',' )[ 0 ].replace( /"/g, '' ).trim();
+			fontSelect.appendChild( option );
+		} );
+	}
 
 	function readDefault( id, fallback ) {
 		const el = document.getElementById( id );
@@ -106,9 +136,15 @@
 	}
 
 	function getMaxViews() {
-		const field = document.getElementById( 'wc_gpd_max_design_views' );
-		const value = field ? parseInt( field.value, 10 ) : maxViews;
-		return Math.min( 6, Math.max( 1, value || 1 ) );
+		return MAX_VIEWS;
+	}
+
+	function syncMaxViewsField() {
+		if ( ! maxViewsHidden ) {
+			return;
+		}
+		const count = documentData.views ? documentData.views.length : 1;
+		maxViewsHidden.value = String( Math.max( 1, count ) );
 	}
 
 	function getActiveView() {
@@ -247,11 +283,22 @@
 	}
 
 	function hideAllPropPanels() {
-		[ shapePropsFields, imagePropsPanel, textPropsPanel, placeholderPropsPanel, graphicPropsPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
+		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
 			if ( el ) {
 				el.hidden = true;
 			}
 		} );
+		if ( textEditorHint ) {
+			textEditorHint.hidden = false;
+		}
+	}
+
+	function activeTextObject() {
+		const active = canvas.getActiveObject();
+		if ( isTemplateText( active ) || isPlaceholder( active ) ) {
+			return active;
+		}
+		return null;
 	}
 
 	function updateSelectionPanels() {
@@ -275,13 +322,15 @@
 		if ( imageSelected && imagePropsPanel ) {
 			imagePropsPanel.hidden = false;
 		}
-		if ( textSelected && textPropsPanel ) {
-			textPropsPanel.hidden = false;
-			syncTextPropsPanel( active );
-		}
-		if ( placeholderSelected && placeholderPropsPanel ) {
-			placeholderPropsPanel.hidden = false;
-			syncPlaceholderPropsPanel( active );
+		if ( ( textSelected || placeholderSelected ) && textEditorPanel ) {
+			textEditorPanel.hidden = false;
+			if ( textEditorHint ) {
+				textEditorHint.hidden = true;
+			}
+			if ( placeholderMeta ) {
+				placeholderMeta.hidden = ! placeholderSelected;
+			}
+			syncTextEditorPanel( active, placeholderSelected );
 		}
 		if ( graphicSelected && graphicPropsPanel ) {
 			graphicPropsPanel.hidden = false;
@@ -314,17 +363,35 @@
 		renderLayersList();
 	}
 
-	function syncTextPropsPanel( obj ) {
-		const content = document.getElementById( 'wc_gpd_template_text_content' );
-		const font = document.getElementById( 'wc_gpd_template_font_family' );
-		const size = document.getElementById( 'wc_gpd_template_font_size' );
-		const color = document.getElementById( 'wc_gpd_template_text_color' );
-		const shrink = document.getElementById( 'wc_gpd_template_shrink_fit' );
+	function syncTextEditorPanel( obj, isPlaceholder ) {
+		const content = document.getElementById( 'wc_gpd_tpl_text_content' );
+		const font = document.getElementById( 'wc_gpd_tpl_font_family' );
+		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
+		const color = document.getElementById( 'wc_gpd_tpl_text_color' );
+		const shrink = document.getElementById( 'wc_gpd_tpl_shrink_fit' );
+		const lineHeight = document.getElementById( 'wc_gpd_tpl_line_height' );
+		const letterSpacing = document.getElementById( 'wc_gpd_tpl_letter_spacing' );
+		const boldBtn = document.getElementById( 'wc_gpd_tpl_bold' );
+		const italicBtn = document.getElementById( 'wc_gpd_tpl_italic' );
+		const underlineBtn = document.getElementById( 'wc_gpd_tpl_underline' );
+		const label = document.getElementById( 'wc_gpd_placeholder_label' );
+		const key = document.getElementById( 'wc_gpd_placeholder_key' );
+		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
+
+		if ( isPlaceholder && label ) {
+			label.value = obj.wcGpdPlaceholderLabel || '';
+		}
+		if ( isPlaceholder && key ) {
+			key.value = obj.wcGpdPlaceholderKey || '';
+		}
+		if ( isPlaceholder && boxW ) {
+			boxW.value = String( Math.round( obj.width || 240 ) );
+		}
 		if ( content ) {
 			content.value = obj.text || '';
 		}
 		if ( font ) {
-			font.value = obj.fontFamily || 'Arial';
+			font.value = obj.fontFamily || ( editorConfig.fonts ? editorConfig.fonts[ 0 ] : 'Arial' );
 		}
 		if ( size ) {
 			size.value = String( Math.round( obj.fontSize || 32 ) );
@@ -332,68 +399,44 @@
 		if ( color ) {
 			color.value = obj.fill || '#000000';
 		}
-		if ( shrink ) {
-			shrink.checked = !! obj.wcGpdShrinkToFit;
+		if ( lineHeight ) {
+			lineHeight.value = String( obj.lineHeight || 1.16 );
 		}
-		setLockCheckboxes( 'wc_gpd_lock_', obj );
-	}
-
-	function syncPlaceholderPropsPanel( obj ) {
-		const label = document.getElementById( 'wc_gpd_placeholder_label' );
-		const key = document.getElementById( 'wc_gpd_placeholder_key' );
-		const def = document.getElementById( 'wc_gpd_placeholder_default' );
-		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
-		const shrink = document.getElementById( 'wc_gpd_placeholder_shrink_fit' );
-		if ( label ) {
-			label.value = obj.wcGpdPlaceholderLabel || '';
-		}
-		if ( key ) {
-			key.value = obj.wcGpdPlaceholderKey || '';
-		}
-		if ( def ) {
-			def.value = obj.text || '';
-		}
-		if ( boxW ) {
-			boxW.value = String( Math.round( obj.width || 240 ) );
+		if ( letterSpacing ) {
+			letterSpacing.value = String( obj.charSpacing || 0 );
 		}
 		if ( shrink ) {
 			shrink.checked = !! obj.wcGpdShrinkToFit;
 		}
-		setLockCheckboxes( 'wc_gpd_ph_lock_', obj );
+		if ( boldBtn ) {
+			boldBtn.classList.toggle( 'is-active', obj.fontWeight === 'bold' );
+		}
+		if ( italicBtn ) {
+			italicBtn.classList.toggle( 'is-active', obj.fontStyle === 'italic' );
+		}
+		if ( underlineBtn ) {
+			underlineBtn.classList.toggle( 'is-active', !! obj.underline );
+		}
+		document.querySelectorAll( '.wc-gpd-tpl-align' ).forEach( ( btn ) => {
+			btn.classList.toggle( 'is-active', btn.dataset.align === ( obj.textAlign || 'left' ) );
+		} );
+		setAllowCheckboxes( obj );
 	}
 
-	function setLockCheckboxes( prefix, obj ) {
-		const map = {
-			font: 'wcGpdLockFont',
-			size: 'wcGpdLockSize',
-			color: 'wcGpdLockColor',
-			bold: 'wcGpdLockBold',
-			italic: 'wcGpdLockItalic',
-			align: 'wcGpdLockAlign',
-			move: 'wcGpdLockMove',
-		};
-		Object.keys( map ).forEach( ( key ) => {
-			const el = document.getElementById( prefix + key );
+	function setAllowCheckboxes( obj ) {
+		Object.keys( CUSTOMER_ALLOW_MAP ).forEach( ( key ) => {
+			const el = document.getElementById( 'wc_gpd_allow_' + key );
 			if ( el ) {
-				el.checked = !! obj[ map[ key ] ];
+				el.checked = ! obj[ CUSTOMER_ALLOW_MAP[ key ] ];
 			}
 		} );
 	}
 
-	function applyLockCheckboxes( prefix, obj ) {
-		const map = {
-			font: 'wcGpdLockFont',
-			size: 'wcGpdLockSize',
-			color: 'wcGpdLockColor',
-			bold: 'wcGpdLockBold',
-			italic: 'wcGpdLockItalic',
-			align: 'wcGpdLockAlign',
-			move: 'wcGpdLockMove',
-		};
-		Object.keys( map ).forEach( ( key ) => {
-			const el = document.getElementById( prefix + key );
+	function applyAllowCheckboxes( obj ) {
+		Object.keys( CUSTOMER_ALLOW_MAP ).forEach( ( key ) => {
+			const el = document.getElementById( 'wc_gpd_allow_' + key );
 			if ( el ) {
-				obj[ map[ key ] ] = el.checked;
+				obj[ CUSTOMER_ALLOW_MAP[ key ] ] = ! el.checked;
 			}
 		} );
 	}
@@ -643,6 +686,12 @@
 			wcGpdLockFont: true,
 			wcGpdLockSize: true,
 			wcGpdLockColor: true,
+			wcGpdLockBold: true,
+			wcGpdLockItalic: true,
+			wcGpdLockUnderline: true,
+			wcGpdLockAlign: true,
+			wcGpdLockLineHeight: true,
+			wcGpdLockLetterSpacing: true,
 			wcGpdLockMove: true,
 		} );
 		canvas.add( box );
@@ -809,6 +858,7 @@
 			template_image_id: 0, bounding_box_uid: '', objects: [],
 		} );
 		loadView( `view_${ index }` );
+		syncMaxViewsField();
 	}
 
 	function renameView() {
@@ -836,6 +886,7 @@
 
 	function saveJson() {
 		persistCanvasToActiveView();
+		syncMaxViewsField();
 		if ( jsonInput ) {
 			jsonInput.value = JSON.stringify( documentData );
 		}
@@ -856,7 +907,10 @@
 		if ( ! documentData.views || ! documentData.views.length ) {
 			ensureDocument();
 		}
-		documentData.views = documentData.views.slice( 0, getMaxViews() );
+		if ( documentData.views.length > MAX_VIEWS ) {
+			documentData.views = documentData.views.slice( 0, MAX_VIEWS );
+		}
+		syncMaxViewsField();
 		loadView( documentData.views[ 0 ].id );
 	}
 
@@ -869,10 +923,6 @@
 		}
 		if ( heightInput ) {
 			heightInput.value = String( height );
-		}
-		const label = document.getElementById( 'wc-gpd-canvas-size-label' );
-		if ( label ) {
-			label.textContent = `${ width } × ${ height } px`;
 		}
 	}
 
@@ -902,82 +952,92 @@
 		canvas.requestRenderAll();
 	}
 
-	function bindTextPropInputs() {
-		const content = document.getElementById( 'wc_gpd_template_text_content' );
-		const font = document.getElementById( 'wc_gpd_template_font_family' );
-		const size = document.getElementById( 'wc_gpd_template_font_size' );
-		const color = document.getElementById( 'wc_gpd_template_text_color' );
-		const shrink = document.getElementById( 'wc_gpd_template_shrink_fit' );
+	function bindTextEditor() {
+		const content = document.getElementById( 'wc_gpd_tpl_text_content' );
+		const font = document.getElementById( 'wc_gpd_tpl_font_family' );
+		const size = document.getElementById( 'wc_gpd_tpl_font_size' );
+		const color = document.getElementById( 'wc_gpd_tpl_text_color' );
+		const shrink = document.getElementById( 'wc_gpd_tpl_shrink_fit' );
+		const lineHeight = document.getElementById( 'wc_gpd_tpl_line_height' );
+		const letterSpacing = document.getElementById( 'wc_gpd_tpl_letter_spacing' );
+		const label = document.getElementById( 'wc_gpd_placeholder_label' );
+		const key = document.getElementById( 'wc_gpd_placeholder_key' );
+		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
 
-		function activeText() {
-			const obj = canvas.getActiveObject();
-			return isTemplateText( obj ) ? obj : null;
+		function applyAndRender( obj ) {
+			if ( ! obj ) {
+				return;
+			}
+			canvas.requestRenderAll();
+			renderLayersList();
 		}
 
 		if ( content ) {
 			content.addEventListener( 'input', () => {
-				const obj = activeText();
+				const obj = activeTextObject();
 				if ( obj ) {
 					obj.set( 'text', content.value );
-					canvas.requestRenderAll();
-					renderLayersList();
+					applyAndRender( obj );
 				}
 			} );
 		}
-		[ font, size, color, shrink ].forEach( ( el ) => {
-			if ( ! el ) {
-				return;
-			}
-			el.addEventListener( 'input', () => {
-				const obj = activeText();
-				if ( ! obj ) {
-					return;
-				}
-				if ( font && el === font ) {
+		if ( font ) {
+			font.addEventListener( 'change', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
 					obj.set( 'fontFamily', font.value );
+					applyAndRender( obj );
 				}
-				if ( size && el === size ) {
+			} );
+		}
+		if ( size ) {
+			size.addEventListener( 'input', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
 					obj.set( 'fontSize', parseInt( size.value, 10 ) || 32 );
+					applyAndRender( obj );
 				}
-				if ( color && el === color ) {
+			} );
+		}
+		if ( color ) {
+			color.addEventListener( 'input', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
 					obj.set( 'fill', color.value );
+					applyAndRender( obj );
 				}
-				if ( shrink && el === shrink ) {
+			} );
+		}
+		if ( lineHeight ) {
+			lineHeight.addEventListener( 'input', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
+					obj.set( 'lineHeight', parseFloat( lineHeight.value ) || 1.16 );
+					applyAndRender( obj );
+				}
+			} );
+		}
+		if ( letterSpacing ) {
+			letterSpacing.addEventListener( 'input', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
+					obj.set( 'charSpacing', parseInt( letterSpacing.value, 10 ) || 0 );
+					applyAndRender( obj );
+				}
+			} );
+		}
+		if ( shrink ) {
+			shrink.addEventListener( 'change', () => {
+				const obj = activeTextObject();
+				if ( obj ) {
 					obj.wcGpdShrinkToFit = shrink.checked;
 				}
-				canvas.requestRenderAll();
 			} );
-		} );
-
-		[ 'font', 'size', 'color', 'bold', 'italic', 'align', 'move' ].forEach( ( key ) => {
-			const el = document.getElementById( 'wc_gpd_lock_' + key );
-			if ( el ) {
-				el.addEventListener( 'change', () => {
-					const obj = activeText();
-					if ( obj ) {
-						applyLockCheckboxes( 'wc_gpd_lock_', obj );
-					}
-				} );
-			}
-		} );
-	}
-
-	function bindPlaceholderPropInputs() {
-		const label = document.getElementById( 'wc_gpd_placeholder_label' );
-		const key = document.getElementById( 'wc_gpd_placeholder_key' );
-		const def = document.getElementById( 'wc_gpd_placeholder_default' );
-		const boxW = document.getElementById( 'wc_gpd_placeholder_width' );
-		const shrink = document.getElementById( 'wc_gpd_placeholder_shrink_fit' );
-
-		function activePh() {
-			const obj = canvas.getActiveObject();
-			return isPlaceholder( obj ) ? obj : null;
 		}
-
 		if ( label ) {
 			label.addEventListener( 'input', () => {
-				const obj = activePh();
-				if ( obj ) {
+				const obj = activeTextObject();
+				if ( obj && isPlaceholder( obj ) ) {
 					obj.wcGpdPlaceholderLabel = label.value;
 					renderLayersList();
 				}
@@ -985,45 +1045,73 @@
 		}
 		if ( key ) {
 			key.addEventListener( 'input', () => {
-				const obj = activePh();
-				if ( obj ) {
+				const obj = activeTextObject();
+				if ( obj && isPlaceholder( obj ) ) {
 					obj.wcGpdPlaceholderKey = key.value.replace( /\s+/g, '_' ).toLowerCase();
-				}
-			} );
-		}
-		if ( def ) {
-			def.addEventListener( 'input', () => {
-				const obj = activePh();
-				if ( obj ) {
-					obj.set( 'text', def.value );
-					canvas.requestRenderAll();
 				}
 			} );
 		}
 		if ( boxW ) {
 			boxW.addEventListener( 'input', () => {
-				const obj = activePh();
-				if ( obj ) {
+				const obj = activeTextObject();
+				if ( obj && isPlaceholder( obj ) ) {
 					obj.set( 'width', parseInt( boxW.value, 10 ) || 240 );
-					canvas.requestRenderAll();
+					applyAndRender( obj );
 				}
 			} );
 		}
-		if ( shrink ) {
-			shrink.addEventListener( 'change', () => {
-				const obj = activePh();
-				if ( obj ) {
-					obj.wcGpdShrinkToFit = shrink.checked;
+
+		document.getElementById( 'wc_gpd_tpl_bold' )?.addEventListener( 'click', () => {
+			const obj = activeTextObject();
+			if ( ! obj ) {
+				return;
+			}
+			const on = obj.fontWeight !== 'bold';
+			obj.set( 'fontWeight', on ? 'bold' : 'normal' );
+			document.getElementById( 'wc_gpd_tpl_bold' )?.classList.toggle( 'is-active', on );
+			applyAndRender( obj );
+		} );
+		document.getElementById( 'wc_gpd_tpl_italic' )?.addEventListener( 'click', () => {
+			const obj = activeTextObject();
+			if ( ! obj ) {
+				return;
+			}
+			const on = obj.fontStyle !== 'italic';
+			obj.set( 'fontStyle', on ? 'italic' : 'normal' );
+			document.getElementById( 'wc_gpd_tpl_italic' )?.classList.toggle( 'is-active', on );
+			applyAndRender( obj );
+		} );
+		document.getElementById( 'wc_gpd_tpl_underline' )?.addEventListener( 'click', () => {
+			const obj = activeTextObject();
+			if ( ! obj ) {
+				return;
+			}
+			const on = ! obj.underline;
+			obj.set( 'underline', on );
+			document.getElementById( 'wc_gpd_tpl_underline' )?.classList.toggle( 'is-active', on );
+			applyAndRender( obj );
+		} );
+		document.querySelectorAll( '.wc-gpd-tpl-align' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				const obj = activeTextObject();
+				if ( ! obj ) {
+					return;
 				}
+				obj.set( 'textAlign', btn.dataset.align );
+				document.querySelectorAll( '.wc-gpd-tpl-align' ).forEach( ( b ) => {
+					b.classList.toggle( 'is-active', b === btn );
+				} );
+				applyAndRender( obj );
 			} );
-		}
-		[ 'font', 'size', 'color', 'bold', 'italic', 'align', 'move' ].forEach( ( k ) => {
-			const el = document.getElementById( 'wc_gpd_ph_lock_' + k );
+		} );
+
+		Object.keys( CUSTOMER_ALLOW_MAP ).forEach( ( key ) => {
+			const el = document.getElementById( 'wc_gpd_allow_' + key );
 			if ( el ) {
 				el.addEventListener( 'change', () => {
-					const obj = activePh();
+					const obj = activeTextObject();
 					if ( obj ) {
-						applyLockCheckboxes( 'wc_gpd_ph_lock_', obj );
+						applyAllowCheckboxes( obj );
 					}
 				} );
 			}
@@ -1202,13 +1290,6 @@
 	$( '#wc-gpd-template-rename-view' ).on( 'click', renameView );
 	$( '#wc_gpd_canvas_width, #wc_gpd_canvas_height' ).on( 'change input', resizeCanvasDimensions );
 
-	$( '#wc_gpd_max_design_views' ).on( 'change', () => {
-		while ( documentData.views.length > getMaxViews() ) {
-			documentData.views.pop();
-		}
-		renderTabs();
-	} );
-
 	if ( popoutBtn && editorRoot && window.WcGpdPopout ) {
 		popoutBtn.addEventListener( 'click', () => window.WcGpdPopout.toggle( editorRoot, applyResponsiveScale ) );
 		editorRoot.addEventListener( 'wc-gpd-popout-closed', applyResponsiveScale );
@@ -1218,8 +1299,8 @@
 	$( document ).on( 'click', '#publish, #save-post', saveJson );
 	window.addEventListener( 'resize', applyResponsiveScale );
 
-	bindTextPropInputs();
-	bindPlaceholderPropInputs();
+	initFontSelect();
+	bindTextEditor();
 	bindGraphicPropInputs();
 	loadGraphicLibrary();
 	loadJson();
