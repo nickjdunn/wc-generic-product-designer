@@ -95,6 +95,10 @@ class WC_GPD_Admin_Fonts implements WC_GPD_Module {
 					'customerLabel'     => __( 'Customer sees', 'wc-generic-product-designer' ),
 					'originalLabel'     => __( 'Original', 'wc-generic-product-designer' ),
 					'remove'            => __( 'Remove', 'wc-generic-product-designer' ),
+					'loadMore'          => __( 'Load more', 'wc-generic-product-designer' ),
+					'allCategories'     => __( 'All categories', 'wc-generic-product-designer' ),
+					'showing'           => __( 'Showing %1$s–%2$s of %3$s', 'wc-generic-product-designer' ),
+					'perPage'           => __( 'Per page', 'wc-generic-product-designer' ),
 				),
 			)
 		);
@@ -112,12 +116,21 @@ class WC_GPD_Admin_Fonts implements WC_GPD_Module {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'wc-generic-product-designer' ) ), 403 );
 		}
 
-		$query = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
-		$limit = isset( $_GET['limit'] ) ? absint( $_GET['limit'] ) : 40;
-		$limit = min( 80, max( 5, $limit ) );
+		$query    = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$limit    = isset( $_GET['limit'] ) ? absint( $_GET['limit'] ) : 50;
+		$offset   = isset( $_GET['offset'] ) ? absint( $_GET['offset'] ) : 0;
+		$category = isset( $_GET['category'] ) ? sanitize_text_field( wp_unslash( $_GET['category'] ) ) : '';
 
-		$results = WC_GPD_Font_Registry::search_google_fonts( $query, $limit );
-		wp_send_json_success( array( 'fonts' => $results ) );
+		$results = WC_GPD_Font_Registry::search_google_fonts( $query, $limit, $offset, $category );
+		wp_send_json_success(
+			array(
+				'fonts'      => $results['fonts'],
+				'total'      => $results['total'],
+				'offset'     => $offset,
+				'limit'      => $limit,
+				'categories' => WC_GPD_Font_Registry::get_google_categories(),
+			)
+		);
 	}
 
 	/**
@@ -225,11 +238,35 @@ class WC_GPD_Admin_Fonts implements WC_GPD_Module {
 
 					<div class="wc-gpd-settings-card wc-gpd-fonts-browser">
 						<h4><?php esc_html_e( 'Browse Google Fonts', 'wc-generic-product-designer' ); ?></h4>
-						<p class="wc-gpd-fonts-search-row">
-							<input type="search" id="wc-gpd-google-font-search" class="regular-text" placeholder="<?php esc_attr_e( 'Search Google Fonts…', 'wc-generic-product-designer' ); ?>" />
-							<button type="button" class="button" id="wc-gpd-google-font-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
-						</p>
+						<div class="wc-gpd-fonts-browse-toolbar">
+							<p class="wc-gpd-fonts-search-row">
+								<input type="search" id="wc-gpd-google-font-search" class="regular-text" placeholder="<?php esc_attr_e( 'Search Google Fonts…', 'wc-generic-product-designer' ); ?>" />
+								<button type="button" class="button" id="wc-gpd-google-font-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
+							</p>
+							<p class="wc-gpd-fonts-filter-row">
+								<label>
+									<?php esc_html_e( 'Category', 'wc-generic-product-designer' ); ?>
+									<select id="wc-gpd-google-font-category">
+										<option value=""><?php esc_html_e( 'All categories', 'wc-generic-product-designer' ); ?></option>
+									</select>
+								</label>
+								<label>
+									<?php esc_html_e( 'Per page', 'wc-generic-product-designer' ); ?>
+									<select id="wc-gpd-google-font-limit">
+										<option value="50">50</option>
+										<option value="100">100</option>
+										<option value="250">250</option>
+										<option value="500">500</option>
+										<option value="1000">1000</option>
+									</select>
+								</label>
+							</p>
+						</div>
+						<p class="wc-gpd-fonts-browse-status description" id="wc-gpd-google-font-status" hidden></p>
 						<ul id="wc-gpd-google-font-results" class="wc-gpd-google-font-results"></ul>
+						<p class="wc-gpd-fonts-load-more-row" id="wc-gpd-google-font-load-more-wrap" hidden>
+							<button type="button" class="button" id="wc-gpd-google-font-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
+						</p>
 					</div>
 
 					<div class="wc-gpd-settings-card wc-gpd-fonts-custom">

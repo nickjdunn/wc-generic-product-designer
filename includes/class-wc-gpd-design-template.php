@@ -216,16 +216,8 @@ class WC_GPD_Design_Template {
 		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
 		update_post_meta( $template_id, self::META_MAX_DESIGN_VIEWS, $max_views );
 
-		$libraries_raw = isset( $_POST['wc_gpd_graphic_libraries'] ) ? wp_unslash( $_POST['wc_gpd_graphic_libraries'] ) : '';
-		$libraries     = self::sanitize_graphic_libraries( is_string( $libraries_raw ) ? $libraries_raw : '' );
-		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, wp_json_encode( $libraries ) );
-		$flat_ids = array();
-		foreach ( $libraries as $library ) {
-			if ( ! empty( $library['ids'] ) && is_array( $library['ids'] ) ) {
-				$flat_ids = array_merge( $flat_ids, $library['ids'] );
-			}
-		}
-		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( array_values( array_unique( $flat_ids ) ) ) );
+		$flat_ids = WC_GPD_Graphic_Libraries::all_attachment_ids();
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( $flat_ids ) );
 
 		$fonts_raw = isset( $_POST['wc_gpd_template_fonts'] ) ? wp_unslash( $_POST['wc_gpd_template_fonts'] ) : '';
 		$fonts     = self::sanitize_template_fonts( is_string( $fonts_raw ) ? $fonts_raw : '' );
@@ -278,31 +270,8 @@ class WC_GPD_Design_Template {
 	 * @return array<int,array{id:string,name:string,ids:int[]}>
 	 */
 	public static function get_graphic_libraries( $template_id ) {
-		$template_id = absint( $template_id );
-		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, true );
-		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
-			$decoded = json_decode( $raw, true );
-			if ( is_array( $decoded ) && ! empty( $decoded ) ) {
-				return self::normalize_libraries_array( $decoded );
-			}
-		}
-		$legacy = self::get_graphic_library( $template_id );
-		if ( empty( $legacy ) ) {
-			return array(
-				array(
-					'id'   => 'default',
-					'name' => __( 'Default graphics', 'wc-generic-product-designer' ),
-					'ids'  => array(),
-				),
-			);
-		}
-		return array(
-			array(
-				'id'   => 'default',
-				'name' => __( 'Default graphics', 'wc-generic-product-designer' ),
-				'ids'  => array_column( $legacy, 'id' ),
-			),
-		);
+		unset( $template_id );
+		return WC_GPD_Graphic_Libraries::get_all();
 	}
 
 	/**
@@ -365,6 +334,11 @@ class WC_GPD_Design_Template {
 	 * @return array<int,array{id:int,url:string,title:string}>
 	 */
 	public static function get_graphic_library( $template_id ) {
+		$site = WC_GPD_Graphic_Libraries::flat_for_frontend();
+		if ( ! empty( $site ) ) {
+			return $site;
+		}
+
 		$template_id = absint( $template_id );
 		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, true );
 		$ids         = array();

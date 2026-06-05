@@ -401,29 +401,53 @@ class WC_GPD_Font_Registry {
 	}
 
 	/**
-	 * @param string $query Search string.
-	 * @param int    $limit Max results.
-	 * @return array<int,array{family:string,category:string}>
+	 * @return string[]
 	 */
-	public static function search_google_fonts( $query = '', $limit = 40 ) {
-		$list  = self::fetch_google_metadata();
-		$query = strtolower( trim( (string) $query ) );
-		$hits  = array();
+	public static function get_google_categories() {
+		$list = self::fetch_google_metadata();
+		$cats = array();
+		foreach ( $list as $row ) {
+			if ( ! empty( $row['category'] ) ) {
+				$cats[ $row['category'] ] = true;
+			}
+		}
+		$keys = array_keys( $cats );
+		sort( $keys );
+		return $keys;
+	}
+
+	/**
+	 * @param string $query    Search string.
+	 * @param int    $limit    Max results.
+	 * @param int    $offset   Result offset.
+	 * @param string $category Category filter.
+	 * @return array{fonts:array,total:int}
+	 */
+	public static function search_google_fonts( $query = '', $limit = 40, $offset = 0, $category = '' ) {
+		$list     = self::fetch_google_metadata();
+		$query    = strtolower( trim( (string) $query ) );
+		$category = sanitize_text_field( (string) $category );
+		$limit    = min( 1000, max( 5, absint( $limit ) ) );
+		$offset   = max( 0, absint( $offset ) );
+		$matched  = array();
 
 		foreach ( $list as $row ) {
+			if ( $category && ( empty( $row['category'] ) || $category !== $row['category'] ) ) {
+				continue;
+			}
 			if ( $query && false === strpos( strtolower( $row['family'] ), $query ) ) {
 				continue;
 			}
-			$hits[] = array(
+			$matched[] = array(
 				'family'   => $row['family'],
 				'category' => $row['category'],
 			);
-			if ( count( $hits ) >= $limit ) {
-				break;
-			}
 		}
 
-		return $hits;
+		return array(
+			'fonts' => array_slice( $matched, $offset, $limit ),
+			'total' => count( $matched ),
+		);
 	}
 
 	/**

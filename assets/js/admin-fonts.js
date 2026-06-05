@@ -10,8 +10,23 @@
 	const resultsEl = document.getElementById( 'wc-gpd-google-font-results' );
 	const searchInput = document.getElementById( 'wc-gpd-google-font-search' );
 	const defaultSelect = document.getElementById( 'wc-gpd-default-font-select' );
+	const categorySelect = document.getElementById( 'wc-gpd-google-font-category' );
+	const limitSelect = document.getElementById( 'wc-gpd-google-font-limit' );
+	const statusEl = document.getElementById( 'wc-gpd-google-font-status' );
+	const loadMoreWrap = document.getElementById( 'wc-gpd-google-font-load-more-wrap' );
+	const loadMoreBtn = document.getElementById( 'wc-gpd-google-font-load-more' );
 
 	let state = { enabled: [], google_fonts: [], custom: [], display_labels: {}, catalog: {} };
+	let browseState = {
+		query: '',
+		category: '',
+		limit: 50,
+		offset: 0,
+		total: 0,
+		fonts: [],
+		categories: [],
+		loading: false,
+	};
 
 	function loadState() {
 		if ( ! stateInput || ! stateInput.value ) {
@@ -210,17 +225,95 @@
 		persistState();
 	}
 
-	function searchGoogleFonts( query ) {
-		if ( ! resultsEl ) {
+	function readBrowseParams() {
+		return {
+			query: searchInput ? searchInput.value : '',
+			category: categorySelect ? categorySelect.value : '',
+			limit: limitSelect ? parseInt( limitSelect.value, 10 ) || 50 : 50,
+		};
+	}
+
+	function updateBrowseStatus() {
+		if ( ! statusEl ) {
 			return;
 		}
-		resultsEl.innerHTML = '<li class="wc-gpd-fonts-loading">' + ( config.i18n?.searching || 'Searching…' ) + '</li>';
+		const count = browseState.fonts.length;
+		if ( ! count && ! browseState.loading ) {
+			statusEl.hidden = true;
+			return;
+		}
+		const start = count ? 1 : 0;
+		const end = browseState.fonts.length;
+		const total = browseState.total || count;
+		const template = config.i18n?.showing || 'Showing %1$s–%2$s of %3$s';
+		statusEl.textContent = template
+			.replace( '%1$s', String( start ) )
+			.replace( '%2$s', String( end ) )
+			.replace( '%3$s', String( total ) );
+		statusEl.hidden = false;
+	}
+
+	function updateLoadMoreButton() {
+		if ( ! loadMoreWrap ) {
+			return;
+		}
+		const hasMore = browseState.fonts.length < browseState.total;
+		loadMoreWrap.hidden = ! hasMore || browseState.loading;
+	}
+
+	function populateCategories( categories ) {
+		if ( ! categorySelect || ! categories || ! categories.length ) {
+			return;
+		}
+		const current = categorySelect.value;
+		const existing = new Set();
+		Array.from( categorySelect.options ).forEach( ( opt ) => {
+			if ( opt.value ) {
+				existing.add( opt.value );
+			}
+		} );
+		categories.forEach( ( cat ) => {
+			if ( ! cat || existing.has( cat ) ) {
+				return;
+			}
+			const option = document.createElement( 'option' );
+			option.value = cat;
+			option.textContent = cat.replace( /-/g, ' ' );
+			categorySelect.appendChild( option );
+			existing.add( cat );
+		} );
+		if ( current ) {
+			categorySelect.value = current;
+		}
+	}
+
+	function fetchGoogleFonts( append ) {
+		if ( ! resultsEl || browseState.loading ) {
+			return;
+		}
+		const params = readBrowseParams();
+		if ( ! append ) {
+			browseState.offset = 0;
+			browseState.fonts = [];
+			browseState.query = params.query;
+			browseState.category = params.category;
+			browseState.limit = params.limit;
+			resultsEl.innerHTML = '<li class="wc-gpd-fonts-loading">' + ( config.i18n?.searching || 'Searching…' ) + '</li>';
+		} else {
+			browseState.offset = browseState.fonts.length;
+		}
+		browseState.loading = true;
+		updateLoadMoreButton();
 
 		const url = new URL( config.ajaxUrl || '/wp-admin/admin-ajax.php', window.location.origin );
 		url.searchParams.set( 'action', 'wc_gpd_search_google_fonts' );
 		url.searchParams.set( 'nonce', config.nonce || '' );
-		url.searchParams.set( 'q', query || '' );
-		url.searchParams.set( 'limit', '50' );
+		url.searchParams.set( 'q', params.query || '' );
+		url.searchParams.set( 'limit', String( params.limit ) );
+		url.searchParams.set( 'offset', String( browseState.offset ) );
+		if ( params.category ) {
+			url.searchParams.set( 'category', params.category );
+		}
 
 		fetch( url.toString(), { credentials: 'same-origin' } )
 			.then( ( response ) => {
@@ -237,10 +330,29 @@
 				if ( ! payload || ! payload.success || ! payload.data || ! payload.data.fonts ) {
 					throw new Error( 'No results' );
 				}
-				renderResults( payload.data.fonts );
+				browseState.total = payload.data.total || payload.data.fonts.length;
+				if ( payload.data.categories ) {
+					browseState.categories = payload.data.categories;
+					populateCategories( payload.data.categories );
+				}
+				if ( append ) {
+					browseState.fonts = browseState.fonts.concat( payload.data.fonts );
+				} else {
+					browseState.fonts = payload.data.fonts;
+				}
+				renderResults( browseState.fonts );
 			} )
 			.catch( () => {
-				resultsEl.innerHTML = '<li class="wc-gpd-fonts-error">' + ( config.i18n?.noResults || 'Could not load fonts.' ) + '</li>';
+				if ( ! append ) {
+					resultsEl.innerHTML = '<li class="wc-gpd-fonts-error">' + ( config.i18n?.noResults || 'Could not load fonts.' ) + '</li>';
+					browseState.fonts = [];
+					browseState.total = 0;
+				}
+			} )
+			.finally( () => {
+				browseState.loading = false;
+				updateBrowseStatus();
+				updateLoadMoreButton();
 			} );
 	}
 
@@ -251,6 +363,8 @@
 		resultsEl.innerHTML = '';
 		if ( ! fonts.length ) {
 			resultsEl.innerHTML = '<li>' + ( config.i18n?.noResults || 'No fonts found.' ) + '</li>';
+			updateBrowseStatus();
+			updateLoadMoreButton();
 			return;
 		}
 		fonts.forEach( ( font ) => {
@@ -260,29 +374,44 @@
 			const installed = state.enabled.includes( key );
 			li.innerHTML = ''
 				+ '<span class="wc-gpd-google-font-name" style="font-family:\'' + font.family + '\', sans-serif">' + font.family + '</span>'
-				+ '<span class="wc-gpd-google-font-meta">' + ( font.category || '' ) + '</span>'
+				+ '<span class="wc-gpd-google-font-meta">' + ( font.category || '' ).replace( /-/g, ' ' ) + '</span>'
 				+ '<button type="button" class="button button-small" ' + ( installed ? 'disabled' : '' ) + '>'
 				+ ( installed ? ( config.i18n?.added || 'Added' ) : ( config.i18n?.addFont || 'Add' ) )
 				+ '</button>';
 			if ( ! installed ) {
 				li.querySelector( 'button' ).addEventListener( 'click', () => {
 					addGoogleFont( font.family );
-					renderResults( fonts );
+					li.querySelector( 'button' ).disabled = true;
+					li.querySelector( 'button' ).textContent = config.i18n?.added || 'Added';
 				} );
 			}
 			resultsEl.appendChild( li );
 		} );
+		updateBrowseStatus();
+		updateLoadMoreButton();
 	}
 
 	document.getElementById( 'wc-gpd-google-font-search-btn' )?.addEventListener( 'click', () => {
-		searchGoogleFonts( searchInput ? searchInput.value : '' );
+		fetchGoogleFonts( false );
 	} );
 
 	searchInput?.addEventListener( 'keydown', ( event ) => {
 		if ( 'Enter' === event.key ) {
 			event.preventDefault();
-			searchGoogleFonts( searchInput.value );
+			fetchGoogleFonts( false );
 		}
+	} );
+
+	categorySelect?.addEventListener( 'change', () => {
+		fetchGoogleFonts( false );
+	} );
+
+	limitSelect?.addEventListener( 'change', () => {
+		fetchGoogleFonts( false );
+	} );
+
+	loadMoreBtn?.addEventListener( 'click', () => {
+		fetchGoogleFonts( true );
 	} );
 
 	document.getElementById( 'wc-gpd-add-custom-font' )?.addEventListener( 'click', () => {
@@ -311,5 +440,5 @@
 	loadState();
 	rebuildCatalog();
 	renderInstalled();
-	searchGoogleFonts( '' );
+	fetchGoogleFonts( false );
 }( jQuery ) );

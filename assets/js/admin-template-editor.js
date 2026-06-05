@@ -33,10 +33,8 @@
 	const imageBinEl = document.getElementById( 'wc-gpd-template-image-bin' );
 	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
-	const graphicLibrariesInput = document.getElementById( 'wc_gpd_graphic_libraries' );
 	const templateFontsInput = document.getElementById( 'wc_gpd_template_fonts' );
-	const graphicLibrariesListEl = document.getElementById( 'wc-gpd-graphic-libraries-list' );
-	const selectionDimsPanel = document.getElementById( 'wc-gpd-selection-dims-panel' );
+	const accordionEl = document.getElementById( 'wc-gpd-tpl-accordion' );
 	const shrinkFitRow = document.getElementById( 'wc-gpd-shrink-fit-row' );
 	const showRulerToggle = document.getElementById( 'wc_gpd_tpl_show_ruler' );
 	const showMeasurementsToggle = document.getElementById( 'wc_gpd_tpl_show_measurements' );
@@ -308,7 +306,7 @@
 	}
 
 	function hideAllPropPanels() {
-		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel, selectionDimsPanel ].forEach( ( el ) => {
+		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicPropsPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
 			if ( el ) {
 				el.hidden = true;
 			}
@@ -316,6 +314,75 @@
 		if ( textEditorHint ) {
 			textEditorHint.hidden = false;
 		}
+	}
+
+	function openAccordionSection( sectionName, exclusive ) {
+		if ( ! accordionEl || ! sectionName ) {
+			return;
+		}
+		const onlyOne = exclusive !== false;
+		accordionEl.querySelectorAll( '.wc-gpd-accordion-section' ).forEach( ( section ) => {
+			const isTarget = section.dataset.section === sectionName;
+			const toggle = section.querySelector( '.wc-gpd-accordion-toggle' );
+			const body = section.querySelector( '.wc-gpd-accordion-body' );
+			if ( onlyOne && ! isTarget ) {
+				section.classList.remove( 'is-open' );
+				if ( toggle ) {
+					toggle.setAttribute( 'aria-expanded', 'false' );
+				}
+				if ( body ) {
+					body.hidden = true;
+				}
+			}
+			if ( isTarget ) {
+				section.classList.add( 'is-open' );
+				if ( toggle ) {
+					toggle.setAttribute( 'aria-expanded', 'true' );
+				}
+				if ( body ) {
+					body.hidden = false;
+				}
+			}
+		} );
+	}
+
+	function openAccordionForSelection( active ) {
+		if ( ! active ) {
+			return;
+		}
+		if ( isTemplateText( active ) || isPlaceholder( active ) ) {
+			openAccordionSection( 'text' );
+		} else if ( isMockupImage( active ) || isGraphicImage( active ) || isGraphicSlot( active ) ) {
+			openAccordionSection( 'images' );
+		} else if ( isShape( active ) ) {
+			openAccordionSection( 'outlines' );
+		} else {
+			openAccordionSection( 'size' );
+		}
+	}
+
+	function initAccordion() {
+		if ( ! accordionEl ) {
+			return;
+		}
+		accordionEl.querySelectorAll( '.wc-gpd-accordion-toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const section = toggle.closest( '.wc-gpd-accordion-section' );
+				if ( ! section ) {
+					return;
+				}
+				const body = section.querySelector( '.wc-gpd-accordion-body' );
+				if ( section.classList.contains( 'is-open' ) ) {
+					section.classList.remove( 'is-open' );
+					toggle.setAttribute( 'aria-expanded', 'false' );
+					if ( body ) {
+						body.hidden = true;
+					}
+				} else {
+					openAccordionSection( section.dataset.section || '' );
+				}
+			} );
+		} );
 	}
 
 	function objectDimensions( obj ) {
@@ -332,10 +399,9 @@
 	}
 
 	function syncSelectionDimsPanel( obj ) {
-		if ( ! selectionDimsPanel || ! obj ) {
+		if ( ! obj ) {
 			return;
 		}
-		selectionDimsPanel.hidden = false;
 		const dims = objectDimensions( obj );
 		const wEl = document.getElementById( 'wc_gpd_sel_width' );
 		const hEl = document.getElementById( 'wc_gpd_sel_height' );
@@ -464,6 +530,7 @@
 		}
 		if ( active ) {
 			syncSelectionDimsPanel( active );
+			openAccordionForSelection( active );
 		}
 
 		renderLayersList();
@@ -826,6 +893,7 @@
 		canvas.setActiveObject( rect );
 		sortLayers();
 		canvas.requestRenderAll();
+		updateSelectionPanels();
 	}
 
 	function addCircle() {
@@ -839,6 +907,7 @@
 		canvas.setActiveObject( circle );
 		sortLayers();
 		canvas.requestRenderAll();
+		updateSelectionPanels();
 	}
 
 	function addTemplateText() {
@@ -973,27 +1042,8 @@
 	}
 
 	function loadGraphicLibraries() {
-		if ( ! graphicLibrariesInput || ! graphicLibrariesInput.value ) {
-			graphicLibraries = [];
-			renderGraphicLibrariesPanel();
-			return;
-		}
-		try {
-			graphicLibraries = JSON.parse( graphicLibrariesInput.value ) || [];
-		} catch ( e ) {
-			graphicLibraries = [];
-		}
-		if ( ! Array.isArray( graphicLibraries ) ) {
-			graphicLibraries = [];
-		}
-		renderGraphicLibrariesPanel();
-	}
-
-	function saveGraphicLibraries() {
-		if ( graphicLibrariesInput ) {
-			graphicLibrariesInput.value = JSON.stringify( graphicLibraries );
-		}
-		renderGraphicLibrariesPanel();
+		const site = editorConfig.siteLibraries;
+		graphicLibraries = Array.isArray( site ) ? site : [];
 	}
 
 	function saveTemplateFonts() {
@@ -1007,98 +1057,6 @@
 			}
 		} );
 		templateFontsInput.value = JSON.stringify( keys );
-	}
-
-	function renderGraphicLibrariesPanel() {
-		if ( ! graphicLibrariesListEl ) {
-			return;
-		}
-		graphicLibrariesListEl.innerHTML = '';
-		graphicLibraries.forEach( ( lib, index ) => {
-			const row = document.createElement( 'div' );
-			row.className = 'wc-gpd-graphic-library-row';
-			const nameInput = document.createElement( 'input' );
-			nameInput.type = 'text';
-			nameInput.className = 'wc-gpd-library-name';
-			nameInput.value = lib.name || '';
-			nameInput.placeholder = 'Library name';
-			nameInput.addEventListener( 'input', () => {
-				lib.name = nameInput.value;
-				saveGraphicLibraries();
-			} );
-			const manageBtn = document.createElement( 'button' );
-			manageBtn.type = 'button';
-			manageBtn.className = 'button button-small';
-			manageBtn.textContent = 'Images';
-			manageBtn.addEventListener( 'click', () => manageLibraryImages( lib ) );
-			const removeBtn = document.createElement( 'button' );
-			removeBtn.type = 'button';
-			removeBtn.className = 'button button-link-delete';
-			removeBtn.textContent = 'Remove';
-			removeBtn.addEventListener( 'click', () => {
-				graphicLibraries.splice( index, 1 );
-				saveGraphicLibraries();
-			} );
-			const preview = document.createElement( 'ul' );
-			preview.className = 'wc-gpd-graphic-library-preview';
-			( lib.ids || [] ).forEach( ( id ) => {
-				if ( ! window.wp || ! wp.media ) {
-					return;
-				}
-				wp.media.attachment( id ).fetch().then( () => {
-					const att = wp.media.attachment( id );
-					const url = att.get( 'url' );
-					if ( ! url ) {
-						return;
-					}
-					const li = document.createElement( 'li' );
-					const img = document.createElement( 'img' );
-					img.src = url;
-					img.alt = att.get( 'title' ) || '';
-					li.appendChild( img );
-					preview.appendChild( li );
-				} );
-			} );
-			row.appendChild( nameInput );
-			row.appendChild( manageBtn );
-			row.appendChild( removeBtn );
-			row.appendChild( preview );
-			graphicLibrariesListEl.appendChild( row );
-		} );
-	}
-
-	function manageLibraryImages( lib ) {
-		if ( ! window.wp || ! wp.media ) {
-			return;
-		}
-		const frame = wp.media( {
-			title: 'Graphic library images',
-			button: { text: 'Use selected' },
-			multiple: true,
-			library: { type: [ 'image' ] },
-		} );
-		frame.on( 'open', () => {
-			const selection = frame.state().get( 'selection' );
-			( lib.ids || [] ).forEach( ( id ) => {
-				const attachment = wp.media.attachment( id );
-				attachment.fetch();
-				selection.add( attachment );
-			} );
-		} );
-		frame.on( 'select', () => {
-			lib.ids = frame.state().get( 'selection' ).map( ( att ) => att.id );
-			saveGraphicLibraries();
-		} );
-		frame.open();
-	}
-
-	function addGraphicLibrary() {
-		graphicLibraries.push( {
-			id: `lib_${ Date.now().toString( 36 ) }`,
-			name: `Library ${ graphicLibraries.length + 1 }`,
-			ids: [],
-		} );
-		saveGraphicLibraries();
 	}
 
 	function trackUploadedImage( attachment ) {
@@ -1235,6 +1193,30 @@
 		}
 	}
 
+	function deleteView() {
+		if ( ! documentData.views || documentData.views.length <= 1 ) {
+			window.alert( 'At least one design area is required.' );
+			return;
+		}
+		const view = getActiveView();
+		if ( ! view ) {
+			return;
+		}
+		const label = view.label || view.id;
+		if ( ! window.confirm( `Delete design area "${ label }"? This cannot be undone.` ) ) {
+			return;
+		}
+		persistCanvasToActiveView();
+		const idx = documentData.views.findIndex( ( row ) => row.id === activeViewId );
+		if ( idx < 0 ) {
+			return;
+		}
+		documentData.views.splice( idx, 1 );
+		const nextIdx = Math.min( idx, documentData.views.length - 1 );
+		loadView( documentData.views[ nextIdx ].id );
+		syncMaxViewsField();
+	}
+
 	function deleteActiveLayer() {
 		const active = canvas.getActiveObject();
 		if ( ! active ) {
@@ -1252,7 +1234,6 @@
 		if ( jsonInput ) {
 			jsonInput.value = JSON.stringify( documentData );
 		}
-		saveGraphicLibraries();
 		saveTemplateFonts();
 	}
 
@@ -1660,7 +1641,6 @@
 	}
 	document.getElementById( 'wc-gpd-template-delete-graphic' )?.addEventListener( 'click', deleteActiveLayer );
 	document.getElementById( 'wc-gpd-template-delete-slot' )?.addEventListener( 'click', deleteActiveLayer );
-	document.getElementById( 'wc-gpd-template-delete-layer' )?.addEventListener( 'click', deleteActiveLayer );
 
 	if ( uploadImageBtn && window.wp && wp.media ) {
 		uploadImageBtn.addEventListener( 'click', () => {
@@ -1676,7 +1656,6 @@
 	}
 
 	document.getElementById( 'wc-gpd-set-mockup-background' )?.addEventListener( 'click', setMockupBackground );
-	document.getElementById( 'wc-gpd-add-graphic-library' )?.addEventListener( 'click', addGraphicLibrary );
 	document.querySelectorAll( '.wc-gpd-template-font-pick' ).forEach( ( el ) => {
 		el.addEventListener( 'change', saveTemplateFonts );
 	} );
@@ -1716,6 +1695,7 @@
 	$( '.wc-gpd-add-template-circle' ).on( 'click', addCircle );
 	$( '#wc-gpd-template-add-view' ).on( 'click', addView );
 	$( '#wc-gpd-template-rename-view' ).on( 'click', renameView );
+	$( '#wc-gpd-template-delete-view' ).on( 'click', deleteView );
 	$( '#wc_gpd_canvas_width, #wc_gpd_canvas_height' ).on( 'change input', resizeCanvasDimensions );
 
 	if ( popoutBtn && editorRoot && window.WcGpdPopout ) {
@@ -1736,6 +1716,7 @@
 	window.addEventListener( 'resize', applyResponsiveScale );
 
 	initFontSelect();
+	initAccordion();
 	bindTextEditor();
 	bindGraphicPropInputs();
 	loadGraphicLibraries();
