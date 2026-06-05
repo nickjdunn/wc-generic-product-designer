@@ -132,3 +132,8 @@
 .wc-gpd-btn-add-text {
 	width: 100%;
 }
+
+/* PoC: canvas replaces product photo on designer products */
+.single-product.wc-gpd-product .woocommerce-product-gallery {
+	display: none;
+}

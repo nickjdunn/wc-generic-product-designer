@@ -48,6 +48,20 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
 		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer' ), 5 );
+		add_filter( 'body_class', array( $this, 'add_body_class' ) );
+	}
+
+	/**
+	 * Hide default gallery via CSS when designer is active on this product.
+	 *
+	 * @param array $classes Body classes.
+	 * @return array
+	 */
+	public function add_body_class( $classes ) {
+		if ( $this->is_designer_context() ) {
+			$classes[] = 'wc-gpd-product';
+		}
+		return $classes;
 	}
 
 	/**
@@ -60,11 +74,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return false;
 		}
 		$product_id = get_queried_object_id();
-		if ( ! $product_id || ! WC_GPD_Product_Meta::is_enabled( $product_id ) ) {
-			return false;
-		}
-		$settings = WC_GPD_Product_Meta::get_settings( $product_id );
-		return ! empty( $settings['template_url'] );
+		return $product_id && WC_GPD_Product_Meta::is_enabled( $product_id );
 	}
 
 	/**

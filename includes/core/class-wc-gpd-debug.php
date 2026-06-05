@@ -138,6 +138,7 @@ class WC_GPD_Debug implements WC_GPD_Module {
 		$settings = WC_GPD_Settings::all();
 		$logs     = WC_GPD_Logger::get_buffer( 50 );
 		$env      = $this->get_environment();
+		$poc      = $this->get_poc_status();
 
 		if ( isset( $_GET['wc_gpd_saved'] ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Debug settings saved.', 'wc-generic-product-designer' ) . '</p></div>';
@@ -164,6 +165,53 @@ class WC_GPD_Debug implements WC_GPD_Module {
 			<p class="description">
 				<?php esc_html_e( 'Enable logging to trace cart, SVG export, and module lifecycle events. Logs also write to WooCommerce → Status → Logs when debug is on.', 'wc-generic-product-designer' ); ?>
 			</p>
+
+			<div class="wc-gpd-debug-panel wc-gpd-debug-panel--poc">
+				<h2><?php esc_html_e( 'Proof of concept — quick start', 'wc-generic-product-designer' ); ?></h2>
+				<ol class="wc-gpd-poc-steps">
+					<li>
+						<?php
+						printf(
+							/* translators: %s: URL to new product screen */
+							esc_html__( 'Create or edit a %ssimple product%s → Product data → Product Designer → enable designer, set canvas size, optionally upload a template image → Update.', 'wc-generic-product-designer' ),
+							'<a href="' . esc_url( admin_url( 'post-new.php?post_type=product' ) ) . '">',
+							'</a>'
+						);
+						?>
+					</li>
+					<li><?php esc_html_e( 'Open the product on the storefront — canvas appears above Add to cart (product photo is hidden).', 'wc-generic-product-designer' ); ?></li>
+					<li><?php esc_html_e( 'Edit the default text layer, then Add to cart — cart should show “Design attached”.', 'wc-generic-product-designer' ); ?></li>
+					<li><?php esc_html_e( 'Complete checkout → open the order in admin → Production designs → Download production SVG.', 'wc-generic-product-designer' ); ?></li>
+				</ol>
+				<?php if ( empty( $poc['products'] ) ) : ?>
+					<p class="wc-gpd-poc-warning"><?php esc_html_e( 'No products have the designer enabled yet.', 'wc-generic-product-designer' ); ?></p>
+				<?php else : ?>
+					<table class="widefat striped">
+						<thead>
+							<tr>
+								<th><?php esc_html_e( 'Product', 'wc-generic-product-designer' ); ?></th>
+								<th><?php esc_html_e( 'Canvas', 'wc-generic-product-designer' ); ?></th>
+								<th><?php esc_html_e( 'Template', 'wc-generic-product-designer' ); ?></th>
+								<th><?php esc_html_e( 'Actions', 'wc-generic-product-designer' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $poc['products'] as $row ) : ?>
+								<tr>
+									<td><?php echo esc_html( $row['name'] ); ?></td>
+									<td><code><?php echo esc_html( $row['canvas'] ); ?></code></td>
+									<td><?php echo esc_html( $row['template'] ); ?></td>
+									<td>
+										<a href="<?php echo esc_url( $row['edit_url'] ); ?>"><?php esc_html_e( 'Edit', 'wc-generic-product-designer' ); ?></a>
+										|
+										<a href="<?php echo esc_url( $row['view_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View', 'wc-generic-product-designer' ); ?></a>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			</div>
 
 			<div class="wc-gpd-debug-grid">
 				<div class="wc-gpd-debug-panel">
@@ -255,6 +303,35 @@ class WC_GPD_Debug implements WC_GPD_Module {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * PoC status: enabled designer products.
+	 *
+	 * @return array{products: array<int, array<string, string>>}
+	 */
+	private function get_poc_status() {
+		$rows     = array();
+		$ids      = WC_GPD_Product_Meta::get_enabled_product_ids( 10 );
+
+		foreach ( $ids as $product_id ) {
+			$product = wc_get_product( $product_id );
+			if ( ! $product ) {
+				continue;
+			}
+			$settings = WC_GPD_Product_Meta::get_settings( $product_id );
+			$rows[]   = array(
+				'name'      => $product->get_name(),
+				'canvas'    => $settings['width'] . ' × ' . $settings['height'],
+				'template'  => $settings['template_url']
+					? __( 'Yes', 'wc-generic-product-designer' )
+					: __( 'Blank canvas', 'wc-generic-product-designer' ),
+				'edit_url'  => get_edit_post_link( $product_id, 'raw' ),
+				'view_url'  => get_permalink( $product_id ),
+			);
+		}
+
+		return array( 'products' => $rows );
 	}
 
 	/**

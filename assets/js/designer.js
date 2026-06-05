@@ -45,7 +45,7 @@
 
 	let activeText = null;
 	let displayScale = 1;
-	let isExporting = false;
+	let submitApproved = false;
 
 	/**
 	 * Populate font dropdown.
@@ -103,6 +103,9 @@
 	 */
 	function loadBackground() {
 		if ( ! config.templateUrl ) {
+			canvas.backgroundColor = '#f4f4f4';
+			canvas.requestRenderAll();
+			log.debug( 'Using blank canvas background (no template image)' );
 			return;
 		}
 
@@ -110,6 +113,9 @@
 			config.templateUrl,
 			( img ) => {
 				if ( ! img ) {
+					log.warn( 'Template image failed to load; using blank canvas' );
+					canvas.backgroundColor = '#f4f4f4';
+					canvas.requestRenderAll();
 					return;
 				}
 				const scaleX = PROD_WIDTH / img.width;
@@ -335,23 +341,16 @@
 	 * Intercept add to cart: inject SVG then submit natively.
 	 */
 	function bindAddToCart() {
-		const addButton = form.querySelector( 'button[type="submit"], input[type="submit"]' );
-		if ( ! addButton ) {
-			return;
-		}
-
 		form.addEventListener( 'submit', ( event ) => {
-			if ( isExporting ) {
+			if ( submitApproved ) {
 				return;
 			}
 
 			event.preventDefault();
-			isExporting = true;
 
 			if ( ! hasTextLayer() ) {
 				log.warn( 'Add to cart blocked: no text layers' );
 				window.alert( config.i18n.layerRequired );
-				isExporting = false;
 				return;
 			}
 
@@ -359,12 +358,11 @@
 			if ( ! svg ) {
 				log.error( 'SVG export failed' );
 				window.alert( config.i18n.exportError );
-				isExporting = false;
 				return;
 			}
 
 			svgInput.value = svg;
-			isExporting = false;
+			submitApproved = true;
 			log.info( 'Submitting add to cart with design SVG' );
 			form.submit();
 		} );
@@ -466,4 +464,6 @@
 	loadBackground();
 	applyResponsiveScale();
 	bindAddToCart();
+	addTextLayer();
+	log.info( 'Designer ready' );
 } )();

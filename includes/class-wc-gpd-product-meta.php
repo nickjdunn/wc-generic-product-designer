@@ -76,4 +76,29 @@ class WC_GPD_Product_Meta {
 			'template_url' => $template_url ? $template_url : '',
 		);
 	}
+
+	/**
+	 * Product IDs with designer enabled.
+	 *
+	 * @param int $limit Max results.
+	 * @return int[]
+	 */
+	public static function get_enabled_product_ids( $limit = 20 ) {
+		$query = new WP_Query(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'publish',
+				'posts_per_page' => absint( $limit ),
+				'fields'         => 'ids',
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => self::META_ENABLED,
+						'value' => 'yes',
+					),
+				),
+			)
+		);
+
+		return array_map( 'absint', $query->posts );
+	}
 }

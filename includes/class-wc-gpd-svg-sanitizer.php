@@ -63,7 +63,8 @@ class WC_GPD_SVG_Sanitizer {
 		libxml_use_internal_errors( $previous );
 
 		if ( ! $loaded ) {
-			return false;
+			WC_GPD_Logger::debug( 'SVG DOM parse failed, using tag-strip fallback' );
+			return self::strip_tags_fallback( $svg );
 		}
 
 		$disallowed_tags = array( 'script', 'foreignObject', 'iframe', 'object', 'embed', 'link' );

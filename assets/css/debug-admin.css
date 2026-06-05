@@ -1,5 +1,19 @@
-.wc-gpd-debug-wrap .description {
-	max-width: 720px;
+.wc-gpd-debug-panel--poc {
+	margin: 1.25rem 0;
+}
+
+.wc-gpd-poc-steps {
+	margin: 0.75rem 0 1rem 1.25rem;
+	max-width: 820px;
+}
+
+.wc-gpd-poc-steps li {
+	margin-bottom: 0.5rem;
+}
+
+.wc-gpd-poc-warning {
+	color: #996800;
+	font-weight: 600;
 }
 
 .wc-gpd-debug-grid {
