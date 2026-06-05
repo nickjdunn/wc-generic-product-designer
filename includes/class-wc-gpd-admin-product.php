@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Admin product settings.
  */
-class WC_GPD_Admin_Product {
+class WC_GPD_Admin_Product implements WC_GPD_Module {
 
 	/**
 	 * @var WC_GPD_Admin_Product|null
@@ -34,6 +34,13 @@ class WC_GPD_Admin_Product {
 	 * Constructor.
 	 */
 	private function __construct() {
+		// Hooks registered via register().
+	}
+
+	/**
+	 * Register module hooks.
+	 */
+	public function register() {
 		add_filter( 'woocommerce_product_data_tabs', array( $this, 'add_product_tab' ) );
 		add_action( 'woocommerce_product_data_panels', array( $this, 'render_product_tab_panel' ) );
 		add_action( 'woocommerce_process_product_meta', array( $this, 'save_product_meta' ) );
@@ -170,6 +177,16 @@ class WC_GPD_Admin_Product {
 			$template_id = 0;
 		}
 		update_post_meta( $post_id, WC_GPD_Product_Meta::META_TEMPLATE_ID, $template_id );
+
+		WC_GPD_Logger::info(
+			'Product designer settings saved',
+			array(
+				'product_id' => $post_id,
+				'enabled'    => $enabled,
+				'width'      => $width,
+				'height'     => $height,
+			)
+		);
 	}
 
 	/**

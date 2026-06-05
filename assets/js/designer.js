@@ -9,12 +9,17 @@
 		return;
 	}
 
+	const log = window.wcGpdDebug || { setEnabled() {}, debug() {}, info() {}, warn() {}, error() {} };
+	log.setEnabled( !! config.debug );
+	log.info( 'Designer initializing', { width: config.canvasWidth, height: config.canvasHeight } );
+
 	const canvasEl = document.getElementById( 'wc-gpd-canvas' );
 	const designerRoot = document.getElementById( 'wc-gpd-designer' );
 	const svgInput = document.getElementById( 'wc-gpd-design-svg' );
 	const form = document.querySelector( 'form.cart' );
 
 	if ( ! canvasEl || ! designerRoot || ! svgInput || ! form ) {
+		log.error( 'Designer markup missing required elements' );
 		return;
 	}
 
@@ -267,6 +272,7 @@
 		canvas.setActiveObject( text );
 		canvas.requestRenderAll();
 		syncToolbar( text );
+		log.debug( 'Text layer added' );
 	}
 
 	/**
@@ -321,6 +327,7 @@
 			svg = svg.replace( '<svg ', `<svg width="${ PROD_WIDTH }" height="${ PROD_HEIGHT }" ` );
 		}
 
+		log.info( 'Production SVG exported', { bytes: svg ? svg.length : 0 } );
 		return svg;
 	}
 
@@ -342,6 +349,7 @@
 			isExporting = true;
 
 			if ( ! hasTextLayer() ) {
+				log.warn( 'Add to cart blocked: no text layers' );
 				window.alert( config.i18n.layerRequired );
 				isExporting = false;
 				return;
@@ -349,6 +357,7 @@
 
 			const svg = exportProductionSvg();
 			if ( ! svg ) {
+				log.error( 'SVG export failed' );
 				window.alert( config.i18n.exportError );
 				isExporting = false;
 				return;
@@ -356,6 +365,7 @@
 
 			svgInput.value = svg;
 			isExporting = false;
+			log.info( 'Submitting add to cart with design SVG' );
 			form.submit();
 		} );
 	}

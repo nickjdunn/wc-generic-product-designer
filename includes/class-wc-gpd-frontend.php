@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Frontend designer UI.
  */
-class WC_GPD_Frontend {
+class WC_GPD_Frontend implements WC_GPD_Module {
 
 	/**
 	 * @var WC_GPD_Frontend|null
@@ -39,6 +39,13 @@ class WC_GPD_Frontend {
 	 * Constructor.
 	 */
 	private function __construct() {
+		// Hooks registered via register().
+	}
+
+	/**
+	 * Register module hooks.
+	 */
+	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
 		add_action( 'woocommerce_before_add_to_cart_button', array( $this, 'render_designer' ), 5 );
 	}
@@ -87,9 +94,17 @@ class WC_GPD_Frontend {
 		);
 
 		wp_enqueue_script(
+			'wc-gpd-debug',
+			WC_GPD_PLUGIN_URL . 'assets/js/debug.js',
+			array(),
+			WC_GPD_VERSION,
+			true
+		);
+
+		wp_enqueue_script(
 			'wc-gpd-designer',
 			WC_GPD_PLUGIN_URL . 'assets/js/designer.js',
-			array( 'fabric-js' ),
+			array( 'fabric-js', 'wc-gpd-debug' ),
 			WC_GPD_VERSION,
 			true
 		);
@@ -101,6 +116,7 @@ class WC_GPD_Frontend {
 				'canvasWidth'  => $settings['width'],
 				'canvasHeight' => $settings['height'],
 				'templateUrl'  => $settings['template_url'],
+				'debug'          => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'        => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'    => self::NONCE_NAME,
 				'i18n'         => array(
@@ -126,6 +142,14 @@ class WC_GPD_Frontend {
 				),
 			)
 		);
+
+		WC_GPD_Logger::debug(
+			'Designer assets enqueued',
+			array(
+				'product_id' => $product_id,
+				'js_debug'   => WC_GPD_Settings::is_js_debug_enabled(),
+			)
+		);
 	}
 
 	/**
@@ -143,6 +167,11 @@ class WC_GPD_Frontend {
 
 		$settings = WC_GPD_Product_Meta::get_settings( $product->get_id() );
 		$this->designer_rendered = true;
+
+		WC_GPD_Logger::debug(
+			'Designer UI rendered',
+			array( 'product_id' => $product->get_id() )
+		);
 
 		$aspect = $settings['height'] > 0
 			? ( $settings['width'] / $settings['height'] )

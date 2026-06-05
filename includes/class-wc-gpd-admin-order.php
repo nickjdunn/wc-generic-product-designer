@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Order admin export panel.
  */
-class WC_GPD_Admin_Order {
+class WC_GPD_Admin_Order implements WC_GPD_Module {
 
 	/**
 	 * @var WC_GPD_Admin_Order|null
@@ -34,6 +34,13 @@ class WC_GPD_Admin_Order {
 	 * Constructor.
 	 */
 	private function __construct() {
+		// Hooks registered via register().
+	}
+
+	/**
+	 * Register module hooks.
+	 */
+	public function register() {
 		add_action( 'add_meta_boxes', array( $this, 'register_meta_box' ), 20 );
 		add_action( 'admin_post_' . self::DOWNLOAD_ACTION, array( $this, 'handle_download' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_order_styles' ) );

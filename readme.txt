@@ -3,7 +3,7 @@ Contributors: wc-generic-product-designer
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,11 +26,17 @@ Allow customers to add styled text layers on a product canvas and export product
 
 1. Push this repo to GitHub (see `scripts/push-to-github.ps1`).
 2. On the store, install the **Git Updater** plugin.
-3. For a private repo, add `define( 'GITHUB_TOKEN', '...' );` to wp-config.php (see `git-updater.wp-config.example.php`).
-4. Install this plugin via Git Updater using your GitHub repo URL, or upload once — Git Updater detects it via the `GitHub Plugin URI` header.
+3. **Settings → Git Updater → Install Plugin** — use ONLY this slug (not a full URL):
+   nickjdunn/wc-generic-product-designer
+   If a branch field appears, set it to `main`.
+4. For a private repo, add `define( 'GITHUB_TOKEN', '...' );` to wp-config.php (see `git-updater.wp-config.example.php`).
 5. For each release: bump `Version` in the main plugin file, commit, push, then update from **Dashboard → Updates**.
 
 == Changelog ==
+
+= 1.1.0 =
+* Core architecture: autoloader, service container, module interface.
+* Debug framework: admin debug panel, structured logger, JS console debug.
 
 = 1.0.0 =
 * Initial release.

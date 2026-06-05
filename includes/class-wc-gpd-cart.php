@@ -10,7 +10,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * WooCommerce cart/order integration.
  */
-class WC_GPD_Cart {
+class WC_GPD_Cart implements WC_GPD_Module {
 
 	/**
 	 * @var WC_GPD_Cart|null
@@ -31,6 +31,13 @@ class WC_GPD_Cart {
 	 * Constructor.
 	 */
 	private function __construct() {
+		// Hooks registered via register().
+	}
+
+	/**
+	 * Register module hooks.
+	 */
+	public function register() {
 		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_add_to_cart' ), 10, 3 );
 		add_filter( 'woocommerce_add_cart_item_data', array( $this, 'add_cart_item_data' ), 10, 3 );
 		add_filter( 'woocommerce_get_item_data', array( $this, 'display_cart_item_data' ), 10, 2 );
@@ -51,6 +58,7 @@ class WC_GPD_Cart {
 		}
 
 		if ( ! isset( $_POST[ WC_GPD_Frontend::NONCE_NAME ] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ WC_GPD_Frontend::NONCE_NAME ] ) ), WC_GPD_Frontend::NONCE_ACTION ) ) {
+			WC_GPD_Logger::warning( 'Add to cart nonce failed', array( 'product_id' => $product_id ) );
 			wc_add_notice( __( 'Security check failed. Please refresh the page and try again.', 'wc-generic-product-designer' ), 'error' );
 			return false;
 		}
@@ -59,9 +67,24 @@ class WC_GPD_Cart {
 		$svg     = WC_GPD_SVG_Sanitizer::sanitize( is_string( $raw_svg ) ? $raw_svg : '' );
 
 		if ( ! $svg ) {
+			WC_GPD_Logger::warning(
+				'Add to cart rejected: invalid or missing SVG',
+				array(
+					'product_id' => $product_id,
+					'raw_length' => is_string( $raw_svg ) ? strlen( $raw_svg ) : 0,
+				)
+			);
 			wc_add_notice( __( 'Please complete your product design before adding to cart.', 'wc-generic-product-designer' ), 'error' );
 			return false;
 		}
+
+		WC_GPD_Logger::info(
+			'Design validated for cart',
+			array(
+				'product_id' => $product_id,
+				'svg_bytes'  => strlen( $svg ),
+			)
+		);
 
 		return $passed;
 	}
@@ -132,6 +155,14 @@ class WC_GPD_Cart {
 				'_wc_gpd_has_design',
 				'yes',
 				true
+			);
+			WC_GPD_Logger::info(
+				'Design saved to order line item',
+				array(
+					'order_id' => $order->get_id(),
+					'item_id'  => $item->get_id(),
+					'svg_bytes' => strlen( $svg ),
+				)
 			);
 		}
 	}

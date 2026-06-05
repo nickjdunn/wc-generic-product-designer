@@ -22,15 +22,18 @@ class WC_GPD_SVG_Sanitizer {
 	 */
 	public static function sanitize( $svg ) {
 		if ( ! is_string( $svg ) || '' === trim( $svg ) ) {
+			WC_GPD_Logger::debug( 'SVG sanitize failed: empty input' );
 			return false;
 		}
 
 		if ( strlen( $svg ) > self::MAX_SVG_BYTES ) {
+			WC_GPD_Logger::warning( 'SVG sanitize failed: exceeds max size', array( 'bytes' => strlen( $svg ) ) );
 			return false;
 		}
 
 		// Must look like SVG.
 		if ( ! preg_match( '/<svg[\s>]/i', $svg ) ) {
+			WC_GPD_Logger::debug( 'SVG sanitize failed: not valid SVG markup' );
 			return false;
 		}
 
