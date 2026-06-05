@@ -730,6 +730,61 @@
 	font-style: normal;
 }
 
+.wc-gpd-bootstrap-icons-credit a {
+	margin-left: 4px;
+}
+
+.wc-gpd-bootstrap-icons-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin: 8px 0;
+}
+
+.wc-gpd-bootstrap-icons-toolbar input[type="search"] {
+	flex: 1 1 160px;
+	min-width: 0;
+}
+
+.wc-gpd-bootstrap-icon-limit-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+}
+
+.wc-gpd-bootstrap-icon-featured {
+	margin-bottom: 8px;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #dcdcde;
+}
+
+.wc-gpd-bootstrap-icon-results {
+	max-height: 280px;
+	overflow-y: auto;
+	margin-bottom: 6px;
+}
+
+.wc-gpd-bootstrap-icon-btn img {
+	display: block;
+	width: 28px;
+	height: 28px;
+	object-fit: contain;
+}
+
+.wc-gpd-bootstrap-icon-btn span {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wc-gpd-bootstrap-icon-load-more {
+	text-align: center;
+	margin: 0;
+}
+
 .wc-gpd-tpl-font-picks {
 	display: flex;
 	flex-direction: column;

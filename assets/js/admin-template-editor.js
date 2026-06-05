@@ -30,7 +30,6 @@
 	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
 	const unitsSelect = document.getElementById( 'wc_gpd_tpl_units' );
 	const freeformHint = document.getElementById( 'wc-gpd-freeform-hint' );
-	const shapeLibraryGrid = document.getElementById( 'wc-gpd-shape-library-grid' );
 	const editorRoot = document.getElementById( 'wc-gpd-template-editor-root' );
 	const popoutBtn = document.getElementById( 'wc-gpd-template-popout' );
 	const templateFontsInput = document.getElementById( 'wc_gpd_template_fonts' );
@@ -206,7 +205,7 @@
 		if ( ! obj || obj.wcGpdLayerType === 'graphic_slot' || obj.wcGpdGraphicSlot ) {
 			return false;
 		}
-		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline' ];
+		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline', 'group' ];
 		return shapeTypes.indexOf( obj.type ) >= 0 && obj.wcGpdTemplateLayer;
 	}
 
@@ -1070,31 +1069,72 @@
 		updateSelectionPanels();
 	}
 
-	function addLibraryShape( shapeDef ) {
-		if ( ! shapeDef || ! shapeDef.path ) {
+	function styleShapeForEngraving( target, color ) {
+		if ( ! target ) {
 			return;
 		}
-		const path = new fabric.Path( shapeDef.path, {
-			left: width / 2,
-			top: height / 2,
-			originX: 'center',
-			originY: 'center',
-			scaleX: 6,
-			scaleY: 6,
-			fill: 'transparent',
-			stroke: defaultOutlineColor(),
-			strokeWidth: defaultOutlineWidth(),
-			wcGpdUid: uid(),
-			wcGpdLayerLabel: shapeDef.label || shapeDef.id,
+		if ( target.type === 'group' && target.getObjects ) {
+			target.getObjects().forEach( ( child ) => styleShapeForEngraving( child, color ) );
+			return;
+		}
+		target.set( {
+			fill: color,
+			stroke: null,
+			strokeWidth: 0,
 		} );
-		syncShapeFlags( path );
-		canvas.add( path );
-		canvas.setActiveObject( path );
-		sortLayers();
-		canvas.requestRenderAll();
-		updateSelectionPanels();
-		openAccordionSection( 'shapes' );
 	}
+
+	function addBootstrapIconFromSvg( svgString, slug ) {
+		if ( ! svgString ) {
+			return;
+		}
+		cancelFreeformMode();
+		fabric.loadSVGFromString( svgString, ( objects, options ) => {
+			if ( ! objects || ! objects.length ) {
+				return;
+			}
+			let obj = objects.length === 1 ? objects[ 0 ] : fabric.util.groupSVGElements( objects, options );
+			const color = defaultOutlineColor();
+			styleShapeForEngraving( obj, color );
+			const targetSize = 96;
+			const bounds = obj.getBoundingRect( true, true );
+			const base = Math.max( bounds.width || 16, bounds.height || 16, 1 );
+			const scale = targetSize / base;
+			obj.set( {
+				left: width / 2,
+				top: height / 2,
+				originX: 'center',
+				originY: 'center',
+				scaleX: scale,
+				scaleY: scale,
+				wcGpdUid: uid(),
+				wcGpdTemplateLayer: true,
+				wcGpdLayerLabel: ( slug || 'icon' ).replace( /-/g, ' ' ),
+			} );
+			syncShapeFlags( obj );
+			canvas.add( obj );
+			canvas.setActiveObject( obj );
+			sortLayers();
+			canvas.requestRenderAll();
+			updateSelectionPanels();
+			openAccordionSection( 'shapes' );
+		} );
+	}
+
+	window.wcGpdAddBootstrapIcon = function ( slug ) {
+		const iconsConfig = editorConfig.bootstrapIcons || {};
+		const url = new URL( iconsConfig.ajaxUrl || '/wp-admin/admin-ajax.php', window.location.origin );
+		url.searchParams.set( 'action', 'wc_gpd_get_bootstrap_icon' );
+		url.searchParams.set( 'nonce', iconsConfig.nonce || '' );
+		url.searchParams.set( 'icon', slug );
+		fetch( url.toString(), { credentials: 'same-origin' } )
+			.then( ( response ) => response.json() )
+			.then( ( payload ) => {
+				if ( payload && payload.success && payload.data && payload.data.svg ) {
+					addBootstrapIconFromSvg( payload.data.svg, slug );
+				}
+			} );
+	};
 
 	function clearFreeformPreview() {
 		if ( freeformPreview ) {
@@ -1182,26 +1222,6 @@
 		if ( freeformHint ) {
 			freeformHint.hidden = true;
 		}
-	}
-
-	function initShapeLibraryGrid() {
-		if ( ! shapeLibraryGrid ) {
-			return;
-		}
-		const shapes = window.wcGpdTemplateShapes || [];
-		shapeLibraryGrid.innerHTML = '';
-		shapes.forEach( ( shape ) => {
-			const btn = document.createElement( 'button' );
-			btn.type = 'button';
-			btn.className = 'wc-gpd-shape-library-btn';
-			btn.title = shape.label || shape.id;
-			btn.innerHTML = `<svg viewBox="${ shape.viewBox || '0 0 24 24' }" aria-hidden="true"><path d="${ shape.path }" fill="currentColor"/></svg><span>${ shape.label || shape.id }</span>`;
-			btn.addEventListener( 'click', () => {
-				cancelFreeformMode();
-				addLibraryShape( shape );
-			} );
-			shapeLibraryGrid.appendChild( btn );
-		} );
 	}
 
 	function addTemplateText() {
@@ -1984,7 +2004,6 @@
 
 	initFontSelect();
 	initAccordion();
-	initShapeLibraryGrid();
 	updateUnitSuffixes();
 	bindTextEditor();
 	bindImagePropInputs();

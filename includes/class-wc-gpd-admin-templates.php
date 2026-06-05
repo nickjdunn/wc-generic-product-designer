@@ -38,6 +38,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 		add_action( 'init', array( 'WC_GPD_Design_Template', 'register_post_type' ) );
 		add_action( 'admin_menu', array( $this, 'register_menu' ), 58 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		WC_GPD_Bootstrap_Icons::register_ajax();
 	}
 
 	/**
@@ -122,16 +123,16 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			true
 		);
 		wp_enqueue_script(
-			'wc-gpd-template-shape-library',
-			WC_GPD_PLUGIN_URL . 'assets/js/template-shape-library.js',
-			array(),
+			'wc-gpd-admin-template-editor',
+			WC_GPD_PLUGIN_URL . 'assets/js/admin-template-editor.js',
+			array( 'jquery', 'fabric-js', 'wc-gpd-designer-popout' ),
 			WC_GPD_VERSION,
 			true
 		);
 		wp_enqueue_script(
-			'wc-gpd-admin-template-editor',
-			WC_GPD_PLUGIN_URL . 'assets/js/admin-template-editor.js',
-			array( 'jquery', 'fabric-js', 'wc-gpd-designer-popout', 'wc-gpd-template-shape-library' ),
+			'wc-gpd-admin-bootstrap-icons',
+			WC_GPD_PLUGIN_URL . 'assets/js/admin-bootstrap-icons.js',
+			array( 'wc-gpd-admin-template-editor' ),
 			WC_GPD_VERSION,
 			true
 		);
@@ -145,6 +146,25 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				'fontOptions' => WC_GPD_Font_Registry::fonts_for_template( $template_id ),
 				'defaultFont'   => WC_GPD_Font_Registry::default_font_family(),
 				'siteLibraries' => WC_GPD_Graphic_Libraries::get_all(),
+				'bootstrapIcons' => array(
+					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+					'nonce'       => wp_create_nonce( WC_GPD_Bootstrap_Icons::NONCE_ACTION ),
+					'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
+				),
+			)
+		);
+		wp_localize_script(
+			'wc-gpd-admin-bootstrap-icons',
+			'wcGpdBootstrapIcons',
+			array(
+				'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+				'nonce'       => wp_create_nonce( WC_GPD_Bootstrap_Icons::NONCE_ACTION ),
+				'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
+				'i18n'        => array(
+					'searching' => __( 'Loading icons…', 'wc-generic-product-designer' ),
+					'noResults' => __( 'No icons found.', 'wc-generic-product-designer' ),
+					'showing'   => __( 'Showing %1$s–%2$s of %3$s', 'wc-generic-product-designer' ),
+				),
 			)
 		);
 		WC_GPD_Font_Registry::enqueue_for_designer( $template_id );
@@ -509,8 +529,30 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 								<button type="button" class="button button-small wc-gpd-add-template-freeform" id="wc-gpd-add-template-freeform"><?php esc_html_e( 'Freeform', 'wc-generic-product-designer' ); ?></button>
 							</div>
 							<p class="wc-gpd-tpl-hint wc-gpd-freeform-hint" id="wc-gpd-freeform-hint" hidden><?php esc_html_e( 'Click to place points. Click the first point again (or double-click) to close the shape.', 'wc-generic-product-designer' ); ?></p>
-							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Engraving shapes', 'wc-generic-product-designer' ); ?></h5>
-							<div class="wc-gpd-shape-library-grid" id="wc-gpd-shape-library-grid"></div>
+							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Bootstrap Icons', 'wc-generic-product-designer' ); ?></h5>
+							<p class="description wc-gpd-bootstrap-icons-credit">
+								<?php esc_html_e( 'Over 2,000 MIT-licensed icons bundled for offline use. Click an icon to add it to the template.', 'wc-generic-product-designer' ); ?>
+								<a href="https://icons.getbootstrap.com/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'icons.getbootstrap.com', 'wc-generic-product-designer' ); ?></a>
+							</p>
+							<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-featured" id="wc-gpd-bootstrap-icon-featured"></div>
+							<div class="wc-gpd-bootstrap-icons-toolbar">
+								<input type="search" id="wc-gpd-bootstrap-icon-search" class="regular-text" placeholder="<?php esc_attr_e( 'Search icons (e.g. heart, star, flower)…', 'wc-generic-product-designer' ); ?>" />
+								<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
+								<label class="wc-gpd-bootstrap-icon-limit-label">
+									<?php esc_html_e( 'Per page', 'wc-generic-product-designer' ); ?>
+									<select id="wc-gpd-bootstrap-icon-limit">
+										<option value="48">48</option>
+										<option value="60" selected="selected">60</option>
+										<option value="96">96</option>
+										<option value="120">120</option>
+									</select>
+								</label>
+							</div>
+							<p class="description" id="wc-gpd-bootstrap-icon-status" hidden></p>
+							<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-bootstrap-icon-results"></div>
+							<p class="wc-gpd-bootstrap-icon-load-more" id="wc-gpd-bootstrap-icon-load-more-wrap" hidden>
+								<button type="button" class="button button-small" id="wc-gpd-bootstrap-icon-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
+							</p>
 							<div class="wc-gpd-tpl-selection" id="wc-gpd-shape-props-fields" hidden>
 								<p><label><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?> <input type="color" id="wc_gpd_template_stroke_color" value="<?php echo esc_attr( $ps['outline_color'] ); ?>" /></label></p>
 								<p><label><?php esc_html_e( 'Width', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_template_stroke_width" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['outline_stroke_width'] ); ?>" /></label></p>
