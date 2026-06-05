@@ -103,6 +103,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 
 		$product_id = get_queried_object_id();
 		$settings     = WC_GPD_Product_Meta::get_settings( $product_id );
+		$edit_context = $this->get_edit_cart_context( $product_id );
 
 		wp_enqueue_style(
 			'wc-gpd-designer',
@@ -145,6 +146,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'debug'          => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'        => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'    => self::NONCE_NAME,
+				'editCartKey'  => $edit_context ? $edit_context['cart_item_key'] : '',
+				'existingDesignSvg' => $edit_context ? $edit_context['svg'] : '',
+				'isEditing'    => (bool) $edit_context,
 				'i18n'         => array(
 					'addText'       => __( 'Add text layer', 'wc-generic-product-designer' ),
 					'selectLayer'   => __( 'Select a text layer on the canvas to edit it.', 'wc-generic-product-designer' ),
@@ -157,6 +161,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'alignRight'    => __( 'Align right', 'wc-generic-product-designer' ),
 					'layerRequired' => __( 'Add at least one text layer before adding to cart.', 'wc-generic-product-designer' ),
 					'exportError'   => __( 'Could not export your design. Please try again.', 'wc-generic-product-designer' ),
+					'editingNotice' => __( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ),
+					'updateCart'    => __( 'Update cart with design', 'wc-generic-product-designer' ),
+					'loadDesignError' => __( 'Could not load your saved design. Please create a new one.', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => array(
 					'Arial, Helvetica, sans-serif',
@@ -192,6 +199,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		}
 
 		$settings = WC_GPD_Product_Meta::get_settings( $product->get_id() );
+		$edit_context = $this->get_edit_cart_context( $product->get_id() );
 		$this->designer_rendered = true;
 
 		WC_GPD_Logger::debug(
@@ -213,6 +221,11 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			role="region"
 			aria-label="<?php esc_attr_e( 'Product designer', 'wc-generic-product-designer' ); ?>"
 		>
+			<?php if ( $edit_context ) : ?>
+				<p class="wc-gpd-designer__notice" role="status">
+					<?php esc_html_e( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ); ?>
+				</p>
+			<?php endif; ?>
 			<div class="wc-gpd-designer__layout">
 				<div class="wc-gpd-designer__toolbar" aria-label="<?php esc_attr_e( 'Design tools', 'wc-generic-product-designer' ); ?>">
 					<div class="wc-gpd-designer__toolbar-row">
@@ -255,8 +268,51 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</div>
 			</div>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
+			<?php if ( $edit_context ) : ?>
+				<input type="hidden" name="wc_gpd_edit_cart_key" id="wc-gpd-edit-cart-key" value="<?php echo esc_attr( $edit_context['cart_item_key'] ); ?>" />
+			<?php endif; ?>
 			<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Load cart design for editing when ?wc_gpd_edit= cart key is present.
+	 *
+	 * @param int $product_id Product ID.
+	 * @return array{cart_item_key:string,svg:string}|null
+	 */
+	private function get_edit_cart_context( $product_id ) {
+		if ( ! $product_id || ! isset( $_GET['wc_gpd_edit'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return null;
+		}
+
+		if ( ! WC()->cart ) {
+			return null;
+		}
+
+		$cart_item_key = sanitize_text_field( wp_unslash( $_GET['wc_gpd_edit'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! $cart_item_key ) {
+			return null;
+		}
+
+		$cart_item = WC()->cart->get_cart_item( $cart_item_key );
+		if ( ! $cart_item || (int) $cart_item['product_id'] !== (int) $product_id ) {
+			return null;
+		}
+
+		if ( empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] ) ) {
+			return null;
+		}
+
+		$svg = WC_GPD_SVG_Sanitizer::sanitize( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_SVG ] );
+		if ( ! $svg ) {
+			return null;
+		}
+
+		return array(
+			'cart_item_key' => $cart_item_key,
+			'svg'           => $svg,
+		);
 	}
 }

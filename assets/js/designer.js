@@ -61,6 +61,12 @@
 			form.appendChild( nonce );
 			log.debug( 'Moved nonce into cart form' );
 		}
+
+		const editKey = document.getElementById( 'wc-gpd-edit-cart-key' );
+		if ( editKey && ! form.contains( editKey ) ) {
+			form.appendChild( editKey );
+			log.debug( 'Moved edit cart key into cart form' );
+		}
 	}
 
 	ensureFieldsInForm();
@@ -416,6 +422,44 @@
 	}
 
 	/**
+	 * Restore text layers from saved SVG (cart edit mode).
+	 *
+	 * @param {string} svgString Saved design SVG.
+	 * @returns {Promise<void>}
+	 */
+	function loadDesignFromSvg( svgString ) {
+		return new Promise( ( resolve, reject ) => {
+			fabric.loadSVGFromString( svgString, ( objects ) => {
+				if ( ! objects || ! objects.length ) {
+					reject( new Error( 'empty' ) );
+					return;
+				}
+
+				canvas.getObjects().slice().forEach( ( obj ) => {
+					if ( isTextLayer( obj ) ) {
+						canvas.remove( obj );
+					}
+				} );
+
+				objects.forEach( ( obj ) => {
+					obj.wcGpdTextLayer = true;
+					canvas.add( obj );
+				} );
+
+				canvas.requestRenderAll();
+				const first = objects[ 0 ];
+				if ( first ) {
+					canvas.setActiveObject( first );
+					syncToolbar( first );
+				}
+
+				log.info( 'Loaded design from cart', { layers: objects.length } );
+				resolve();
+			} );
+		} );
+	}
+
+	/**
 	 * @returns {HTMLElement|null}
 	 */
 	function getAddToCartButton() {
@@ -597,6 +641,23 @@
 	loadBackground();
 	applyResponsiveScale();
 	bindAddToCart();
-	addTextLayer();
+
+	if ( config.isEditing && config.i18n.updateCart ) {
+		const addBtn = getAddToCartButton();
+		if ( addBtn ) {
+			addBtn.textContent = config.i18n.updateCart;
+		}
+	}
+
+	if ( config.existingDesignSvg ) {
+		loadDesignFromSvg( config.existingDesignSvg ).catch( () => {
+			log.warn( 'Failed to load cart design; starting fresh' );
+			window.alert( config.i18n.loadDesignError );
+			addTextLayer();
+		} );
+	} else {
+		addTextLayer();
+	}
+
 	log.info( 'Designer ready' );
 } )();

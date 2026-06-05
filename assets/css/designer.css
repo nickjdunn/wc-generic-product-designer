@@ -129,6 +129,15 @@
 	margin: 0 auto;
 }
 
+.wc-gpd-designer__notice {
+	margin: 0 0 1rem;
+	padding: 0.65rem 0.85rem;
+	background: #eef6fc;
+	border-left: 4px solid #2271b1;
+	border-radius: 2px;
+	font-size: 0.925rem;
+}
+
 .wc-gpd-btn-add-text {
 	width: 100%;
 }
