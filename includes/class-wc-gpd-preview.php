@@ -134,6 +134,55 @@ class WC_GPD_Preview {
 	}
 
 	/**
+	 * Build a full production composite for an order line item.
+	 *
+	 * @param WC_Order_Item_Product $item Order line item.
+	 * @return string SVG document or empty.
+	 */
+	public static function composite_from_order_item( $item ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return '';
+		}
+
+		$svg = $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_SVG, true );
+		$svg = WC_GPD_SVG_Sanitizer::sanitize( $svg );
+		if ( ! $svg ) {
+			return '';
+		}
+
+		$product_id = $item->get_product_id();
+		if ( ! $product_id ) {
+			return '';
+		}
+
+		return self::build_composite_svg_document( $svg, WC_GPD_Product_Meta::get_settings( $product_id ) );
+	}
+
+	/**
+	 * Preview image URL for an order line (saved at checkout or generated).
+	 *
+	 * @param WC_Order_Item_Product $item Order line item.
+	 * @return string
+	 */
+	public static function preview_url_from_order_item( $item ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return '';
+		}
+
+		$url = $item->get_meta( WC_GPD_Product_Meta::ORDER_META_PREVIEW_URL, true );
+		if ( $url ) {
+			return esc_url( $url );
+		}
+
+		$document = self::composite_from_order_item( $item );
+		if ( ! $document ) {
+			return '';
+		}
+
+		return 'data:image/svg+xml;base64,' . base64_encode( $document );
+	}
+
+	/**
 	 * Return sanitized inline SVG for embedding.
 	 *
 	 * @param string $svg Sanitized SVG string.

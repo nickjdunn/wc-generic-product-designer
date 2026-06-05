@@ -22,7 +22,8 @@ class WC_GPD_Product_Meta {
 	const CART_KEY_PREVIEW_URL = 'wc_gpd_preview_url';
 	const CART_KEY_PREVIEW_ID  = 'wc_gpd_preview_id';
 
-	const ORDER_META_DESIGN_SVG = '_wc_gpd_design_svg';
+	const ORDER_META_DESIGN_SVG   = '_wc_gpd_design_svg';
+	const ORDER_META_PREVIEW_URL  = '_wc_gpd_preview_url';
 
 	const DEFAULT_WIDTH  = 800;
 	const DEFAULT_HEIGHT = 600;

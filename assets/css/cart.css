@@ -3,6 +3,8 @@
 .wc-block-cart-item__image img.wc-gpd-cart-thumb-img,
 .wc-block-components-product-image img.wc-gpd-cart-thumb-img,
 .woocommerce-checkout-review-order-table .wc-gpd-cart-thumb-img,
+.woocommerce-order-details .wc-gpd-cart-thumb-img,
+.woocommerce-table--order-details .wc-gpd-cart-thumb-img,
 .widget_shopping_cart .wc-gpd-cart-thumb-img {
 	width: 92px;
 	height: auto;

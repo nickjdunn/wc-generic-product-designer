@@ -557,6 +557,20 @@ class WC_GPD_Cart implements WC_GPD_Module {
 				'yes',
 				true
 			);
+
+			if ( ! empty( $values[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ) ) {
+				$item->add_meta_data(
+					WC_GPD_Product_Meta::ORDER_META_PREVIEW_URL,
+					esc_url_raw( $values[ WC_GPD_Product_Meta::CART_KEY_PREVIEW_URL ] ),
+					true
+				);
+			}
+
+			$item->add_meta_data(
+				__( 'Design', 'wc-generic-product-designer' ),
+				__( 'Custom design attached', 'wc-generic-product-designer' ),
+				true
+			);
 			WC_GPD_Logger::info(
 				'Design saved to order line item',
 				array(

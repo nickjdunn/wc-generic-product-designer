@@ -22,12 +22,20 @@
 	margin-bottom: 12px;
 }
 
-.wc-gpd-order-design__preview svg {
+.wc-gpd-order-design__preview-img {
 	width: 100%;
 	height: auto;
 	display: block;
+	object-fit: contain;
+}
+
+.wc-gpd-order-design__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
 }
 
 .wc-gpd-download-svg {
-	margin-top: 0.25rem !important;
+	margin-top: 0 !important;
 }

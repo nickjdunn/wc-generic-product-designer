@@ -181,7 +181,7 @@ class WC_GPD_Debug implements WC_GPD_Module {
 					</li>
 					<li><?php esc_html_e( 'Open the product on the storefront — canvas appears above Add to cart (product photo is hidden).', 'wc-generic-product-designer' ); ?></li>
 					<li><?php esc_html_e( 'Edit the default text layer, then Add to cart — cart should show “Design attached”.', 'wc-generic-product-designer' ); ?></li>
-					<li><?php esc_html_e( 'Complete checkout → open the order in admin → Production designs → Download production SVG.', 'wc-generic-product-designer' ); ?></li>
+					<li><?php esc_html_e( 'Complete checkout — order confirmation and emails show the design preview; admin order shows Production designs with full SVG download.', 'wc-generic-product-designer' ); ?></li>
 				</ol>
 				<?php if ( empty( $poc['products'] ) ) : ?>
 					<p class="wc-gpd-poc-warning"><?php esc_html_e( 'No products have the designer enabled yet.', 'wc-generic-product-designer' ); ?></p>
