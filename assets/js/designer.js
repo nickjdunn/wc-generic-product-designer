@@ -190,6 +190,7 @@
 		contextEmpty: document.getElementById( 'wc-gpd-context-empty' ),
 		contextPane: document.getElementById( 'wc-gpd-context-pane' ),
 		contextLayerName: document.getElementById( 'wc-gpd-context-layer-name' ),
+		contextGraphicHint: document.getElementById( 'wc-gpd-context-graphic-hint' ),
 		fontFamily: document.getElementById( 'wc-gpd-font-family' ),
 		fontSize: document.getElementById( 'wc-gpd-font-size' ),
 		bold: document.getElementById( 'wc-gpd-bold' ),
@@ -207,9 +208,6 @@
 		alignRow: designerRoot.querySelector( '.wc-gpd-control-align' ),
 		alignButtons: designerRoot.querySelectorAll( '.wc-gpd-align' ),
 		layersList: document.getElementById( 'wc-gpd-layers-list' ),
-		layerForward: document.getElementById( 'wc-gpd-layer-forward' ),
-		layerBackward: document.getElementById( 'wc-gpd-layer-backward' ),
-		layerDelete: document.getElementById( 'wc-gpd-layer-delete' ),
 		studio: document.getElementById( 'wc-gpd-studio' ),
 		studioPanel: document.getElementById( 'wc-gpd-studio-panel' ),
 		studioNav: document.getElementById( 'wc-gpd-studio-nav' ),
@@ -356,6 +354,18 @@
 			templateViews: summarizeTemplateViews(),
 			canvasLayers: canvas.getObjects().map( ( obj ) => buildLayerPermissionReport( obj ) ),
 			activeLayer: buildLayerPermissionReport( activeText ),
+			addMenu: {
+				allowText: productAllowsAdd( 'text' ),
+				allowShape: productAllowsAdd( 'shape' ),
+				allowGraphic: productAllowsAdd( 'graphic' ),
+				allowImage: productAllowsAdd( 'image' ),
+				allowIcon: productAllowsAdd( 'icon' ),
+				graphicItems: resolveAddGraphicItems().length,
+				iconSlugs: getBootstrapIconSlugs().length,
+				iconBaseUrl: bootstrapIcons.iconBaseUrl || null,
+				graphicReady: isAddGroupReady( 'graphic' ),
+				iconReady: isAddGroupReady( 'icon' ),
+			},
 			recentEvents: diagnosticsLog.slice(),
 		};
 	}
@@ -385,11 +395,46 @@
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
 	const bootstrapIcons = config.bootstrapIcons || {};
+	const demoGraphics = Array.isArray( config.demoGraphics ) ? config.demoGraphics : [];
+
+	function resolveAddGraphicItems() {
+		const items = [];
+		const seen = new Set();
+		function pushItem( item ) {
+			if ( ! item || ! item.url || seen.has( item.url ) ) {
+				return;
+			}
+			seen.add( item.url );
+			items.push( item );
+		}
+		graphicLibrary.forEach( pushItem );
+		demoGraphics.forEach( pushItem );
+		return items;
+	}
+
+	function getBootstrapIconSlugs() {
+		return Array.isArray( bootstrapIcons.featured ) ? bootstrapIcons.featured : [];
+	}
+
+	function isAddGroupEnabled( key ) {
+		return productAllowsAdd( key );
+	}
+
+	function isAddGroupReady( key ) {
+		if ( key === 'graphic' ) {
+			return isAddGroupEnabled( 'graphic' ) && resolveAddGraphicItems().length > 0;
+		}
+		if ( key === 'icon' ) {
+			return isAddGroupEnabled( 'icon' ) && getBootstrapIconSlugs().length > 0 && !! bootstrapIcons.iconBaseUrl;
+		}
+		return isAddGroupEnabled( key );
+	}
+
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
-		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
+		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId', 'wcGpdCustomerUpload', 'wcGpdLayerLabel',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
@@ -520,6 +565,99 @@
 		} );
 	}
 
+	function setGraphicContextVisible( visible ) {
+		if ( ui.contextGraphicHint ) {
+			ui.contextGraphicHint.hidden = ! visible;
+		}
+		designerRoot.querySelectorAll( '[data-customer-context="graphic"]' ).forEach( ( row ) => {
+			row.hidden = ! visible;
+		} );
+	}
+
+	function layerLabelForCustomer( obj ) {
+		if ( ! obj ) {
+			return config.i18n.layerText || 'Layer';
+		}
+		if ( obj.wcGpdLayerLabel ) {
+			return obj.wcGpdLayerLabel;
+		}
+		const text = typeof obj.text === 'string' ? obj.text.trim() : '';
+		if ( text ) {
+			return text.slice( 0, 40 );
+		}
+		if ( isCustomerGraphic( obj ) ) {
+			return obj.wcGpdCustomerUpload
+				? ( config.i18n.layerImage || 'Uploaded image' )
+				: ( config.i18n.layerGraphic || 'Graphic' );
+		}
+		if ( isCustomerAddedIcon( obj ) ) {
+			return config.i18n.layerIcon || 'Icon';
+		}
+		if ( isCustomerEditableShape( obj ) ) {
+			return config.i18n.layerShape || 'Shape';
+		}
+		if ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) {
+			return config.i18n.layerText || 'Text layer';
+		}
+		return config.i18n.layerText || 'Layer';
+	}
+
+	function layerTypeBadgeForCustomer( obj ) {
+		if ( isCustomerGraphic( obj ) ) {
+			return obj.wcGpdCustomerUpload ? 'IMG' : 'GFX';
+		}
+		if ( isCustomerAddedIcon( obj ) ) {
+			return 'ICO';
+		}
+		if ( isCustomerEditableShape( obj ) ) {
+			return 'SHP';
+		}
+		if ( isTextLayer( obj ) ) {
+			return 'TXT';
+		}
+		return 'LYR';
+	}
+
+	function customerLayerActionBtn( title, label, onClick ) {
+		const btn = document.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'wc-gpd-tpl-layer-action';
+		btn.title = title;
+		btn.setAttribute( 'aria-label', title );
+		btn.textContent = label;
+		btn.addEventListener( 'click', ( event ) => {
+			event.preventDefault();
+			event.stopPropagation();
+			onClick();
+		} );
+		return btn;
+	}
+
+	function moveCustomerLayer( obj, direction ) {
+		if ( ! obj || ! isCustomerSelectableLayer( obj ) ) {
+			return;
+		}
+		if ( direction === 'up' ) {
+			canvas.bringForward( obj );
+		} else {
+			canvas.sendBackwards( obj );
+		}
+		canvas.setActiveObject( obj );
+		syncToolbar( obj );
+		syncLayersList();
+		canvas.requestRenderAll();
+	}
+
+	function deleteCustomerLayer( obj ) {
+		if ( ! canCustomerDeleteLayer( obj ) ) {
+			return;
+		}
+		canvas.remove( obj );
+		discardSelection();
+		syncLayersList();
+		canvas.requestRenderAll();
+	}
+
 	function isDesignerOpen() {
 		return designerOpen || designerRoot.classList.contains( 'wc-gpd-is-popout' );
 	}
@@ -595,12 +733,13 @@
 	}
 
 	function applyProductToolSettings() {
-		const allowText = productAllowsAdd( 'text' );
-		const allowShape = productAllowsAdd( 'shape' );
-		const allowGraphic = productAllowsAdd( 'graphic' ) && graphicLibrary.length > 0;
-		const allowImage = productAllowsAdd( 'image' );
-		const allowIcon = productAllowsAdd( 'icon' );
-		const anyAdd = allowText || allowShape || allowGraphic || allowImage || allowIcon;
+		const allowText = isAddGroupReady( 'text' );
+		const allowShape = isAddGroupReady( 'shape' );
+		const allowGraphic = isAddGroupReady( 'graphic' );
+		const allowImage = isAddGroupReady( 'image' );
+		const allowIcon = isAddGroupReady( 'icon' );
+		const anyAdd = allowText || allowShape || allowGraphic || allowImage || allowIcon
+			|| isAddGroupEnabled( 'graphic' ) || isAddGroupEnabled( 'icon' );
 
 		setToolVisible( ui.addText, allowText );
 		setToolVisible( ui.addShape, allowShape );
@@ -608,9 +747,9 @@
 
 		designerRoot.querySelectorAll( '[data-add-group]' ).forEach( ( group ) => {
 			const key = group.getAttribute( 'data-add-group' );
-			const visible = productAllowsAdd( key );
-			group.hidden = ! visible;
-			if ( visible ) {
+			const enabled = isAddGroupEnabled( key );
+			group.hidden = ! enabled;
+			if ( enabled ) {
 				const toggle = group.querySelector( '.wc-gpd-add-menu__toggle' );
 				const body = group.querySelector( '.wc-gpd-add-menu__body' );
 				if ( toggle && body && ! group.classList.contains( 'is-open' ) ) {
@@ -631,13 +770,13 @@
 			ui.navAdd.hidden = ! anyAdd;
 		}
 
-		if ( allowGraphic ) {
+		if ( isAddGroupEnabled( 'graphic' ) ) {
 			renderAddGraphicLibrary();
 		} else if ( ui.addGraphicLibrary ) {
 			ui.addGraphicLibrary.innerHTML = '';
 		}
 
-		if ( allowIcon ) {
+		if ( isAddGroupEnabled( 'icon' ) ) {
 			renderAddIconPicker();
 		} else if ( ui.addIconPicker ) {
 			ui.addIconPicker.innerHTML = '';
@@ -666,13 +805,21 @@
 	}
 
 	function renderAddGraphicLibrary() {
-		if ( ! ui.addGraphicLibrary || ! graphicLibrary.length ) {
+		if ( ! ui.addGraphicLibrary ) {
 			return;
 		}
+		const items = resolveAddGraphicItems();
 		ui.addGraphicLibrary.innerHTML = '';
+		if ( ! items.length ) {
+			const empty = document.createElement( 'p' );
+			empty.className = 'wc-gpd-add-menu__empty';
+			empty.textContent = config.i18n.noGraphicsAvailable || 'No graphics are available yet. Add graphics in the store admin under Graphic Libraries.';
+			ui.addGraphicLibrary.appendChild( empty );
+			return;
+		}
 		const row = document.createElement( 'div' );
 		row.className = 'wc-gpd-graphic-thumb-row';
-		graphicLibrary.forEach( ( item ) => {
+		items.forEach( ( item ) => {
 			const btn = document.createElement( 'button' );
 			btn.type = 'button';
 			btn.className = 'wc-gpd-graphic-thumb';
@@ -688,13 +835,16 @@
 		if ( ! ui.addIconPicker ) {
 			return;
 		}
-		const featured = Array.isArray( bootstrapIcons.featured ) ? bootstrapIcons.featured : [];
+		const featured = getBootstrapIconSlugs();
 		const baseUrl = bootstrapIcons.iconBaseUrl || '';
+		ui.addIconPicker.innerHTML = '';
 		if ( ! featured.length || ! baseUrl ) {
-			ui.addIconPicker.innerHTML = '';
+			const empty = document.createElement( 'p' );
+			empty.className = 'wc-gpd-add-menu__empty';
+			empty.textContent = config.i18n.noIconsAvailable || 'Icons are not available on this site yet.';
+			ui.addIconPicker.appendChild( empty );
 			return;
 		}
-		ui.addIconPicker.innerHTML = '';
 		const row = document.createElement( 'div' );
 		row.className = 'wc-gpd-add-icon-row';
 		featured.forEach( ( slug ) => {
@@ -726,6 +876,7 @@
 
 	function applyLayerToolSettings( obj ) {
 		const isShapeLayer = isCustomerEditableShape( obj );
+		const isGraphicLayer = isCustomerGraphic( obj );
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const colorAllowed = textColorAllowed( obj );
 		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
@@ -754,12 +905,12 @@
 		setPropRowVisible( ui.boldBtn, styleAllowed );
 
 		if ( colorRow ) {
-			const showColor = colorAllowed && ( isShapeLayer || isText );
+			const showColor = colorAllowed && ( isShapeLayer || isText ) && ! isGraphicLayer;
 			colorRow.hidden = ! showColor;
 			colorRow.classList.remove( 'is-disabled' );
 		}
 		if ( ui.colorSwatches ) {
-			ui.colorSwatches.hidden = ! colorAllowed || ( ! paletteOnly && ! isShapeLayer );
+			ui.colorSwatches.hidden = ! colorAllowed || isGraphicLayer || ( ! paletteOnly && ! isShapeLayer );
 		}
 		if ( ui.textColor ) {
 			ui.textColor.hidden = ! pickerAllowed || ! isText;
@@ -797,7 +948,20 @@
 		const currentFill = ( obj && obj.fill ) ? String( obj.fill ).toLowerCase() : defaultTextColor( obj ).toLowerCase();
 
 		roles.forEach( ( role ) => {
+			const group = document.createElement( 'div' );
+			group.className = 'wc-gpd-color-role-group';
+			if ( isShapeLayer && roles.length > 1 ) {
+				const roleLabel = document.createElement( 'span' );
+				roleLabel.className = 'wc-gpd-color-role-label';
+				roleLabel.textContent = role === 'stroke'
+					? ( config.i18n.outlineColor || 'Outline' )
+					: ( config.i18n.fillColor || 'Fill' );
+				group.appendChild( roleLabel );
+			}
+			const swatchRow = document.createElement( 'div' );
+			swatchRow.className = 'wc-gpd-color-role-swatches';
 			const colors = paletteColorsForObject( obj, role );
+			const currentStroke = ( obj && obj.stroke ) ? String( obj.stroke ).toLowerCase() : '';
 			colors.forEach( ( color ) => {
 				const btn = document.createElement( 'button' );
 				btn.type = 'button';
@@ -805,7 +969,10 @@
 				btn.style.backgroundColor = color;
 				btn.title = color;
 				btn.setAttribute( 'aria-label', color );
-				btn.classList.toggle( 'is-active', ! isShapeLayer && color.toLowerCase() === currentFill );
+				const isActive = isShapeLayer
+					? ( role === 'stroke' ? color.toLowerCase() === currentStroke : color.toLowerCase() === currentFill )
+					: color.toLowerCase() === currentFill;
+				btn.classList.toggle( 'is-active', isActive );
 				btn.addEventListener( 'click', () => {
 					if ( ! activeText ) {
 						return;
@@ -825,8 +992,10 @@
 					renderColorSwatches( activeText );
 					canvas.requestRenderAll();
 				} );
-				ui.colorSwatches.appendChild( btn );
+				swatchRow.appendChild( btn );
 			} );
+			group.appendChild( swatchRow );
+			ui.colorSwatches.appendChild( group );
 		} );
 	}
 
@@ -1781,6 +1950,20 @@
 	}
 
 	function applyGraphicInteractivity( obj ) {
+		if ( isCustomerGraphic( obj ) && ! obj.wcGpdGraphicSlotUid ) {
+			obj.set( {
+				selectable: true,
+				evented: true,
+				hasControls: true,
+				hasBorders: true,
+				lockMovementX: false,
+				lockMovementY: false,
+				lockScalingX: false,
+				lockScalingY: false,
+				lockUniScaling: false,
+			} );
+			return;
+		}
 		if ( obj.wcGpdGraphicSlotUid ) {
 			obj.set( {
 				selectable: true,
@@ -1967,6 +2150,16 @@
 		} );
 	}
 
+	function canCustomerDeleteLayer( obj ) {
+		if ( ! obj ) {
+			return false;
+		}
+		if ( isCustomerGraphic( obj ) || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return true;
+		}
+		return isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj );
+	}
+
 	/**
 	 * Render clickable layer list (top layer first).
 	 */
@@ -1987,35 +2180,22 @@
 		}
 
 		const ordered = layers.slice().reverse();
-		ordered.forEach( ( obj, index ) => {
-			let label = ( obj.text && String( obj.text ).trim() )
-				? String( obj.text ).trim().slice( 0, 40 )
-				: '';
-			if ( ! label && obj.wcGpdLayerLabel ) {
-				label = obj.wcGpdLayerLabel;
-			}
-			if ( ! label && isCustomerEditableShape( obj ) ) {
-				label = isCustomerAddedIcon( obj ) || obj.type === 'group'
-					? ( config.i18n.layerIcon || 'Icon' )
-					: ( config.i18n.layerShape || 'Shape' );
-			}
-			if ( ! label ) {
-				label = ( config.i18n.layerText || 'Text layer' ) + ' ' + ( index + 1 );
-			}
-
+		ordered.forEach( ( obj ) => {
 			const li = document.createElement( 'li' );
+			li.className = 'wc-gpd-tpl-layer-row' + ( canvas.getActiveObject() === obj ? ' is-active' : '' );
+
 			const btn = document.createElement( 'button' );
 			btn.type = 'button';
-			btn.className = 'wc-gpd-layer-item';
-			btn.textContent = label;
+			btn.className = 'wc-gpd-tpl-layer-item';
+			const badge = document.createElement( 'span' );
+			badge.className = 'wc-gpd-layer-type-badge';
+			badge.textContent = layerTypeBadgeForCustomer( obj );
+			const name = document.createElement( 'span' );
+			name.className = 'wc-gpd-layer-name';
+			name.textContent = layerLabelForCustomer( obj );
+			btn.appendChild( badge );
+			btn.appendChild( name );
 			btn.setAttribute( 'data-layer-index', String( canvas.getObjects().indexOf( obj ) ) );
-
-			if ( canvas.getActiveObject() === obj ) {
-				btn.classList.add( 'is-active' );
-				btn.setAttribute( 'aria-pressed', 'true' );
-			} else {
-				btn.setAttribute( 'aria-pressed', 'false' );
-			}
 
 			btn.addEventListener( 'click', () => {
 				canvas.setActiveObject( obj );
@@ -2025,7 +2205,28 @@
 				openCustomerSection( 'context' );
 			} );
 
+			const actions = document.createElement( 'span' );
+			actions.className = 'wc-gpd-tpl-layer-actions';
+			actions.appendChild( customerLayerActionBtn(
+				config.i18n.bringForward || 'Bring forward',
+				'↑',
+				() => moveCustomerLayer( obj, 'up' )
+			) );
+			actions.appendChild( customerLayerActionBtn(
+				config.i18n.sendBackward || 'Send backward',
+				'↓',
+				() => moveCustomerLayer( obj, 'down' )
+			) );
+			if ( canCustomerDeleteLayer( obj ) ) {
+				actions.appendChild( customerLayerActionBtn(
+					config.i18n.deleteLayer || 'Delete layer',
+					'✕',
+					() => deleteCustomerLayer( obj )
+				) );
+			}
+
 			li.appendChild( btn );
+			li.appendChild( actions );
 			ui.layersList.appendChild( li );
 		} );
 	}
@@ -2051,7 +2252,8 @@
 		activeText = obj;
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const isShapeLayer = !! obj && isCustomerEditableShape( obj );
-		const enabled = isText || isShapeLayer;
+		const isGraphicLayer = !! obj && isCustomerGraphic( obj );
+		const enabled = isText || isShapeLayer || isGraphicLayer;
 
 		if ( ui.toolsPanel ) {
 			ui.toolsPanel.classList.remove( 'is-disabled' );
@@ -2063,6 +2265,7 @@
 			ui.contextPane.hidden = ! enabled;
 		}
 		setTextContextVisible( isText );
+		setGraphicContextVisible( isGraphicLayer );
 
 		if ( ! enabled ) {
 			renderColorSwatches( null );
@@ -2071,15 +2274,7 @@
 		}
 
 		if ( ui.contextLayerName ) {
-			let label = config.i18n.layerText || 'Layer';
-			if ( isText && obj.text && String( obj.text ).trim() ) {
-				label = String( obj.text ).trim().slice( 0, 48 );
-			} else if ( obj.wcGpdLayerLabel ) {
-				label = obj.wcGpdLayerLabel;
-			} else if ( isShapeLayer ) {
-				label = obj.type === 'group' ? ( config.i18n.layerIcon || 'Icon' ) : ( config.i18n.layerShape || 'Shape' );
-			}
-			ui.contextLayerName.textContent = label;
+			ui.contextLayerName.textContent = layerLabelForCustomer( obj );
 		}
 
 		syncContextNav( obj );
@@ -2215,6 +2410,7 @@
 				canvas.add( img );
 				canvas.setActiveObject( img );
 				canvas.requestRenderAll();
+				syncToolbar( img );
 				syncLayersList();
 			},
 			{ crossOrigin: 'anonymous' }
@@ -2227,6 +2423,7 @@
 		}
 		const region = getConstraintRect();
 		const objectUrl = URL.createObjectURL( file );
+		const fileLabel = file.name ? file.name.replace( /\.[^.]+$/, '' ) : ( config.i18n.layerImage || 'Uploaded image' );
 		fabric.Image.fromURL(
 			objectUrl,
 			( img ) => {
@@ -2246,12 +2443,15 @@
 					wcGpdGraphicLayer: true,
 					wcGpdLayerType: 'graphic',
 					wcGpdCustomerUpload: true,
+					wcGpdLayerLabel: fileLabel,
 				} );
 				applyGraphicInteractivity( img );
 				canvas.add( img );
 				canvas.setActiveObject( img );
 				canvas.requestRenderAll();
+				syncToolbar( img );
 				syncLayersList();
+				openCustomerSection( 'context' );
 			},
 			{ crossOrigin: 'anonymous' }
 		);
@@ -2867,41 +3067,6 @@
 	window.addEventListener( 'resize', () => {
 		applyResponsiveScale();
 	} );
-
-	if ( ui.layerForward ) {
-		ui.layerForward.addEventListener( 'click', () => {
-			const obj = canvas.getActiveObject();
-			if ( ! isUsableTextLayer( obj ) ) {
-				return;
-			}
-			canvas.bringForward( obj );
-			syncLayersList();
-			canvas.requestRenderAll();
-		} );
-	}
-
-	if ( ui.layerBackward ) {
-		ui.layerBackward.addEventListener( 'click', () => {
-			const obj = canvas.getActiveObject();
-			if ( ! isUsableTextLayer( obj ) ) {
-				return;
-			}
-			canvas.sendBackwards( obj );
-			syncLayersList();
-			canvas.requestRenderAll();
-		} );
-	}
-
-	if ( ui.layerDelete ) {
-		ui.layerDelete.addEventListener( 'click', () => {
-			const obj = canvas.getActiveObject();
-			if ( ! isUsableTextLayer( obj ) ) {
-				return;
-			}
-			canvas.remove( obj );
-			discardSelection();
-		} );
-	}
 
 	let resizeTimer;
 	const canvasWrap = designerRoot.querySelector( '.wc-gpd-designer__canvas-wrap' );

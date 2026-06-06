@@ -322,7 +322,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'productName'        => get_the_title( $product_id ),
 				'productPrice'       => wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price_html() : '',
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
-				'graphicLibrary'     => ! empty( $settings['graphic_library'] ) ? $settings['graphic_library'] : array(),
+				'graphicLibrary'     => self::graphic_library_for_product( $product_id, $settings ),
 				'graphicLibraries'   => ! empty( $settings['graphic_libraries'] ) ? $settings['graphic_libraries'] : array(),
 				'bootstrapIcons'     => array(
 					'featured'    => WC_GPD_Bootstrap_Icons::featured_slugs(),
@@ -360,6 +360,13 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'layerText'     => __( 'Text layer', 'wc-generic-product-designer' ),
 					'layerShape'    => __( 'Shape', 'wc-generic-product-designer' ),
 					'layerIcon'     => __( 'Icon', 'wc-generic-product-designer' ),
+					'layerGraphic'  => __( 'Graphic', 'wc-generic-product-designer' ),
+					'layerImage'    => __( 'Uploaded image', 'wc-generic-product-designer' ),
+					'fillColor'     => __( 'Fill', 'wc-generic-product-designer' ),
+					'outlineColor'  => __( 'Outline', 'wc-generic-product-designer' ),
+					'noGraphicsAvailable' => __( 'No graphics are available yet. Add images under WooCommerce → Graphic Libraries, or attach graphics to this template.', 'wc-generic-product-designer' ),
+					'noIconsAvailable' => __( 'Icons are not available. Ensure Bootstrap Icons are bundled with the plugin.', 'wc-generic-product-designer' ),
+					'graphicLayerHint' => __( 'Drag to move. Use the corner handles to resize.', 'wc-generic-product-designer' ),
 					'bringForward'  => __( 'Bring forward', 'wc-generic-product-designer' ),
 					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
 					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
@@ -568,6 +575,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 							<p class="wc-gpd-context-empty" id="wc-gpd-context-empty"><?php esc_html_e( 'Select a layer on the canvas to edit its properties.', 'wc-generic-product-designer' ); ?></p>
 							<div class="wc-gpd-context-pane" id="wc-gpd-context-pane" hidden>
 								<p class="wc-gpd-context-layer-name" id="wc-gpd-context-layer-name"></p>
+								<p class="wc-gpd-context-hint wc-gpd-control-graphic" id="wc-gpd-context-graphic-hint" data-customer-context="graphic" hidden><?php esc_html_e( 'Drag to move. Use the corner handles to resize.', 'wc-generic-product-designer' ); ?></p>
 								<div class="wc-gpd-tools-panel wc-gpd-tools-panel--rows" id="wc-gpd-tools-panel">
 									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-font-family"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
@@ -613,12 +621,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 							</div>
 						</div>
 						<div class="wc-gpd-studio-panel-section" data-section="layers" hidden>
-							<ul class="wc-gpd-layers-list" id="wc-gpd-layers-list"></ul>
-							<div class="wc-gpd-layers-actions">
-								<button type="button" class="wc-gpd-layer-action" id="wc-gpd-layer-forward" title="<?php esc_attr_e( 'Bring forward', 'wc-generic-product-designer' ); ?>">↑</button>
-								<button type="button" class="wc-gpd-layer-action" id="wc-gpd-layer-backward" title="<?php esc_attr_e( 'Send backward', 'wc-generic-product-designer' ); ?>">↓</button>
-								<button type="button" class="wc-gpd-layer-action wc-gpd-layer-action--delete" id="wc-gpd-layer-delete"><?php esc_html_e( 'Delete', 'wc-generic-product-designer' ); ?></button>
-							</div>
+							<ul class="wc-gpd-tpl-layers-list wc-gpd-customer-layers-list" id="wc-gpd-layers-list"></ul>
 						</div>
 					</div>
 				</aside>
@@ -828,5 +831,43 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		}
 
 		return $views;
+	}
+
+	/**
+	 * Graphic library items for the storefront Add menu.
+	 *
+	 * @param int   $product_id Product ID.
+	 * @param array $settings   Resolved product settings.
+	 * @return array<int,array{id:int,url:string,title:string}>
+	 */
+	private static function graphic_library_for_product( $product_id, $settings ) {
+		$library = ! empty( $settings['graphic_library'] ) && is_array( $settings['graphic_library'] )
+			? $settings['graphic_library']
+			: array();
+
+		if ( ! empty( $library ) ) {
+			return $library;
+		}
+
+		if ( WC_GPD_Sample_Content::is_sample_product( $product_id ) ) {
+			return self::bundled_demo_graphics();
+		}
+
+		return array();
+	}
+
+	/**
+	 * Bundled demo graphics for the sample product when no media library items exist.
+	 *
+	 * @return array<int,array{id:int,url:string,title:string}>
+	 */
+	private static function bundled_demo_graphics() {
+		return array(
+			array(
+				'id'    => 0,
+				'url'   => WC_GPD_PLUGIN_URL . 'assets/demo/gpd-demo-graphic.svg',
+				'title' => __( 'Demo star', 'wc-generic-product-designer' ),
+			),
+		);
 	}
 }

@@ -16,7 +16,7 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '5';
+	const SAMPLE_VERSION     = '6';
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
@@ -340,9 +340,28 @@ class WC_GPD_Sample_Content {
 			'colors' => array( '#000000', '#2563eb', '#dc2626', '#16a34a' ),
 		);
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_PALETTES, wp_json_encode( $palettes ) );
-		WC_GPD_Product_Settings::save( $post_id, WC_GPD_Product_Settings::DEFAULTS );
+		WC_GPD_Product_Settings::save( $post_id, self::demo_product_settings() );
 
 		return (int) $post_id;
+	}
+
+	/**
+	 * Demo template/product customer-tool defaults.
+	 *
+	 * @return array
+	 */
+	private static function demo_product_settings() {
+		return array_merge(
+			WC_GPD_Product_Settings::DEFAULTS,
+			array(
+				'allow_add_text'    => true,
+				'allow_add_shape'   => true,
+				'allow_add_graphic' => true,
+				'allow_add_image'   => true,
+				'allow_add_icon'    => true,
+				'allow_free_text'   => true,
+			)
+		);
 	}
 
 	/**
@@ -461,7 +480,7 @@ class WC_GPD_Sample_Content {
 		update_post_meta( $saved_id, WC_GPD_Product_Meta::META_ENABLED, 'yes' );
 		update_post_meta( $saved_id, WC_GPD_Product_Meta::META_TEMPLATE_REF, absint( $template_id ) );
 		update_post_meta( $saved_id, WC_GPD_Product_Meta::META_REPLACE_GALLERY, 'yes' );
-		WC_GPD_Product_Settings::save( $saved_id, WC_GPD_Product_Settings::DEFAULTS );
+		WC_GPD_Product_Settings::save( $saved_id, self::demo_product_settings() );
 
 		return (int) $saved_id;
 	}
