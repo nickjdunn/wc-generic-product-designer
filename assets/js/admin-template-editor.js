@@ -1628,8 +1628,11 @@
 		} );
 	}
 
-	function loadView( viewId ) {
-		persistCanvasToActiveView();
+	function loadView( viewId, options ) {
+		const skipPersist = options && options.skipPersist;
+		if ( ! skipPersist ) {
+			persistCanvasToActiveView();
+		}
 		activeViewId = viewId;
 		const view = getActiveView();
 		clearCanvas();
@@ -2157,7 +2160,7 @@
 	function loadJson() {
 		if ( ! jsonInput || ! jsonInput.value ) {
 			ensureDocument();
-			loadView( documentData.views[ 0 ].id );
+			loadView( documentData.views[ 0 ].id, { skipPersist: true } );
 			return;
 		}
 		try {
@@ -2172,7 +2175,7 @@
 			documentData.views = documentData.views.slice( 0, MAX_VIEWS );
 		}
 		syncMaxViewsField();
-		loadView( documentData.views[ 0 ].id );
+		loadView( documentData.views[ 0 ].id, { skipPersist: true } );
 	}
 
 	function syncDimensionFields() {

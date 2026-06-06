@@ -22,10 +22,15 @@ class WC_GPD_Template_Json {
 		'rect',
 		'circle',
 		'ellipse',
+		'polygon',
+		'polyline',
+		'path',
+		'line',
 		'image',
 		'i-text',
 		'text',
 		'textbox',
+		'group',
 	);
 
 	/**
@@ -199,6 +204,23 @@ class WC_GPD_Template_Json {
 				if ( $clean_obj ) {
 					$clean[] = $clean_obj;
 				}
+				continue;
+			}
+
+			if ( 'group' === $type ) {
+				$object['wcGpdUid']           = $uid;
+				$object['wcGpdTemplateLayer'] = true;
+				$object['wcGpdOutlineLayer']  = ! empty( $object['wcGpdOutlineLayer'] );
+				$object['wcGpdBoundingBox']   = ! empty( $object['wcGpdBoundingBox'] );
+				$object['wcGpdLayerType']     = ! empty( $object['wcGpdLayerType'] ) ? sanitize_key( (string) $object['wcGpdLayerType'] ) : 'shape';
+				$object['selectable']         = false;
+				$object['evented']            = false;
+				if ( ! empty( $object['wcGpdLayerLabel'] ) ) {
+					$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
+				} else {
+					unset( $object['wcGpdLayerLabel'] );
+				}
+				$clean[] = $object;
 				continue;
 			}
 
