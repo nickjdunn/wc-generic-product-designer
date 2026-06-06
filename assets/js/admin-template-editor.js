@@ -48,7 +48,7 @@
 		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
 		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
-		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
+		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockText', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
@@ -97,6 +97,8 @@
 		use_global_colors: false,
 		global_colors: [ '#000000' ],
 	};
+
+	const PAL_CUSTOM = 'pal_custom';
 
 	const STEPPER_CONFIG = {
 		line_height: {
@@ -721,13 +723,49 @@
 		return ( palettesData.palettes || [] ).find( ( palette ) => palette.id === paletteId );
 	}
 
-	function colorsForLayer( obj ) {
+	function isCustomPaletteId( paletteId ) {
+		return paletteId === PAL_CUSTOM;
+	}
+
+	function ensureLayerCustomColors( obj ) {
+		if ( ! Array.isArray( obj.wcGpdLayerColors ) || ! obj.wcGpdLayerColors.length ) {
+			obj.wcGpdLayerColors = [ '#000000' ];
+		}
+	}
+
+	function getLayerColorSource( obj ) {
 		if ( palettesData.use_global_colors ) {
-			return palettesData.global_colors || [ '#000000' ];
+			return {
+				type: 'global',
+				colors: palettesData.global_colors || [ '#000000' ],
+				persist() {
+					savePalettesToInput();
+				},
+			};
 		}
 		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		if ( isCustomPaletteId( paletteId ) ) {
+			ensureLayerCustomColors( obj );
+			return {
+				type: 'custom',
+				colors: obj.wcGpdLayerColors,
+				persist() {},
+			};
+		}
 		const palette = getPaletteById( paletteId ) || getPaletteById( 'pal_default' );
-		return palette ? palette.colors : [ '#000000' ];
+		const colors = palette ? palette.colors : [ '#000000' ];
+		return {
+			type: 'palette',
+			colors,
+			palette,
+			persist() {
+				savePalettesToInput();
+			},
+		};
+	}
+
+	function colorsForLayer( obj ) {
+		return getLayerColorSource( obj ).colors;
 	}
 
 	function renderPalettesAdmin() {
@@ -804,12 +842,12 @@
 		} );
 	}
 
-	function populateLayerPaletteSelect() {
+	function populateLayerPaletteSelect( selectedId ) {
 		const select = document.getElementById( 'wc_gpd_layer_palette_id' );
 		if ( ! select ) {
 			return;
 		}
-		const current = select.value;
+		const current = selectedId || select.value;
 		select.innerHTML = '';
 		( palettesData.palettes || [] ).forEach( ( palette ) => {
 			const opt = document.createElement( 'option' );
@@ -817,6 +855,10 @@
 			opt.textContent = palette.name || palette.id;
 			select.appendChild( opt );
 		} );
+		const customOpt = document.createElement( 'option' );
+		customOpt.value = PAL_CUSTOM;
+		customOpt.textContent = 'Custom colors (this layer)';
+		select.appendChild( customOpt );
 		if ( current ) {
 			select.value = current;
 		}
@@ -829,6 +871,8 @@
 
 		const paletteSelect = document.getElementById( 'wc_gpd_layer_palette_id' );
 		const swatchesEl = document.getElementById( 'wc-gpd-layer-color-swatches' );
+		const addColorBtn = document.getElementById( 'wc-gpd-layer-add-color' );
+		const labelEl = document.getElementById( 'wc-gpd-layer-colors-list-label' );
 		const useGlobal = palettesData.use_global_colors;
 
 		if ( paletteSelect ) {
@@ -837,25 +881,45 @@
 				paletteRow.hidden = useGlobal;
 			}
 			if ( ! useGlobal ) {
-				populateLayerPaletteSelect();
+				populateLayerPaletteSelect( obj.wcGpdPaletteId || 'pal_default' );
 				paletteSelect.value = obj.wcGpdPaletteId || 'pal_default';
 			}
+		}
+
+		if ( labelEl ) {
+			if ( useGlobal ) {
+				labelEl.textContent = 'Template colors';
+			} else if ( isCustomPaletteId( obj.wcGpdPaletteId ) ) {
+				labelEl.textContent = 'Custom colors (this layer)';
+			} else {
+				labelEl.textContent = 'Palette colors';
+			}
+		}
+
+		if ( addColorBtn ) {
+			addColorBtn.hidden = false;
 		}
 
 		if ( ! swatchesEl ) {
 			return;
 		}
 		swatchesEl.innerHTML = '';
-		const colors = colorsForLayer( obj );
+		swatchesEl.classList.add( 'wc-gpd-layer-color-list' );
+
+		const source = getLayerColorSource( obj );
+		const colors = source.colors;
 		const currentFill = isShape( obj ) ? getShapeDisplayColor( obj ) : ( obj.fill || '#000000' );
-		colors.forEach( ( color ) => {
-			const btn = document.createElement( 'button' );
-			btn.type = 'button';
-			btn.className = 'wc-gpd-color-swatch';
-			btn.style.backgroundColor = color;
-			btn.title = color;
-			btn.classList.toggle( 'is-active', color.toLowerCase() === String( currentFill ).toLowerCase() );
-			btn.addEventListener( 'click', () => {
+		colors.forEach( ( color, index ) => {
+			const row = document.createElement( 'div' );
+			row.className = 'wc-gpd-layer-color-row';
+
+			const applyBtn = document.createElement( 'button' );
+			applyBtn.type = 'button';
+			applyBtn.className = 'wc-gpd-color-swatch';
+			applyBtn.style.backgroundColor = color;
+			applyBtn.title = 'Apply ' + color;
+			applyBtn.classList.toggle( 'is-active', color.toLowerCase() === String( currentFill ).toLowerCase() );
+			applyBtn.addEventListener( 'click', () => {
 				if ( isShape( obj ) ) {
 					applyShapeColor( obj, color );
 				} else {
@@ -864,7 +928,45 @@
 				canvas.requestRenderAll();
 				syncColorsPanel( obj );
 			} );
-			swatchesEl.appendChild( btn );
+
+			const picker = document.createElement( 'input' );
+			picker.type = 'color';
+			picker.className = 'wc-gpd-prop-color';
+			picker.value = color;
+			picker.addEventListener( 'input', () => {
+				colors[ index ] = picker.value;
+				source.persist();
+				if ( source.type === 'palette' ) {
+					renderPalettesAdmin();
+				} else if ( source.type === 'global' ) {
+					renderGlobalColorsList();
+				}
+				syncColorsPanel( obj );
+			} );
+
+			const removeBtn = document.createElement( 'button' );
+			removeBtn.type = 'button';
+			removeBtn.className = 'button-link-delete wc-gpd-palette-remove-color';
+			removeBtn.textContent = '×';
+			removeBtn.disabled = colors.length <= 1;
+			removeBtn.addEventListener( 'click', () => {
+				if ( colors.length <= 1 ) {
+					return;
+				}
+				colors.splice( index, 1 );
+				source.persist();
+				if ( source.type === 'palette' ) {
+					renderPalettesAdmin();
+				} else if ( source.type === 'global' ) {
+					renderGlobalColorsList();
+				}
+				syncColorsPanel( obj );
+			} );
+
+			row.appendChild( applyBtn );
+			row.appendChild( picker );
+			row.appendChild( removeBtn );
+			swatchesEl.appendChild( row );
 		} );
 	}
 
@@ -2874,10 +2976,32 @@
 	} );
 	document.getElementById( 'wc_gpd_layer_palette_id' )?.addEventListener( 'change', ( event ) => {
 		const obj = canvas.getActiveObject();
-		if ( obj && objectHasColor( obj ) ) {
-			obj.wcGpdPaletteId = event.target.value;
-			syncColorsPanel( obj );
+		if ( ! obj || ! objectHasColor( obj ) ) {
+			return;
 		}
+		const nextId = event.target.value;
+		if ( isCustomPaletteId( nextId ) && ! isCustomPaletteId( obj.wcGpdPaletteId ) ) {
+			obj.wcGpdLayerColors = colorsForLayer( obj ).slice();
+		} else if ( isCustomPaletteId( nextId ) ) {
+			ensureLayerCustomColors( obj );
+		}
+		obj.wcGpdPaletteId = nextId;
+		syncColorsPanel( obj );
+	} );
+	document.getElementById( 'wc-gpd-layer-add-color' )?.addEventListener( 'click', () => {
+		const obj = canvas.getActiveObject();
+		if ( ! obj || ! objectHasColor( obj ) ) {
+			return;
+		}
+		const source = getLayerColorSource( obj );
+		source.colors.push( '#000000' );
+		source.persist();
+		if ( source.type === 'palette' ) {
+			renderPalettesAdmin();
+		} else if ( source.type === 'global' ) {
+			renderGlobalColorsList();
+		}
+		syncColorsPanel( obj );
 	} );
 	document.getElementById( 'wc-gpd-add-global-color' )?.addEventListener( 'click', () => {
 		palettesData.global_colors = palettesData.global_colors || [];

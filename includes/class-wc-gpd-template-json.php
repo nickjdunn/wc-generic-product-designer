@@ -220,6 +220,7 @@ class WC_GPD_Template_Json {
 				} else {
 					unset( $object['wcGpdLayerLabel'] );
 				}
+				self::sanitize_layer_color_props( $object );
 				$clean[] = $object;
 				continue;
 			}
@@ -252,6 +253,10 @@ class WC_GPD_Template_Json {
 				$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
 			} else {
 				unset( $object['wcGpdLayerLabel'] );
+			}
+
+			if ( in_array( $layer_type, array( 'shape', 'outline' ), true ) || in_array( $type, array( 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'path', 'line' ), true ) ) {
+				self::sanitize_layer_color_props( $object );
 			}
 
 			$clean[] = $object;
@@ -318,6 +323,8 @@ class WC_GPD_Template_Json {
 				: __( 'Field', 'wc-generic-product-designer' );
 		}
 
+		self::sanitize_layer_color_props( $object );
+
 		return $object;
 	}
 
@@ -363,6 +370,35 @@ class WC_GPD_Template_Json {
 		$object['wcGpdBoundingBox']   = false;
 
 		return $object;
+	}
+
+	/**
+	 * Sanitize per-layer palette ID and optional custom color list.
+	 *
+	 * @param array $object Fabric object (by reference).
+	 */
+	private static function sanitize_layer_color_props( array &$object ) {
+		$palette_id = ! empty( $object['wcGpdPaletteId'] ) ? sanitize_key( (string) $object['wcGpdPaletteId'] ) : 'pal_default';
+		if ( 'pal_custom' === $palette_id ) {
+			$object['wcGpdPaletteId'] = 'pal_custom';
+			$colors                   = array();
+			if ( ! empty( $object['wcGpdLayerColors'] ) && is_array( $object['wcGpdLayerColors'] ) ) {
+				foreach ( $object['wcGpdLayerColors'] as $color ) {
+					$hex = sanitize_hex_color( (string) $color );
+					if ( $hex ) {
+						$colors[] = $hex;
+					}
+				}
+			}
+			if ( empty( $colors ) ) {
+				$colors[] = '#000000';
+			}
+			$object['wcGpdLayerColors'] = array_values( array_unique( $colors ) );
+			return;
+		}
+
+		$object['wcGpdPaletteId'] = $palette_id;
+		unset( $object['wcGpdLayerColors'] );
 	}
 
 	/**

@@ -1121,12 +1121,24 @@
 }
 
 .wc-gpd-palette-swatches,
-.wc-gpd-layer-color-swatches,
 .wc-gpd-global-colors-list {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
 	margin: 6px 0;
+}
+
+.wc-gpd-layer-color-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 6px 0;
+}
+
+.wc-gpd-layer-color-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .wc-gpd-palette-color-row,

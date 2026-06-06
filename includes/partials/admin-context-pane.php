@@ -86,9 +86,10 @@ defined( 'ABSPATH' ) || exit;
 			<label class="wc-gpd-prop-label" for="wc_gpd_layer_palette_id"><?php esc_html_e( 'Color palette for this layer', 'wc-generic-product-designer' ); ?></label>
 			<select id="wc_gpd_layer_palette_id" class="wc-gpd-prop-control"></select>
 		</div>
-		<div class="wc-gpd-prop-row">
-			<span class="wc-gpd-prop-label"><?php esc_html_e( 'Palette colors', 'wc-generic-product-designer' ); ?></span>
-			<div class="wc-gpd-layer-color-swatches" id="wc-gpd-layer-color-swatches"></div>
+		<div class="wc-gpd-prop-row" id="wc-gpd-layer-colors-list-row">
+			<span class="wc-gpd-prop-label" id="wc-gpd-layer-colors-list-label"><?php esc_html_e( 'Colors', 'wc-generic-product-designer' ); ?></span>
+			<div class="wc-gpd-layer-color-list" id="wc-gpd-layer-color-swatches"></div>
+			<button type="button" class="button button-small" id="wc-gpd-layer-add-color"><?php esc_html_e( 'Add color', 'wc-generic-product-designer' ); ?></button>
 		</div>
 		<hr class="wc-gpd-prop-divider" />
 		<p class="wc-gpd-prop-subheading"><?php esc_html_e( 'Customer access', 'wc-generic-product-designer' ); ?></p>

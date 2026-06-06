@@ -160,7 +160,7 @@
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
-		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId',
+		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
@@ -175,6 +175,11 @@
 				: [ '#000000' ];
 		}
 		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		if ( paletteId === 'pal_custom' ) {
+			return Array.isArray( obj.wcGpdLayerColors ) && obj.wcGpdLayerColors.length
+				? obj.wcGpdLayerColors
+				: [ '#000000' ];
+		}
 		const palette = ( templatePalettes.palettes || [] ).find( ( item ) => item.id === paletteId );
 		return palette && palette.colors && palette.colors.length ? palette.colors : [ '#000000' ];
 	}
