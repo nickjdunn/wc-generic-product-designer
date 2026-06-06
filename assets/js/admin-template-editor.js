@@ -17,12 +17,13 @@
 	const layersEmptyHint = document.getElementById( 'wc-gpd-layers-empty-hint' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
 	const bboxToggle = document.getElementById( 'wc_gpd_template_is_bbox' );
-	const strokeColorInput = document.getElementById( 'wc_gpd_template_stroke_color' );
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
 	const shapeStrokeWidthRow = document.getElementById( 'wc-gpd-shape-stroke-width-row' );
+	const shapeUseFillToggle = document.getElementById( 'wc_gpd_shape_use_fill' );
+	const shapeUseStrokeToggle = document.getElementById( 'wc_gpd_shape_use_stroke' );
 	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
-	const layerColorsPanel = document.getElementById( 'wc-gpd-layer-colors-panel' );
+	const layerColorsPanel = document.getElementById( 'wc-gpd-fill-colors-panel' );
 	const contextNavBtn = document.getElementById( 'wc-gpd-nav-context' );
 	const contextEmpty = document.getElementById( 'wc-gpd-context-empty' );
 	const contextPane = document.getElementById( 'wc-gpd-context-pane' );
@@ -49,6 +50,7 @@
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
 		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
+		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockText', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
@@ -261,6 +263,10 @@
 		return isShapeType( obj ) && !! obj.wcGpdTemplateLayer;
 	}
 
+	function isIconLayer( obj ) {
+		return isShape( obj ) && obj.type === 'group';
+	}
+
 	function shapeIsFillBased( obj ) {
 		if ( ! obj ) {
 			return false;
@@ -273,21 +279,57 @@
 		return hasFill && ! hasStroke;
 	}
 
-	function getShapeDisplayColor( obj ) {
+	function shapeUsesFill( obj ) {
+		return !! obj && obj.wcGpdShapeUseFill !== false;
+	}
+
+	function shapeUsesStroke( obj ) {
+		return !! obj && obj.wcGpdShapeUseStroke !== false;
+	}
+
+	function inferShapeStyleFlags( obj ) {
+		if ( ! isShape( obj ) ) {
+			return;
+		}
+		if ( typeof obj.wcGpdShapeUseFill === 'undefined' ) {
+			obj.wcGpdShapeUseFill = isIconLayer( obj ) || shapeIsFillBased( obj );
+		}
+		if ( typeof obj.wcGpdShapeUseStroke === 'undefined' ) {
+			obj.wcGpdShapeUseStroke = ! isIconLayer( obj ) && ! shapeIsFillBased( obj );
+		}
+		if ( typeof obj.wcGpdCustomerPaletteOnly === 'undefined' ) {
+			obj.wcGpdCustomerPaletteOnly = true;
+		}
+	}
+
+	function initShapeStyleDefaults( obj, kind ) {
+		if ( ! isShapeType( obj ) ) {
+			return;
+		}
+		if ( kind === 'icon' ) {
+			obj.wcGpdShapeUseFill = true;
+			obj.wcGpdShapeUseStroke = false;
+		} else {
+			obj.wcGpdShapeUseFill = false;
+			obj.wcGpdShapeUseStroke = true;
+		}
+		obj.wcGpdCustomerPaletteOnly = true;
+		obj.wcGpdPaletteId = obj.wcGpdPaletteId || 'pal_default';
+		obj.wcGpdStrokePaletteId = obj.wcGpdStrokePaletteId || 'pal_default';
+	}
+
+	function getShapeFillColor( obj ) {
 		if ( ! obj ) {
 			return defaultOutlineColor();
 		}
 		if ( obj.type === 'group' && obj.getObjects ) {
 			const children = obj.getObjects();
 			for ( let i = 0; i < children.length; i++ ) {
-				const childColor = getShapeDisplayColor( children[ i ] );
-				if ( childColor ) {
+				const childColor = getShapeFillColor( children[ i ] );
+				if ( childColor && childColor !== 'transparent' ) {
 					return childColor;
 				}
 			}
-		}
-		if ( obj.stroke && obj.stroke !== 'transparent' ) {
-			return obj.stroke;
 		}
 		if ( obj.fill && obj.fill !== 'transparent' ) {
 			return obj.fill;
@@ -295,19 +337,125 @@
 		return defaultOutlineColor();
 	}
 
-	function applyShapeColor( obj, color ) {
+	function getShapeStrokeColor( obj ) {
+		if ( ! obj ) {
+			return defaultOutlineColor();
+		}
+		if ( obj.type === 'group' && obj.getObjects ) {
+			const children = obj.getObjects();
+			for ( let i = 0; i < children.length; i++ ) {
+				const childColor = getShapeStrokeColor( children[ i ] );
+				if ( childColor && childColor !== 'transparent' ) {
+					return childColor;
+				}
+			}
+		}
+		if ( obj.stroke && obj.stroke !== 'transparent' ) {
+			return obj.stroke;
+		}
+		return defaultOutlineColor();
+	}
+
+	function applyShapeStyleFromFlags( obj ) {
+		if ( ! isShape( obj ) || obj.wcGpdBoundingBox ) {
+			return;
+		}
+		inferShapeStyleFlags( obj );
+		const useFill = shapeUsesFill( obj );
+		const useStroke = shapeUsesStroke( obj );
+		const fillColor = getShapeFillColor( obj );
+		const strokeColor = getShapeStrokeColor( obj );
+		const strokeWidth = useStroke ? getShapeStrokeWidth( obj ) : 0;
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( {
+				fill: useFill ? fillColor : 'transparent',
+				stroke: useStroke ? strokeColor : null,
+				strokeWidth: useStroke ? strokeWidth : 0,
+				strokeLineJoin: 'round',
+				strokeLineCap: 'round',
+			} );
+		}
+		applyToTarget( obj );
+	}
+
+	function getShapeDisplayColor( obj ) {
+		if ( ! obj ) {
+			return defaultOutlineColor();
+		}
+		if ( shapeUsesFill( obj ) ) {
+			return getShapeFillColor( obj );
+		}
+		if ( shapeUsesStroke( obj ) ) {
+			return getShapeStrokeColor( obj );
+		}
+		return defaultOutlineColor();
+	}
+
+	function applyShapeFillColor( obj, color ) {
 		if ( ! obj || ! isShape( obj ) || obj.wcGpdBoundingBox ) {
 			return;
 		}
-		if ( obj.type === 'group' ) {
-			styleShapeForEngraving( obj, color );
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( { fill: color } );
+		}
+		applyToTarget( obj );
+	}
+
+	function applyShapeStrokeColor( obj, color ) {
+		if ( ! obj || ! isShape( obj ) || obj.wcGpdBoundingBox ) {
 			return;
 		}
-		if ( shapeIsFillBased( obj ) ) {
-			obj.set( { fill: color, stroke: null, strokeWidth: 0 } );
+		const strokeWidth = getShapeStrokeWidth( obj );
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( {
+				stroke: color,
+				strokeWidth,
+				strokeLineJoin: 'round',
+				strokeLineCap: 'round',
+			} );
+		}
+		applyToTarget( obj );
+	}
+
+	function applyShapeColor( obj, color, role ) {
+		if ( role === 'stroke' ) {
+			applyShapeStrokeColor( obj, color );
 			return;
 		}
-		obj.set( { stroke: color, fill: 'transparent' } );
+		if ( role === 'fill' ) {
+			applyShapeFillColor( obj, color );
+			return;
+		}
+		if ( isShape( obj ) && shapeUsesFill( obj ) && ! shapeUsesStroke( obj ) ) {
+			applyShapeFillColor( obj, color );
+			return;
+		}
+		if ( isShape( obj ) && shapeUsesStroke( obj ) ) {
+			applyShapeStrokeColor( obj, color );
+			return;
+		}
+		applyShapeFillColor( obj, color );
 	}
 
 	function getShapeStrokeWidth( obj ) {
@@ -332,7 +480,7 @@
 			return;
 		}
 		const strokeWidth = parseFloat( width ) || defaultOutlineWidth();
-		const color = getShapeDisplayColor( obj );
+		const color = getShapeStrokeColor( obj );
 		function applyToTarget( target ) {
 			if ( ! target ) {
 				return;
@@ -460,7 +608,7 @@
 			return;
 		}
 		obj.set( {
-			stroke: isBbox ? defaultBboxColor() : ( strokeColorInput ? strokeColorInput.value : defaultOutlineColor() ),
+			stroke: isBbox ? defaultBboxColor() : getShapeStrokeColor( obj ),
 			strokeWidth: isBbox ? defaultBboxWidth() : ( strokeWidthInput ? parseFloat( strokeWidthInput.value ) : defaultOutlineWidth() ),
 			fill: 'transparent',
 			strokeDashArray: isBbox ? [ 6, 4 ] : null,
@@ -471,11 +619,18 @@
 		if ( ! obj || ! isShape( obj ) ) {
 			return;
 		}
-		if ( strokeColorInput ) {
-			strokeColorInput.value = getShapeDisplayColor( obj );
+		inferShapeStyleFlags( obj );
+		if ( shapeUseFillToggle ) {
+			shapeUseFillToggle.checked = shapeUsesFill( obj );
+		}
+		if ( shapeUseStrokeToggle ) {
+			shapeUseStrokeToggle.checked = shapeUsesStroke( obj );
 		}
 		if ( strokeWidthInput ) {
 			strokeWidthInput.value = String( getShapeStrokeWidth( obj ) );
+		}
+		if ( shapeStrokeWidthRow ) {
+			shapeStrokeWidthRow.hidden = ! shapeUsesStroke( obj );
 		}
 	}
 
@@ -727,28 +882,72 @@
 		return paletteId === PAL_CUSTOM;
 	}
 
-	function ensureLayerCustomColors( obj ) {
-		if ( ! Array.isArray( obj.wcGpdLayerColors ) || ! obj.wcGpdLayerColors.length ) {
-			obj.wcGpdLayerColors = [ '#000000' ];
+	function getPaletteIdForRole( obj, role ) {
+		if ( role === 'stroke' ) {
+			return obj && obj.wcGpdStrokePaletteId ? obj.wcGpdStrokePaletteId : 'pal_default';
 		}
+		return obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
 	}
 
-	function getLayerColorSource( obj ) {
+	function getCustomColorsForRole( obj, role ) {
+		if ( role === 'stroke' ) {
+			return obj.wcGpdStrokeLayerColors;
+		}
+		return obj.wcGpdLayerColors;
+	}
+
+	function setCustomColorsForRole( obj, role, colors ) {
+		if ( role === 'stroke' ) {
+			obj.wcGpdStrokeLayerColors = colors;
+			return;
+		}
+		obj.wcGpdLayerColors = colors;
+	}
+
+	function setPaletteIdForRole( obj, role, paletteId ) {
+		if ( role === 'stroke' ) {
+			obj.wcGpdStrokePaletteId = paletteId;
+			return;
+		}
+		obj.wcGpdPaletteId = paletteId;
+	}
+
+	function normalizeHexColor( value ) {
+		let hex = String( value || '' ).trim();
+		if ( ! hex ) {
+			return '';
+		}
+		if ( hex.charAt( 0 ) !== '#' ) {
+			hex = '#' + hex;
+		}
+		if ( /^#[0-9a-fA-F]{3}$/.test( hex ) ) {
+			hex = '#' + hex.charAt( 1 ) + hex.charAt( 1 ) + hex.charAt( 2 ) + hex.charAt( 2 ) + hex.charAt( 3 ) + hex.charAt( 3 );
+		}
+		return /^#[0-9a-fA-F]{6}$/.test( hex ) ? hex.toLowerCase() : '';
+	}
+
+	function getLayerColorSource( obj, role ) {
 		if ( palettesData.use_global_colors ) {
 			return {
 				type: 'global',
 				colors: palettesData.global_colors || [ '#000000' ],
+				role,
 				persist() {
 					savePalettesToInput();
 				},
 			};
 		}
-		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		const paletteId = getPaletteIdForRole( obj, role );
 		if ( isCustomPaletteId( paletteId ) ) {
-			ensureLayerCustomColors( obj );
+			let colors = getCustomColorsForRole( obj, role );
+			if ( ! Array.isArray( colors ) ) {
+				colors = [];
+				setCustomColorsForRole( obj, role, colors );
+			}
 			return {
 				type: 'custom',
-				colors: obj.wcGpdLayerColors,
+				colors,
+				role,
 				persist() {},
 			};
 		}
@@ -758,14 +957,167 @@
 			type: 'palette',
 			colors,
 			palette,
+			role,
 			persist() {
 				savePalettesToInput();
 			},
 		};
 	}
 
-	function colorsForLayer( obj ) {
-		return getLayerColorSource( obj ).colors;
+	function colorsForLayer( obj, role ) {
+		return getLayerColorSource( obj, role || 'fill' ).colors;
+	}
+
+	function openNativeColorPicker( initialColor, onPick ) {
+		const picker = document.createElement( 'input' );
+		picker.type = 'color';
+		picker.value = normalizeHexColor( initialColor ) || '#000000';
+		picker.style.position = 'fixed';
+		picker.style.left = '-9999px';
+		document.body.appendChild( picker );
+		const finish = ( color ) => {
+			picker.remove();
+			if ( color ) {
+				onPick( color );
+			}
+		};
+		picker.addEventListener( 'input', () => {
+			finish( picker.value );
+		}, { once: true } );
+		picker.addEventListener( 'change', () => {
+			finish( picker.value );
+		}, { once: true } );
+		picker.click();
+	}
+
+	function getActiveColorForRole( obj, role ) {
+		if ( isShape( obj ) ) {
+			return role === 'stroke' ? getShapeStrokeColor( obj ) : getShapeFillColor( obj );
+		}
+		return obj.fill || '#000000';
+	}
+
+	function renderColorRoleUI( obj, role, config ) {
+		const select = document.getElementById( config.selectId );
+		const swatchesEl = document.getElementById( config.listId );
+		const addColorBtn = document.getElementById( config.addBtnId );
+		const labelEl = document.getElementById( config.labelId );
+		const paletteRow = document.getElementById( config.paletteRowId );
+		const useGlobal = palettesData.use_global_colors;
+		const paletteId = getPaletteIdForRole( obj, role );
+		const isCustom = isCustomPaletteId( paletteId );
+		const isEditable = isCustom && ! useGlobal;
+
+		if ( paletteRow ) {
+			paletteRow.hidden = useGlobal;
+		}
+		if ( select && ! useGlobal ) {
+			populateLayerPaletteSelect( paletteId, select );
+			select.value = paletteId;
+		}
+
+		if ( labelEl ) {
+			if ( useGlobal ) {
+				labelEl.textContent = 'Template colors';
+			} else if ( isCustom ) {
+				labelEl.textContent = role === 'stroke' ? 'Custom outline colors' : 'Custom colors (this layer)';
+			} else {
+				labelEl.textContent = role === 'stroke' ? 'Outline palette colors' : 'Palette colors';
+			}
+		}
+
+		if ( addColorBtn ) {
+			addColorBtn.hidden = ! isEditable;
+		}
+
+		if ( ! swatchesEl ) {
+			return;
+		}
+		swatchesEl.innerHTML = '';
+		swatchesEl.classList.add( 'wc-gpd-layer-color-list' );
+
+		const source = getLayerColorSource( obj, role );
+		const colors = source.colors;
+		const currentColor = String( getActiveColorForRole( obj, role ) ).toLowerCase();
+
+		if ( isEditable && ! colors.length ) {
+			const empty = document.createElement( 'p' );
+			empty.className = 'description';
+			empty.textContent = 'No colors yet. Click Add color to pick the first one.';
+			swatchesEl.appendChild( empty );
+			return;
+		}
+
+		colors.forEach( ( color, index ) => {
+			const row = document.createElement( 'div' );
+			row.className = 'wc-gpd-layer-color-row';
+
+			if ( isEditable ) {
+				const swatchBtn = document.createElement( 'button' );
+				swatchBtn.type = 'button';
+				swatchBtn.className = 'wc-gpd-color-swatch';
+				swatchBtn.style.backgroundColor = color;
+				swatchBtn.title = 'Change ' + color;
+				swatchBtn.addEventListener( 'click', () => {
+					openNativeColorPicker( color, ( nextColor ) => {
+						colors[ index ] = nextColor;
+						source.persist();
+						syncColorsPanel( obj );
+					} );
+				} );
+
+				const hexInput = document.createElement( 'input' );
+				hexInput.type = 'text';
+				hexInput.className = 'wc-gpd-layer-color-hex wc-gpd-prop-control';
+				hexInput.value = color;
+				hexInput.maxLength = 7;
+				hexInput.spellcheck = false;
+				hexInput.addEventListener( 'change', () => {
+					const next = normalizeHexColor( hexInput.value );
+					if ( ! next ) {
+						hexInput.value = colors[ index ];
+						return;
+					}
+					colors[ index ] = next;
+					source.persist();
+					syncColorsPanel( obj );
+				} );
+
+				const removeBtn = document.createElement( 'button' );
+				removeBtn.type = 'button';
+				removeBtn.className = 'button-link-delete wc-gpd-palette-remove-color';
+				removeBtn.textContent = '×';
+				removeBtn.addEventListener( 'click', () => {
+					colors.splice( index, 1 );
+					source.persist();
+					syncColorsPanel( obj );
+				} );
+
+				row.appendChild( swatchBtn );
+				row.appendChild( hexInput );
+				row.appendChild( removeBtn );
+			} else {
+				const applyBtn = document.createElement( 'button' );
+				applyBtn.type = 'button';
+				applyBtn.className = 'wc-gpd-color-swatch';
+				applyBtn.style.backgroundColor = color;
+				applyBtn.title = 'Apply ' + color;
+				applyBtn.classList.toggle( 'is-active', color.toLowerCase() === currentColor );
+				applyBtn.addEventListener( 'click', () => {
+					if ( isShape( obj ) ) {
+						applyShapeColor( obj, color, role );
+						applyShapeStyleFromFlags( obj );
+					} else {
+						obj.set( 'fill', color );
+					}
+					canvas.requestRenderAll();
+					syncColorsPanel( obj );
+				} );
+				row.appendChild( applyBtn );
+			}
+
+			swatchesEl.appendChild( row );
+		} );
 	}
 
 	function renderPalettesAdmin() {
@@ -842,8 +1194,8 @@
 		} );
 	}
 
-	function populateLayerPaletteSelect( selectedId ) {
-		const select = document.getElementById( 'wc_gpd_layer_palette_id' );
+	function populateLayerPaletteSelect( selectedId, selectEl ) {
+		const select = selectEl || document.getElementById( 'wc_gpd_layer_palette_id' );
 		if ( ! select ) {
 			return;
 		}
@@ -869,105 +1221,54 @@
 			return;
 		}
 
-		const paletteSelect = document.getElementById( 'wc_gpd_layer_palette_id' );
-		const swatchesEl = document.getElementById( 'wc-gpd-layer-color-swatches' );
-		const addColorBtn = document.getElementById( 'wc-gpd-layer-add-color' );
-		const labelEl = document.getElementById( 'wc-gpd-layer-colors-list-label' );
 		const useGlobal = palettesData.use_global_colors;
+		const isShapeLayer = isShape( obj );
+		inferShapeStyleFlags( obj );
+		const useFill = ! isShapeLayer || shapeUsesFill( obj );
+		const useStroke = isShapeLayer && shapeUsesStroke( obj );
 
-		if ( paletteSelect ) {
-			const paletteRow = paletteSelect.closest( '.wc-gpd-prop-row' );
-			if ( paletteRow ) {
-				paletteRow.hidden = useGlobal;
-			}
-			if ( ! useGlobal ) {
-				populateLayerPaletteSelect( obj.wcGpdPaletteId || 'pal_default' );
-				paletteSelect.value = obj.wcGpdPaletteId || 'pal_default';
-			}
+		const fillPaletteLabel = document.getElementById( 'wc-gpd-fill-palette-label' );
+		if ( fillPaletteLabel ) {
+			fillPaletteLabel.textContent = isShapeLayer ? 'Fill color palette' : 'Color palette for this layer';
 		}
 
-		if ( labelEl ) {
-			if ( useGlobal ) {
-				labelEl.textContent = 'Template colors';
-			} else if ( isCustomPaletteId( obj.wcGpdPaletteId ) ) {
-				labelEl.textContent = 'Custom colors (this layer)';
-			} else {
-				labelEl.textContent = 'Palette colors';
-			}
+		const fillPanel = document.getElementById( 'wc-gpd-fill-colors-panel' );
+		const fillListRow = document.getElementById( 'wc-gpd-layer-colors-list-row' );
+		const strokePanel = document.getElementById( 'wc-gpd-stroke-colors-panel' );
+		const strokeListRow = document.getElementById( 'wc-gpd-stroke-colors-list-row' );
+
+		if ( fillPanel ) {
+			fillPanel.hidden = ! useFill;
+		}
+		if ( fillListRow ) {
+			fillListRow.hidden = ! useFill;
+		}
+		if ( strokePanel ) {
+			strokePanel.hidden = ! isShapeLayer || ! useStroke || useGlobal;
+		}
+		if ( strokeListRow ) {
+			strokeListRow.hidden = ! isShapeLayer || ! useStroke || useGlobal;
 		}
 
-		if ( addColorBtn ) {
-			addColorBtn.hidden = false;
-		}
-
-		if ( ! swatchesEl ) {
-			return;
-		}
-		swatchesEl.innerHTML = '';
-		swatchesEl.classList.add( 'wc-gpd-layer-color-list' );
-
-		const source = getLayerColorSource( obj );
-		const colors = source.colors;
-		const currentFill = isShape( obj ) ? getShapeDisplayColor( obj ) : ( obj.fill || '#000000' );
-		colors.forEach( ( color, index ) => {
-			const row = document.createElement( 'div' );
-			row.className = 'wc-gpd-layer-color-row';
-
-			const applyBtn = document.createElement( 'button' );
-			applyBtn.type = 'button';
-			applyBtn.className = 'wc-gpd-color-swatch';
-			applyBtn.style.backgroundColor = color;
-			applyBtn.title = 'Apply ' + color;
-			applyBtn.classList.toggle( 'is-active', color.toLowerCase() === String( currentFill ).toLowerCase() );
-			applyBtn.addEventListener( 'click', () => {
-				if ( isShape( obj ) ) {
-					applyShapeColor( obj, color );
-				} else {
-					obj.set( 'fill', color );
-				}
-				canvas.requestRenderAll();
-				syncColorsPanel( obj );
+		if ( useFill ) {
+			renderColorRoleUI( obj, 'fill', {
+				selectId: 'wc_gpd_layer_palette_id',
+				listId: 'wc-gpd-layer-color-swatches',
+				labelId: 'wc-gpd-layer-colors-list-label',
+				addBtnId: 'wc-gpd-layer-add-color',
+				paletteRowId: 'wc-gpd-fill-colors-panel',
 			} );
+		}
 
-			const picker = document.createElement( 'input' );
-			picker.type = 'color';
-			picker.className = 'wc-gpd-prop-color';
-			picker.value = color;
-			picker.addEventListener( 'input', () => {
-				colors[ index ] = picker.value;
-				source.persist();
-				if ( source.type === 'palette' ) {
-					renderPalettesAdmin();
-				} else if ( source.type === 'global' ) {
-					renderGlobalColorsList();
-				}
-				syncColorsPanel( obj );
+		if ( isShapeLayer && useStroke && ! useGlobal ) {
+			renderColorRoleUI( obj, 'stroke', {
+				selectId: 'wc_gpd_stroke_layer_palette_id',
+				listId: 'wc-gpd-stroke-layer-color-swatches',
+				labelId: 'wc-gpd-stroke-colors-list-label',
+				addBtnId: 'wc-gpd-stroke-layer-add-color',
+				paletteRowId: 'wc-gpd-stroke-colors-panel',
 			} );
-
-			const removeBtn = document.createElement( 'button' );
-			removeBtn.type = 'button';
-			removeBtn.className = 'button-link-delete wc-gpd-palette-remove-color';
-			removeBtn.textContent = '×';
-			removeBtn.disabled = colors.length <= 1;
-			removeBtn.addEventListener( 'click', () => {
-				if ( colors.length <= 1 ) {
-					return;
-				}
-				colors.splice( index, 1 );
-				source.persist();
-				if ( source.type === 'palette' ) {
-					renderPalettesAdmin();
-				} else if ( source.type === 'global' ) {
-					renderGlobalColorsList();
-				}
-				syncColorsPanel( obj );
-			} );
-
-			row.appendChild( applyBtn );
-			row.appendChild( picker );
-			row.appendChild( removeBtn );
-			swatchesEl.appendChild( row );
-		} );
+		}
 	}
 
 	function renderGlobalColorsList() {
@@ -1182,7 +1483,7 @@
 
 		const shapeColorRow = document.getElementById( 'wc-gpd-prop-shape-color-row' );
 		if ( shapeColorRow ) {
-			shapeColorRow.hidden = type !== 'shape';
+			shapeColorRow.hidden = true;
 		}
 
 		const paletteOnlyRow = document.getElementById( 'wc-gpd-customer-palette-only-row' );
@@ -1247,7 +1548,7 @@
 
 		const paletteOnly = document.getElementById( 'wc_gpd_customer_color_palette_only' );
 		if ( paletteOnly ) {
-			paletteOnly.checked = !! obj.wcGpdCustomerPaletteOnly;
+			paletteOnly.checked = obj.wcGpdCustomerPaletteOnly !== false;
 		}
 	}
 
@@ -1810,6 +2111,12 @@
 		if ( isTextLayer( obj ) ) {
 			obj.set( { editable: true } );
 			normalizeTextLayer( obj );
+			if ( typeof obj.wcGpdCustomerPaletteOnly === 'undefined' ) {
+				obj.wcGpdCustomerPaletteOnly = true;
+			}
+		}
+		if ( isShape( obj ) ) {
+			inferShapeStyleFlags( obj );
 		}
 	}
 
@@ -1914,6 +2221,8 @@
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( rect );
+		initShapeStyleDefaults( rect, 'shape' );
+		applyShapeStyleFromFlags( rect );
 		canvas.add( rect );
 		canvas.setActiveObject( rect );
 		sortLayers();
@@ -1928,6 +2237,8 @@
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( circle );
+		initShapeStyleDefaults( circle, 'shape' );
+		applyShapeStyleFromFlags( circle );
 		canvas.add( circle );
 		canvas.setActiveObject( circle );
 		sortLayers();
@@ -1961,6 +2272,8 @@
 			wcGpdUid: uid(),
 		} );
 		syncShapeFlags( poly );
+		initShapeStyleDefaults( poly, 'shape' );
+		applyShapeStyleFromFlags( poly );
 		canvas.add( poly );
 		canvas.setActiveObject( poly );
 		sortLayers();
@@ -1985,6 +2298,8 @@
 			}
 		);
 		syncShapeFlags( path );
+		initShapeStyleDefaults( path, 'shape' );
+		applyShapeStyleFromFlags( path );
 		canvas.add( path );
 		canvas.setActiveObject( path );
 		sortLayers();
@@ -2019,7 +2334,6 @@
 			let obj = objects.length === 1 ? objects[ 0 ] : fabric.util.groupSVGElements( objects, options );
 			const color = defaultOutlineColor();
 			styleShapeForEngraving( obj, color );
-			applyShapeStrokeWidth( obj, defaultOutlineWidth() );
 			const targetSize = 96;
 			const bounds = obj.getBoundingRect( true, true );
 			const base = Math.max( bounds.width || 16, bounds.height || 16, 1 );
@@ -2036,6 +2350,8 @@
 				wcGpdLayerLabel: ( slug || 'icon' ).replace( /-/g, ' ' ),
 			} );
 			syncShapeFlags( obj );
+			initShapeStyleDefaults( obj, 'icon' );
+			applyShapeStyleFromFlags( obj );
 			canvas.add( obj );
 			canvas.setActiveObject( obj );
 			sortLayers();
@@ -2109,6 +2425,8 @@
 			wcGpdLayerLabel: 'Freeform',
 		} );
 		syncShapeFlags( poly );
+		initShapeStyleDefaults( poly, 'shape' );
+		applyShapeStyleFromFlags( poly );
 		clearFreeformPreview();
 		freeformMode = false;
 		freeformPoints = [];
@@ -2167,6 +2485,7 @@
 			wcGpdLayerLabel: '',
 			wcGpdFitMode: 'none',
 			wcGpdPaletteId: 'pal_default',
+			wcGpdCustomerPaletteOnly: true,
 			wcGpdCustomerEditable: true,
 			wcGpdHideFromCustomerLayers: false,
 			wcGpdLockMove: false,
@@ -2887,18 +3206,47 @@
 		} );
 	}
 
-	if ( strokeColorInput ) {
-		strokeColorInput.addEventListener( 'input', () => {
+	if ( shapeUseFillToggle ) {
+		shapeUseFillToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
 			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
 				return;
 			}
-			applyShapeColor( active, strokeColorInput.value );
+			active.wcGpdShapeUseFill = shapeUseFillToggle.checked;
+			if ( ! active.wcGpdShapeUseFill && ! active.wcGpdShapeUseStroke ) {
+				active.wcGpdShapeUseStroke = true;
+				if ( shapeUseStrokeToggle ) {
+					shapeUseStrokeToggle.checked = true;
+				}
+			}
+			applyShapeStyleFromFlags( active );
+			syncShapeAppearancePanel( active );
+			syncColorsPanel( active );
 			canvas.requestRenderAll();
 		} );
 	}
 
-		if ( strokeWidthInput ) {
+	if ( shapeUseStrokeToggle ) {
+		shapeUseStrokeToggle.addEventListener( 'change', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
+				return;
+			}
+			active.wcGpdShapeUseStroke = shapeUseStrokeToggle.checked;
+			if ( ! active.wcGpdShapeUseFill && ! active.wcGpdShapeUseStroke ) {
+				active.wcGpdShapeUseFill = true;
+				if ( shapeUseFillToggle ) {
+					shapeUseFillToggle.checked = true;
+				}
+			}
+			applyShapeStyleFromFlags( active );
+			syncShapeAppearancePanel( active );
+			syncColorsPanel( active );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( strokeWidthInput ) {
 		strokeWidthInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
 			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
@@ -2965,6 +3313,35 @@
 		showMeasurementsToggle.addEventListener( 'change', updateRulers );
 	}
 
+	function handlePaletteSelectChange( role, nextId ) {
+		const obj = canvas.getActiveObject();
+		if ( ! obj || ! objectHasColor( obj ) ) {
+			return;
+		}
+		const prevId = getPaletteIdForRole( obj, role );
+		if ( isCustomPaletteId( nextId ) && ! isCustomPaletteId( prevId ) ) {
+			setCustomColorsForRole( obj, role, [] );
+		}
+		setPaletteIdForRole( obj, role, nextId );
+		syncColorsPanel( obj );
+	}
+
+	function handleAddCustomColor( role ) {
+		const obj = canvas.getActiveObject();
+		if ( ! obj || ! objectHasColor( obj ) ) {
+			return;
+		}
+		const source = getLayerColorSource( obj, role );
+		if ( source.type !== 'custom' ) {
+			return;
+		}
+		openNativeColorPicker( '#000000', ( color ) => {
+			source.colors.push( color );
+			source.persist();
+			syncColorsPanel( obj );
+		} );
+	}
+
 	document.getElementById( 'wc-gpd-template-add-text' )?.addEventListener( 'click', addTextField );
 	document.getElementById( 'wc-gpd-add-palette' )?.addEventListener( 'click', () => {
 		const id = `pal_${ Date.now().toString( 36 ) }`;
@@ -2975,33 +3352,16 @@
 		populateLayerPaletteSelect();
 	} );
 	document.getElementById( 'wc_gpd_layer_palette_id' )?.addEventListener( 'change', ( event ) => {
-		const obj = canvas.getActiveObject();
-		if ( ! obj || ! objectHasColor( obj ) ) {
-			return;
-		}
-		const nextId = event.target.value;
-		if ( isCustomPaletteId( nextId ) && ! isCustomPaletteId( obj.wcGpdPaletteId ) ) {
-			obj.wcGpdLayerColors = colorsForLayer( obj ).slice();
-		} else if ( isCustomPaletteId( nextId ) ) {
-			ensureLayerCustomColors( obj );
-		}
-		obj.wcGpdPaletteId = nextId;
-		syncColorsPanel( obj );
+		handlePaletteSelectChange( 'fill', event.target.value );
+	} );
+	document.getElementById( 'wc_gpd_stroke_layer_palette_id' )?.addEventListener( 'change', ( event ) => {
+		handlePaletteSelectChange( 'stroke', event.target.value );
 	} );
 	document.getElementById( 'wc-gpd-layer-add-color' )?.addEventListener( 'click', () => {
-		const obj = canvas.getActiveObject();
-		if ( ! obj || ! objectHasColor( obj ) ) {
-			return;
-		}
-		const source = getLayerColorSource( obj );
-		source.colors.push( '#000000' );
-		source.persist();
-		if ( source.type === 'palette' ) {
-			renderPalettesAdmin();
-		} else if ( source.type === 'global' ) {
-			renderGlobalColorsList();
-		}
-		syncColorsPanel( obj );
+		handleAddCustomColor( 'fill' );
+	} );
+	document.getElementById( 'wc-gpd-stroke-layer-add-color' )?.addEventListener( 'click', () => {
+		handleAddCustomColor( 'stroke' );
 	} );
 	document.getElementById( 'wc-gpd-add-global-color' )?.addEventListener( 'click', () => {
 		palettesData.global_colors = palettesData.global_colors || [];

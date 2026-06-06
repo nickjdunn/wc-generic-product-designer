@@ -161,6 +161,7 @@
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
+		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
@@ -168,16 +169,20 @@
 		'wcGpdCustomerPaletteOnly',
 	];
 
-	function paletteColorsForObject( obj ) {
+	function paletteColorsForObject( obj, role ) {
+		const colorRole = role || 'fill';
 		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
 			return templatePalettes.global_colors && templatePalettes.global_colors.length
 				? templatePalettes.global_colors
 				: [ '#000000' ];
 		}
-		const paletteId = obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default';
+		const paletteId = colorRole === 'stroke'
+			? ( obj && obj.wcGpdStrokePaletteId ? obj.wcGpdStrokePaletteId : 'pal_default' )
+			: ( obj && obj.wcGpdPaletteId ? obj.wcGpdPaletteId : 'pal_default' );
 		if ( paletteId === 'pal_custom' ) {
-			return Array.isArray( obj.wcGpdLayerColors ) && obj.wcGpdLayerColors.length
-				? obj.wcGpdLayerColors
+			const layerColors = colorRole === 'stroke' ? obj.wcGpdStrokeLayerColors : obj.wcGpdLayerColors;
+			return Array.isArray( layerColors ) && layerColors.length
+				? layerColors
 				: [ '#000000' ];
 		}
 		const palette = ( templatePalettes.palettes || [] ).find( ( item ) => item.id === paletteId );

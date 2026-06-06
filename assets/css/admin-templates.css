@@ -1141,6 +1141,12 @@
 	gap: 8px;
 }
 
+.wc-gpd-layer-color-hex {
+	width: 6.5em;
+	font-family: Consolas, Monaco, monospace;
+	font-size: 12px;
+}
+
 .wc-gpd-palette-color-row,
 .wc-gpd-global-color-row {
 	display: inline-flex;
