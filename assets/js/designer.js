@@ -60,6 +60,33 @@
 				obj[ key ] = source[ key ];
 			}
 		} );
+		normalizeCustomerLockProps( obj );
+	}
+
+	function normalizeCustomerLockProps( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		const lockProps = [
+			'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic',
+			'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
+			'wcGpdLockText', 'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect',
+		];
+		lockProps.forEach( ( key ) => {
+			const val = obj[ key ];
+			if ( val === 'true' || val === '1' || val === 1 ) {
+				obj[ key ] = true;
+			} else if ( val === 'false' || val === '0' || val === 0 || val === null || typeof val === 'undefined' ) {
+				obj[ key ] = false;
+			}
+		} );
+		if ( obj.wcGpdCustomerEditable === 'false' || obj.wcGpdCustomerEditable === '0' || obj.wcGpdCustomerEditable === 0 ) {
+			obj.wcGpdCustomerEditable = false;
+		} else if ( typeof obj.wcGpdCustomerEditable === 'undefined' || obj.wcGpdCustomerEditable === 'true' || obj.wcGpdCustomerEditable === '1' || obj.wcGpdCustomerEditable === 1 ) {
+			if ( obj.wcGpdCustomerEditable !== false ) {
+				obj.wcGpdCustomerEditable = true;
+			}
+		}
 	}
 
 	registerFabricCustomProperties();
@@ -268,19 +295,64 @@
 		}
 	}
 
-	function setPropRowState( controlEl, enabled ) {
+	function isCustomerPropLocked( obj, lockProp ) {
+		if ( ! obj || ! lockProp ) {
+			return true;
+		}
+		const val = obj[ lockProp ];
+		return val === true || val === 1 || val === '1' || val === 'true';
+	}
+
+	function isTemplateCustomerLayer( obj ) {
+		return isCustomerEditableTemplateText( obj ) || isCustomerEditableTemplateShape( obj );
+	}
+
+	function productSettingsAllow( productKey ) {
+		if ( ! productKey ) {
+			return true;
+		}
+		const val = productSettings[ productKey ];
+		return val !== false && val !== 0 && val !== '0' && val !== 'false';
+	}
+
+	function layerAllowsTool( obj, lockProp, productKey ) {
+		if ( ! obj || isCustomerPropLocked( obj, lockProp ) ) {
+			return false;
+		}
+		if ( isTemplateCustomerLayer( obj ) ) {
+			return true;
+		}
+		return productSettingsAllow( productKey );
+	}
+
+	function getPropRow( controlEl ) {
 		if ( ! controlEl ) {
-			return;
+			return null;
 		}
-		const row = controlEl.closest( '.wc-gpd-prop-row' );
+		if ( controlEl.classList && controlEl.classList.contains( 'wc-gpd-prop-row' ) ) {
+			return controlEl;
+		}
+		return controlEl.closest ? controlEl.closest( '.wc-gpd-prop-row' ) : null;
+	}
+
+	function setPropRowVisible( controlEl, visible ) {
+		const row = getPropRow( controlEl );
 		if ( ! row ) {
-			controlEl.hidden = ! enabled;
+			setToolVisible( controlEl, visible );
 			return;
 		}
-		row.classList.toggle( 'is-disabled', ! enabled );
+		row.hidden = ! visible;
+		row.classList.remove( 'is-disabled' );
 		row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( input ) => {
-			input.disabled = ! enabled;
+			input.disabled = false;
 		} );
+	}
+
+	function setControlVisible( controlEl, visible ) {
+		if ( controlEl ) {
+			controlEl.hidden = ! visible;
+			controlEl.disabled = false;
+		}
 	}
 
 	function setTextContextVisible( visible ) {
@@ -363,16 +435,6 @@
 		designerOpen = false;
 	}
 
-	function layerAllowsTool( obj, lockProp, productKey ) {
-		if ( ! obj || obj[ lockProp ] ) {
-			return false;
-		}
-		if ( productKey && productSettings[ productKey ] === false ) {
-			return false;
-		}
-		return true;
-	}
-
 	function applyProductToolSettings() {
 		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
 		if ( ui.navLayers ) {
@@ -387,39 +449,59 @@
 		if ( ! ui.toolsPanel ) {
 			return;
 		}
+		ui.toolsPanel.classList.remove( 'is-disabled' );
 		ui.toolsPanel.querySelectorAll( '.wc-gpd-prop-row' ).forEach( ( row ) => {
+			row.hidden = false;
 			row.classList.remove( 'is-disabled' );
 			row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( input ) => {
+				input.hidden = false;
 				input.disabled = false;
 			} );
 		} );
 	}
 
 	function applyLayerToolSettings( obj ) {
+		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const colorAllowed = textColorAllowed( obj );
 		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
 		const pickerAllowed = colorAllowed && ! paletteOnly;
-		const isShapeLayer = isCustomerEditableTemplateShape( obj );
 		const colorRow = designerRoot.querySelector( '.wc-gpd-control-text-color' );
+
+		const fontAllowed = isText && layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' );
+		const sizeAllowed = isText && layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' );
+		const boldAllowed = isText && layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' );
+		const italicAllowed = isText && layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' );
+		const underlineAllowed = isText && layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' );
+		const alignAllowed = isText && layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' );
+		const lineHeightAllowed = isText && layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' );
+		const letterSpacingAllowed = isText && layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' );
+		const styleAllowed = boldAllowed || italicAllowed || underlineAllowed;
+
+		setPropRowVisible( ui.fontFamily, fontAllowed );
+		setPropRowVisible( ui.fontSize, sizeAllowed );
+		setPropRowVisible( ui.lineHeightLabel || ui.lineHeight, lineHeightAllowed );
+		setPropRowVisible( ui.letterSpacingLabel || ui.letterSpacing, letterSpacingAllowed );
+		setPropRowVisible( ui.alignRow, alignAllowed );
+
+		setControlVisible( ui.boldBtn, boldAllowed );
+		setControlVisible( ui.italicBtn, italicAllowed );
+		setControlVisible( ui.underlineBtn, underlineAllowed );
+		setPropRowVisible( ui.boldBtn, styleAllowed );
+
 		if ( colorRow ) {
-			colorRow.classList.toggle( 'is-disabled', ! colorAllowed );
+			const showColor = colorAllowed && ( isShapeLayer || isText );
+			colorRow.hidden = ! showColor;
+			colorRow.classList.remove( 'is-disabled' );
 		}
 		if ( ui.colorSwatches ) {
 			ui.colorSwatches.hidden = ! colorAllowed || ( ! paletteOnly && ! isShapeLayer );
 		}
 		if ( ui.textColor ) {
-			ui.textColor.disabled = ! pickerAllowed;
-			ui.textColor.hidden = ! pickerAllowed;
+			ui.textColor.hidden = ! pickerAllowed || ! isText;
+			ui.textColor.disabled = false;
 		}
-		setPropRowState( ui.fontFamily, layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ) );
-		setPropRowState( ui.fontSize, layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ) );
-		setPropRowState( ui.boldBtn, layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ) );
-		setPropRowState( ui.italicBtn, layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' ) );
-		setPropRowState( ui.underlineBtn, layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' ) );
-		setPropRowState( ui.lineHeightLabel || ui.lineHeight, layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' ) );
-		setPropRowState( ui.letterSpacingLabel || ui.letterSpacing, layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' ) );
-		setPropRowState( ui.alignRow, layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' ) );
-		if ( ui.textColor && obj && isTextLayer( obj ) ) {
+		if ( ui.textColor && obj && isText ) {
 			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
 	}
@@ -1605,7 +1687,7 @@
 		const enabled = isText || isShapeLayer;
 
 		if ( ui.toolsPanel ) {
-			ui.toolsPanel.classList.toggle( 'is-disabled', ! enabled );
+			ui.toolsPanel.classList.remove( 'is-disabled' );
 		}
 		if ( ui.contextEmpty ) {
 			ui.contextEmpty.hidden = enabled;
