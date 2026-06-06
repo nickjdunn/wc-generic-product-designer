@@ -178,11 +178,18 @@
 
 	const ui = {
 		addText: document.getElementById( 'wc-gpd-add-text' ),
-		addShape: document.getElementById( 'wc-gpd-add-shape' ),
+		addShapes: document.getElementById( 'wc-gpd-add-shapes' ),
 		addImage: document.getElementById( 'wc-gpd-add-image' ),
 		addImageFile: document.getElementById( 'wc-gpd-add-image-file' ),
 		addGraphicLibrary: document.getElementById( 'wc-gpd-add-graphic-library' ),
-		addIconPicker: document.getElementById( 'wc-gpd-add-icon-picker' ),
+		iconFeatured: document.getElementById( 'wc-gpd-customer-icon-featured' ),
+		iconSearch: document.getElementById( 'wc-gpd-customer-icon-search' ),
+		iconSearchBtn: document.getElementById( 'wc-gpd-customer-icon-search-btn' ),
+		iconResults: document.getElementById( 'wc-gpd-customer-icon-results' ),
+		iconStatus: document.getElementById( 'wc-gpd-customer-icon-status' ),
+		iconLoadMoreWrap: document.getElementById( 'wc-gpd-customer-icon-load-more-wrap' ),
+		iconLoadMoreBtn: document.getElementById( 'wc-gpd-customer-icon-load-more' ),
+		layersEmptyHint: document.getElementById( 'wc-gpd-layers-empty-hint' ),
 		addMenu: document.getElementById( 'wc-gpd-add-menu' ),
 		addEmpty: document.getElementById( 'wc-gpd-add-empty' ),
 		navAdd: document.getElementById( 'wc-gpd-nav-add' ),
@@ -425,7 +432,7 @@
 			return isAddGroupEnabled( 'graphic' ) && resolveAddGraphicItems().length > 0;
 		}
 		if ( key === 'icon' ) {
-			return isAddGroupEnabled( 'icon' ) && getBootstrapIconSlugs().length > 0 && !! bootstrapIcons.iconBaseUrl;
+			return isAddGroupEnabled( 'icon' ) && !! bootstrapIcons.iconBaseUrl;
 		}
 		return isAddGroupEnabled( key );
 	}
@@ -742,7 +749,6 @@
 			|| isAddGroupEnabled( 'graphic' ) || isAddGroupEnabled( 'icon' );
 
 		setToolVisible( ui.addText, allowText );
-		setToolVisible( ui.addShape, allowShape );
 		setToolVisible( ui.addImage, allowImage );
 
 		designerRoot.querySelectorAll( '[data-add-group]' ).forEach( ( group ) => {
@@ -777,9 +783,7 @@
 		}
 
 		if ( isAddGroupEnabled( 'icon' ) ) {
-			renderAddIconPicker();
-		} else if ( ui.addIconPicker ) {
-			ui.addIconPicker.innerHTML = '';
+			initCustomerIconBrowser();
 		}
 
 		if ( ui.navLayers ) {
@@ -831,32 +835,159 @@
 		ui.addGraphicLibrary.appendChild( row );
 	}
 
-	function renderAddIconPicker() {
-		if ( ! ui.addIconPicker ) {
+	function renderCustomerIconButton( slug ) {
+		const baseUrl = bootstrapIcons.iconBaseUrl || '';
+		const btn = document.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'wc-gpd-shape-library-btn wc-gpd-bootstrap-icon-btn';
+		btn.title = slug;
+		const label = slug.replace( /-/g, ' ' );
+		if ( baseUrl ) {
+			btn.innerHTML = `<img src="${ baseUrl }${ slug }.svg" alt="" width="28" height="28" loading="lazy" /><span>${ label }</span>`;
+		} else {
+			btn.innerHTML = `<span class="wc-gpd-bootstrap-icon-fallback">${ slug.charAt( 0 ).toUpperCase() }</span><span>${ label }</span>`;
+		}
+		btn.addEventListener( 'click', () => addCustomerIcon( slug ) );
+		return btn;
+	}
+
+	const iconBrowserState = {
+		initialized: false,
+		query: '',
+		limit: 60,
+		offset: 0,
+		total: 0,
+		icons: [],
+		loading: false,
+	};
+
+	function renderCustomerIconFeatured( slugs ) {
+		if ( ! ui.iconFeatured ) {
 			return;
 		}
-		const featured = getBootstrapIconSlugs();
-		const baseUrl = bootstrapIcons.iconBaseUrl || '';
-		ui.addIconPicker.innerHTML = '';
-		if ( ! featured.length || ! baseUrl ) {
+		ui.iconFeatured.innerHTML = '';
+		if ( ! slugs || ! slugs.length ) {
+			return;
+		}
+		slugs.forEach( ( slug ) => {
+			ui.iconFeatured.appendChild( renderCustomerIconButton( slug ) );
+		} );
+	}
+
+	function updateCustomerIconStatus() {
+		if ( ! ui.iconStatus ) {
+			return;
+		}
+		const count = iconBrowserState.icons.length;
+		if ( ! count && ! iconBrowserState.loading ) {
+			ui.iconStatus.hidden = true;
+			return;
+		}
+		ui.iconStatus.textContent = `${ count } / ${ iconBrowserState.total || count } icons`;
+		ui.iconStatus.hidden = false;
+	}
+
+	function updateCustomerIconLoadMore() {
+		if ( ! ui.iconLoadMoreWrap ) {
+			return;
+		}
+		ui.iconLoadMoreWrap.hidden = iconBrowserState.loading || iconBrowserState.icons.length >= iconBrowserState.total;
+	}
+
+	function renderCustomerIconResults() {
+		if ( ! ui.iconResults ) {
+			return;
+		}
+		ui.iconResults.innerHTML = '';
+		if ( ! iconBrowserState.icons.length ) {
 			const empty = document.createElement( 'p' );
 			empty.className = 'wc-gpd-add-menu__empty';
-			empty.textContent = config.i18n.noIconsAvailable || 'Icons are not available on this site yet.';
-			ui.addIconPicker.appendChild( empty );
+			empty.textContent = config.i18n.iconsNoResults || 'No icons found.';
+			ui.iconResults.appendChild( empty );
+			updateCustomerIconStatus();
+			updateCustomerIconLoadMore();
 			return;
 		}
-		const row = document.createElement( 'div' );
-		row.className = 'wc-gpd-add-icon-row';
-		featured.forEach( ( slug ) => {
-			const btn = document.createElement( 'button' );
-			btn.type = 'button';
-			btn.className = 'wc-gpd-add-icon-btn';
-			btn.title = slug;
-			btn.innerHTML = `<img src="${ baseUrl }${ slug }.svg" alt="" width="28" height="28" loading="lazy" />`;
-			btn.addEventListener( 'click', () => addCustomerIcon( slug ) );
-			row.appendChild( btn );
+		iconBrowserState.icons.forEach( ( slug ) => {
+			ui.iconResults.appendChild( renderCustomerIconButton( slug ) );
 		} );
-		ui.addIconPicker.appendChild( row );
+		updateCustomerIconStatus();
+		updateCustomerIconLoadMore();
+	}
+
+	function fetchCustomerIcons( append ) {
+		if ( iconBrowserState.loading || ! bootstrapIcons.ajaxUrl ) {
+			return;
+		}
+		const query = ui.iconSearch ? ui.iconSearch.value.trim() : '';
+		if ( ! append ) {
+			iconBrowserState.offset = 0;
+			iconBrowserState.icons = [];
+			iconBrowserState.query = query;
+			if ( ui.iconResults ) {
+				ui.iconResults.innerHTML = '<p class="wc-gpd-add-menu__status">' + ( config.i18n.iconsSearching || 'Loading icons…' ) + '</p>';
+			}
+		} else {
+			iconBrowserState.offset = iconBrowserState.icons.length;
+		}
+		iconBrowserState.loading = true;
+		updateCustomerIconLoadMore();
+
+		const url = new URL( bootstrapIcons.ajaxUrl, window.location.origin );
+		url.searchParams.set( 'action', bootstrapIcons.ajaxAction || 'wc_gpd_search_bootstrap_icons' );
+		url.searchParams.set( 'nonce', bootstrapIcons.nonce || config.nonce || '' );
+		url.searchParams.set( 'q', query );
+		url.searchParams.set( 'limit', String( iconBrowserState.limit ) );
+		url.searchParams.set( 'offset', String( iconBrowserState.offset ) );
+
+		fetch( url.toString(), { credentials: 'same-origin' } )
+			.then( ( response ) => response.json() )
+			.then( ( payload ) => {
+				if ( ! payload || ! payload.success || ! payload.data ) {
+					throw new Error( 'search failed' );
+				}
+				iconBrowserState.total = payload.data.total || 0;
+				if ( ! append && payload.data.featured ) {
+					renderCustomerIconFeatured( payload.data.featured );
+				}
+				const page = payload.data.icons || [];
+				iconBrowserState.icons = append ? iconBrowserState.icons.concat( page ) : page;
+				renderCustomerIconResults();
+			} )
+			.catch( () => {
+				if ( ! append && ui.iconResults ) {
+					ui.iconResults.innerHTML = '<p class="wc-gpd-add-menu__empty">' + ( config.i18n.noIconsAvailable || 'Icons are not available.' ) + '</p>';
+				}
+			} )
+			.finally( () => {
+				iconBrowserState.loading = false;
+				updateCustomerIconLoadMore();
+			} );
+	}
+
+	function initCustomerIconBrowser() {
+		if ( iconBrowserState.initialized ) {
+			return;
+		}
+		iconBrowserState.initialized = true;
+		renderCustomerIconFeatured( getBootstrapIconSlugs() );
+		if ( ui.iconSearchBtn ) {
+			ui.iconSearchBtn.addEventListener( 'click', () => fetchCustomerIcons( false ) );
+		}
+		if ( ui.iconSearch ) {
+			ui.iconSearch.addEventListener( 'keydown', ( event ) => {
+				if ( 'Enter' === event.key ) {
+					event.preventDefault();
+					fetchCustomerIcons( false );
+				}
+			} );
+		}
+		if ( ui.iconLoadMoreBtn ) {
+			ui.iconLoadMoreBtn.addEventListener( 'click', () => fetchCustomerIcons( true ) );
+		}
+		if ( ui.iconResults ) {
+			fetchCustomerIcons( false );
+		}
 	}
 
 	function resetToolRowStates() {
@@ -2171,11 +2302,11 @@
 		const layers = getCustomerLayers();
 		ui.layersList.innerHTML = '';
 
+		if ( ui.layersEmptyHint ) {
+			ui.layersEmptyHint.hidden = layers.length > 0;
+		}
+
 		if ( ! layers.length ) {
-			const empty = document.createElement( 'li' );
-			empty.className = 'wc-gpd-layers-list__empty';
-			empty.textContent = config.i18n.noLayers || 'No layers yet.';
-			ui.layersList.appendChild( empty );
 			return;
 		}
 
@@ -2192,7 +2323,9 @@
 			badge.textContent = layerTypeBadgeForCustomer( obj );
 			const name = document.createElement( 'span' );
 			name.className = 'wc-gpd-layer-name';
-			name.textContent = layerLabelForCustomer( obj );
+			const labelText = layerLabelForCustomer( obj );
+			name.textContent = labelText;
+			name.title = labelText;
 			btn.appendChild( badge );
 			btn.appendChild( name );
 			btn.setAttribute( 'data-layer-index', String( canvas.getObjects().indexOf( obj ) ) );
@@ -2359,28 +2492,116 @@
 		log.debug( 'Text layer added' );
 	}
 
-	function addShapeLayer() {
+	function regularPolygonPoints( sides, radius ) {
+		const points = [];
+		for ( let i = 0; i < sides; i++ ) {
+			const angle = ( 2 * Math.PI * i ) / sides - Math.PI / 2;
+			points.push( {
+				x: radius * Math.cos( angle ),
+				y: radius * Math.sin( angle ),
+			} );
+		}
+		return points;
+	}
+
+	function finishCustomerShape( obj, label ) {
+		if ( label ) {
+			obj.wcGpdLayerLabel = label;
+		}
+		applyCustomerAddedShapeInteractivity( obj );
+		canvas.add( obj );
+		canvas.setActiveObject( obj );
+		canvas.requestRenderAll();
+		syncToolbar( obj );
+		syncLayersList();
+		openCustomerSection( 'context' );
+	}
+
+	function defaultCustomerShapeColors() {
+		const fill = defaultTextColor( null );
+		return { fill, stroke: fill };
+	}
+
+	function addCustomerShape( kind ) {
 		const region = getConstraintRect();
-		const rect = new fabric.Rect( {
+		const center = {
 			left: region.left + region.width / 2,
 			top: region.top + region.height / 2,
+		};
+		const colors = defaultCustomerShapeColors();
+		const common = {
 			originX: 'center',
 			originY: 'center',
-			width: 140,
-			height: 90,
-			fill: '#2563eb',
-			stroke: '#1e3a8a',
+			fill: colors.fill,
+			stroke: colors.stroke,
 			strokeWidth: 2,
 			wcGpdLayerType: 'shape',
 			wcGpdShapeUseFill: true,
 			wcGpdShapeUseStroke: true,
-		} );
-		canvas.add( rect );
-		applyCustomerAddedShapeInteractivity( rect );
-		canvas.setActiveObject( rect );
-		canvas.requestRenderAll();
-		syncToolbar( rect );
-		syncLayersList();
+		};
+
+		let obj = null;
+		let label = config.i18n.layerShape || 'Shape';
+
+		switch ( kind ) {
+			case 'square':
+				obj = new fabric.Rect( {
+					...center,
+					width: 120,
+					height: 120,
+					...common,
+				} );
+				label = config.i18n.shapeSquare || 'Square';
+				break;
+			case 'circle':
+				obj = new fabric.Circle( {
+					...center,
+					radius: 60,
+					...common,
+				} );
+				label = config.i18n.shapeCircle || 'Circle';
+				break;
+			case 'hexagon':
+				obj = new fabric.Polygon( regularPolygonPoints( 6, 70 ), {
+					...center,
+					...common,
+				} );
+				label = config.i18n.shapeHexagon || 'Hexagon';
+				break;
+			case 'octagon':
+				obj = new fabric.Polygon( regularPolygonPoints( 8, 70 ), {
+					...center,
+					...common,
+				} );
+				label = config.i18n.shapeOctagon || 'Octagon';
+				break;
+			case 'heart':
+				obj = new fabric.Path(
+					'M 12 21.35 L 10.55 20.03 C 5.4 15.36 2 12.28 2 8.5 C 2 5.42 4.42 3 7.5 3 C 9.24 3 10.91 3.81 12 5.09 C 13.09 3.81 14.76 3 16.5 3 C 19.58 3 22 5.42 22 8.5 C 22 12.28 18.6 15.36 13.45 20.03 L 12 21.35 Z',
+					{
+						...center,
+						scaleX: 4,
+						scaleY: 4,
+						...common,
+					}
+				);
+				label = config.i18n.shapeHeart || 'Heart';
+				break;
+			case 'rect':
+			default:
+				obj = new fabric.Rect( {
+					...center,
+					width: 140,
+					height: 90,
+					...common,
+				} );
+				label = config.i18n.shapeRectangle || 'Rectangle';
+				break;
+		}
+
+		if ( obj ) {
+			finishCustomerShape( obj, label );
+		}
 	}
 
 	function addGraphicFromLibrary( item ) {
@@ -2943,8 +3164,13 @@
 		ui.addText.addEventListener( 'click', addTextLayer );
 	}
 
-	if ( ui.addShape ) {
-		ui.addShape.addEventListener( 'click', addShapeLayer );
+	if ( ui.addShapes ) {
+		ui.addShapes.addEventListener( 'click', ( event ) => {
+			const btn = event.target.closest( '[data-customer-shape]' );
+			if ( btn ) {
+				addCustomerShape( btn.getAttribute( 'data-customer-shape' ) );
+			}
+		} );
 	}
 
 	if ( ui.addImage && ui.addImageFile ) {

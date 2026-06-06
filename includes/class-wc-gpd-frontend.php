@@ -46,6 +46,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 	 * Register module hooks.
 	 */
 	public function register() {
+		WC_GPD_Bootstrap_Icons::register_storefront_ajax();
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_storefront_cta_assets' ) );
 		add_action( 'wp_footer', array( $this, 'render_deferred_designer' ), 5 );
@@ -327,6 +328,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'bootstrapIcons'     => array(
 					'featured'    => WC_GPD_Bootstrap_Icons::featured_slugs(),
 					'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
+					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+					'ajaxAction'  => WC_GPD_Bootstrap_Icons::AJAX_SEARCH,
+					'nonce'       => wp_create_nonce( self::NONCE_ACTION ),
 				),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
@@ -367,6 +371,19 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'noGraphicsAvailable' => __( 'No graphics are available yet. Add images under WooCommerce → Graphic Libraries, or attach graphics to this template.', 'wc-generic-product-designer' ),
 					'noIconsAvailable' => __( 'Icons are not available. Ensure Bootstrap Icons are bundled with the plugin.', 'wc-generic-product-designer' ),
 					'graphicLayerHint' => __( 'Drag to move. Use the corner handles to resize.', 'wc-generic-product-designer' ),
+					'layersHint'       => __( 'Tap a layer to edit it. Use the arrows to change stacking order.', 'wc-generic-product-designer' ),
+					'layersEmpty'      => __( 'Layers appear here as you add content.', 'wc-generic-product-designer' ),
+					'searchIcons'      => __( 'Search icons…', 'wc-generic-product-designer' ),
+					'iconSearch'       => __( 'Search', 'wc-generic-product-designer' ),
+					'iconLoadMore'     => __( 'Load more', 'wc-generic-product-designer' ),
+					'iconsSearching'   => __( 'Loading icons…', 'wc-generic-product-designer' ),
+					'iconsNoResults'   => __( 'No icons found.', 'wc-generic-product-designer' ),
+					'shapeRectangle'   => __( 'Rectangle', 'wc-generic-product-designer' ),
+					'shapeSquare'      => __( 'Square', 'wc-generic-product-designer' ),
+					'shapeCircle'      => __( 'Circle', 'wc-generic-product-designer' ),
+					'shapeHexagon'     => __( 'Hexagon', 'wc-generic-product-designer' ),
+					'shapeOctagon'     => __( 'Octagon', 'wc-generic-product-designer' ),
+					'shapeHeart'       => __( 'Heart', 'wc-generic-product-designer' ),
 					'bringForward'  => __( 'Bring forward', 'wc-generic-product-designer' ),
 					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
 					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
@@ -543,7 +560,14 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 								<div class="wc-gpd-add-menu__group" data-add-group="shape" hidden>
 									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></button>
 									<div class="wc-gpd-add-menu__body" hidden>
-										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-shape"><?php esc_html_e( 'Add rectangle', 'wc-generic-product-designer' ); ?></button>
+										<div class="wc-gpd-tpl-btn-row wc-gpd-add-shapes" id="wc-gpd-add-shapes" role="group" aria-label="<?php esc_attr_e( 'Add a shape', 'wc-generic-product-designer' ); ?>">
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="rect"><?php esc_html_e( 'Rectangle', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="square"><?php esc_html_e( 'Square', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="circle"><?php esc_html_e( 'Circle', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="hexagon"><?php esc_html_e( 'Hexagon', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="octagon"><?php esc_html_e( 'Octagon', 'wc-generic-product-designer' ); ?></button>
+											<button type="button" class="button button-small wc-gpd-add-menu__btn" data-customer-shape="heart"><?php esc_html_e( 'Heart', 'wc-generic-product-designer' ); ?></button>
+										</div>
 									</div>
 								</div>
 								<div class="wc-gpd-add-menu__group" data-add-group="graphic" hidden>
@@ -562,7 +586,16 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 								<div class="wc-gpd-add-menu__group" data-add-group="icon" hidden>
 									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Icons', 'wc-generic-product-designer' ); ?></button>
 									<div class="wc-gpd-add-menu__body" hidden>
-										<div class="wc-gpd-add-icon-picker" id="wc-gpd-add-icon-picker" role="group" aria-label="<?php esc_attr_e( 'Choose an icon', 'wc-generic-product-designer' ); ?>"></div>
+										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-featured" id="wc-gpd-customer-icon-featured" role="group" aria-label="<?php esc_attr_e( 'Featured icons', 'wc-generic-product-designer' ); ?>"></div>
+										<div class="wc-gpd-bootstrap-icons-toolbar">
+											<input type="search" id="wc-gpd-customer-icon-search" class="wc-gpd-prop-control" placeholder="<?php esc_attr_e( 'Search icons…', 'wc-generic-product-designer' ); ?>" />
+											<button type="button" class="button button-small" id="wc-gpd-customer-icon-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
+										</div>
+										<p class="wc-gpd-add-menu__status" id="wc-gpd-customer-icon-status" hidden></p>
+										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-customer-icon-results" role="group" aria-label="<?php esc_attr_e( 'Icon search results', 'wc-generic-product-designer' ); ?>"></div>
+										<p class="wc-gpd-bootstrap-icon-load-more" id="wc-gpd-customer-icon-load-more-wrap" hidden>
+											<button type="button" class="button button-small" id="wc-gpd-customer-icon-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
+										</p>
 									</div>
 								</div>
 							</div>
@@ -621,7 +654,11 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 							</div>
 						</div>
 						<div class="wc-gpd-studio-panel-section" data-section="layers" hidden>
-							<ul class="wc-gpd-tpl-layers-list wc-gpd-customer-layers-list" id="wc-gpd-layers-list"></ul>
+							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Tap a layer to edit it. Use the arrows to change stacking order.', 'wc-generic-product-designer' ); ?></p>
+							<div class="wc-gpd-customer-layers-scroll">
+								<ul class="wc-gpd-tpl-layers-list wc-gpd-customer-layers-list" id="wc-gpd-layers-list"></ul>
+								<p class="wc-gpd-layers-empty-hint" id="wc-gpd-layers-empty-hint" hidden><?php esc_html_e( 'Layers appear here as you add content.', 'wc-generic-product-designer' ); ?></p>
+							</div>
 						</div>
 					</div>
 				</aside>

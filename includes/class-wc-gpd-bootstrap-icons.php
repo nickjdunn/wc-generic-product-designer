@@ -32,6 +32,14 @@ class WC_GPD_Bootstrap_Icons {
 	}
 
 	/**
+	 * Storefront icon search (runs before admin handler; uses designer nonce).
+	 */
+	public static function register_storefront_ajax() {
+		add_action( 'wp_ajax_' . self::AJAX_SEARCH, array( __CLASS__, 'ajax_search_storefront' ), 5 );
+		add_action( 'wp_ajax_nopriv_' . self::AJAX_SEARCH, array( __CLASS__, 'ajax_search_storefront' ), 5 );
+	}
+
+	/**
 	 * Absolute path to icons directory.
 	 *
 	 * @return string
@@ -182,6 +190,32 @@ class WC_GPD_Bootstrap_Icons {
 			return false;
 		}
 		return WC_GPD_PLUGIN_URL . self::ICONS_DIR . '/' . $slug . '.svg';
+	}
+
+	/**
+	 * AJAX: search icon slugs (storefront designer).
+	 */
+	public static function ajax_search_storefront() {
+		$nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, WC_GPD_Frontend::NONCE_ACTION ) ) {
+			return;
+		}
+
+		$query  = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$limit  = isset( $_GET['limit'] ) ? absint( $_GET['limit'] ) : 60;
+		$offset = isset( $_GET['offset'] ) ? absint( $_GET['offset'] ) : 0;
+
+		$results = self::search( $query, $limit, $offset );
+		wp_send_json_success(
+			array_merge(
+				$results,
+				array(
+					'featured' => self::featured_slugs(),
+					'source'   => 'Bootstrap Icons',
+					'license'  => 'MIT',
+				)
+			)
+		);
 	}
 
 	/**
