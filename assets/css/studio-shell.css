@@ -291,8 +291,13 @@
 	display: grid;
 	grid-template-columns: var(--wc-gpd-studio-nav-w) var(--wc-gpd-studio-drawer-w) minmax( 0, 1fr );
 	grid-template-areas: "nav drawer canvas";
+	grid-template-rows: minmax( 0, 1fr );
 	gap: 0;
 	align-items: stretch;
+	height: var(--wc-gpd-studio-work-h, 480px);
+	max-height: var(--wc-gpd-studio-work-h, 480px);
+	min-height: var(--wc-gpd-studio-work-h, 480px);
+	overflow: hidden;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-accordion {
@@ -337,10 +342,13 @@
 	align-items: stretch;
 	justify-content: stretch;
 	min-width: 0;
-	min-height: var(--wc-gpd-studio-work-h, 480px);
+	height: 100%;
+	max-height: 100%;
+	min-height: 0;
 	padding: 0;
 	background: var(--wc-gpd-studio-bg);
 	border: none;
+	overflow: hidden;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-canvas-frame {
@@ -367,11 +375,18 @@
 	flex-direction: column;
 	min-height: 0;
 	height: 100%;
+	max-height: 100%;
+	overflow: hidden;
+}
+
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-studio-nav {
+	height: 100%;
+	max-height: 100%;
+	overflow: hidden;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio.wc-gpd-tpl-layout {
-	min-height: var(--wc-gpd-studio-work-h, 480px);
-	flex: 1 1 auto;
+	flex: 0 0 auto;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-layers-list {
@@ -388,13 +403,15 @@
 	flex-direction: column;
 	flex: 1 1 auto;
 	min-height: 0;
-	overflow: hidden;
+	overflow-x: hidden;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-context-pane {
-	flex: 1 1 auto;
+	flex: 0 1 auto;
 	min-height: 0;
-	overflow-y: auto;
+	overflow: visible;
 	padding: 0.75rem 1rem;
 	gap: 0.625rem;
 }
@@ -526,11 +543,16 @@
 	font-size: 13px;
 }
 
+.wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-studio-drawer__head {
+	flex-shrink: 0;
+}
+
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-studio-drawer__body {
 	display: flex;
 	flex-direction: column;
 	flex: 1 1 auto;
 	min-height: 0;
+	overflow: hidden;
 	padding: 0;
 }
 
@@ -542,10 +564,12 @@
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root {
 	display: flex;
 	flex-direction: column;
+	height: calc( var( --wc-gpd-studio-chrome-h, 52px ) + var( --wc-gpd-studio-work-h, 480px ) );
 	min-height: calc( var( --wc-gpd-studio-chrome-h, 52px ) + var( --wc-gpd-studio-work-h, 480px ) );
+	max-height: calc( var( --wc-gpd-studio-chrome-h, 52px ) + var( --wc-gpd-studio-work-h, 480px ) );
 	border: none;
 	border-radius: 0;
-	overflow: hidden;
+	overflow: visible;
 	background: var(--wc-gpd-studio-bg);
 }
 
@@ -555,7 +579,7 @@
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio {
-	min-height: var(--wc-gpd-studio-work-h, 480px);
+	flex: 0 0 auto;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-header {
