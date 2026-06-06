@@ -97,6 +97,8 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 					'allIconsNote'  => __( 'This library includes every bundled Bootstrap icon.', 'wc-generic-product-designer' ),
 					'searchIcons'   => __( 'Search icons to add…', 'wc-generic-product-designer' ),
 					'search'        => __( 'Search', 'wc-generic-product-designer' ),
+					'loadAllIcons'  => __( 'Browse all icons', 'wc-generic-product-designer' ),
+					'loadMoreIcons' => __( 'Load more icons', 'wc-generic-product-designer' ),
 					'searching'     => __( 'Loading icons…', 'wc-generic-product-designer' ),
 					'noResults'     => __( 'No icons found.', 'wc-generic-product-designer' ),
 				),
@@ -112,6 +114,7 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 			return;
 		}
 
+		WC_GPD_Graphic_Libraries::maybe_seed_demo_libraries();
 		$libraries = WC_GPD_Graphic_Libraries::get_all();
 
 		if ( isset( $_POST['wc_gpd_libraries_save'] ) ) {

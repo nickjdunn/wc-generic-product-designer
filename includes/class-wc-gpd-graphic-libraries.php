@@ -35,6 +35,30 @@ class WC_GPD_Graphic_Libraries {
 	}
 
 	/**
+	 * One-time seed of deletable demo libraries (graphic, photo, icon).
+	 */
+	public static function maybe_seed_demo_libraries() {
+		if ( get_option( 'wc_gpd_demo_libraries_seeded' ) ) {
+			return;
+		}
+
+		$stored = get_option( self::OPTION_KEY, array() );
+		if ( is_string( $stored ) && '' !== trim( $stored ) ) {
+			$decoded = json_decode( $stored, true );
+			$stored  = is_array( $decoded ) ? $decoded : array();
+		}
+		if ( ! is_array( $stored ) ) {
+			$stored = array();
+		}
+
+		$libraries = self::normalize_libraries_array( $stored );
+		$libraries = self::ensure_default_icon_library( $libraries );
+		$libraries = self::append_demo_libraries( $libraries );
+		update_option( self::OPTION_KEY, wp_json_encode( $libraries ) );
+		update_option( 'wc_gpd_demo_libraries_seeded', 1 );
+	}
+
+	/**
 	 * @param array $libraries Libraries payload.
 	 */
 	public static function save_all( array $libraries ) {
@@ -84,6 +108,12 @@ class WC_GPD_Graphic_Libraries {
 				continue;
 			}
 			$type = self::sanitize_type( $library['type'] ?? self::TYPE_GRAPHIC );
+			if ( self::ALL_ICONS_ID === $id ) {
+				$type      = self::TYPE_ICON;
+				$all_icons = true;
+			} else {
+				$all_icons = ! empty( $library['all_icons'] );
+			}
 			$name = ! empty( $library['name'] ) ? sanitize_text_field( (string) $library['name'] ) : $id;
 			$ids  = array();
 			if ( ! empty( $library['ids'] ) && is_array( $library['ids'] ) ) {
@@ -103,7 +133,6 @@ class WC_GPD_Graphic_Libraries {
 					}
 				}
 			}
-			$all_icons = ! empty( $library['all_icons'] ) || self::ALL_ICONS_ID === $id;
 			$clean[]     = array(
 				'id'         => $id,
 				'name'       => $name,
@@ -123,8 +152,12 @@ class WC_GPD_Graphic_Libraries {
 	 * @return array
 	 */
 	private static function ensure_default_icon_library( array $libraries ) {
-		foreach ( $libraries as $library ) {
+		foreach ( $libraries as $index => $library ) {
 			if ( self::ALL_ICONS_ID === ( $library['id'] ?? '' ) ) {
+				$libraries[ $index ]['type']       = self::TYPE_ICON;
+				$libraries[ $index ]['all_icons']  = true;
+				$libraries[ $index ]['ids']         = array();
+				$libraries[ $index ]['icon_slugs']  = array();
 				return $libraries;
 			}
 		}
@@ -140,6 +173,115 @@ class WC_GPD_Graphic_Libraries {
 			)
 		);
 		return $libraries;
+	}
+
+	const DEMO_GRAPHIC_ID = 'demo_graphic';
+	const DEMO_PHOTO_ID   = 'demo_photo';
+	const DEMO_ICON_ID    = 'demo_icon';
+	const DEMO_ATTACHMENT_OPTION = 'wc_gpd_demo_library_attachment';
+
+	/**
+	 * Seed deletable demo libraries for each type.
+	 *
+	 * @param array $libraries Libraries.
+	 * @return array
+	 */
+	private static function append_demo_libraries( array $libraries ) {
+		$existing = array();
+		foreach ( $libraries as $library ) {
+			if ( ! empty( $library['id'] ) ) {
+				$existing[ $library['id'] ] = true;
+			}
+		}
+
+		$demo_attachment = self::get_or_create_demo_attachment();
+
+		if ( empty( $existing[ self::DEMO_GRAPHIC_ID ] ) ) {
+			$libraries[] = array(
+				'id'         => self::DEMO_GRAPHIC_ID,
+				'name'       => __( 'Demo graphics', 'wc-generic-product-designer' ),
+				'type'       => self::TYPE_GRAPHIC,
+				'ids'        => $demo_attachment ? array( $demo_attachment ) : array(),
+				'icon_slugs' => array(),
+				'all_icons'  => false,
+			);
+		}
+
+		if ( empty( $existing[ self::DEMO_PHOTO_ID ] ) ) {
+			$libraries[] = array(
+				'id'         => self::DEMO_PHOTO_ID,
+				'name'       => __( 'Demo photos', 'wc-generic-product-designer' ),
+				'type'       => self::TYPE_PHOTO,
+				'ids'        => $demo_attachment ? array( $demo_attachment ) : array(),
+				'icon_slugs' => array(),
+				'all_icons'  => false,
+			);
+		}
+
+		if ( empty( $existing[ self::DEMO_ICON_ID ] ) ) {
+			$libraries[] = array(
+				'id'         => self::DEMO_ICON_ID,
+				'name'       => __( 'Demo icons', 'wc-generic-product-designer' ),
+				'type'       => self::TYPE_ICON,
+				'ids'        => array(),
+				'icon_slugs' => WC_GPD_Bootstrap_Icons::featured_slugs(),
+				'all_icons'  => false,
+			);
+		}
+
+		return $libraries;
+	}
+
+	/**
+	 * @return int Attachment ID or 0.
+	 */
+	private static function get_or_create_demo_attachment() {
+		$stored = absint( get_option( self::DEMO_ATTACHMENT_OPTION, 0 ) );
+		if ( $stored && wp_get_attachment_url( $stored ) ) {
+			return $stored;
+		}
+
+		$source = WC_GPD_PLUGIN_DIR . 'assets/demo/gpd-demo-graphic.svg';
+		if ( ! is_readable( $source ) ) {
+			return 0;
+		}
+
+		if ( ! function_exists( 'wp_upload_dir' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			require_once ABSPATH . 'wp-admin/includes/media.php';
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+		}
+
+		$upload_dir = wp_upload_dir();
+		if ( ! empty( $upload_dir['error'] ) ) {
+			return 0;
+		}
+
+		$filename = 'gpd-demo-graphic.svg';
+		$dest     = trailingslashit( $upload_dir['path'] ) . $filename;
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
+		if ( ! copy( $source, $dest ) ) {
+			return 0;
+		}
+
+		$filetype = wp_check_filetype( $filename, null );
+		$attachment_id = wp_insert_attachment(
+			array(
+				'post_mime_type' => $filetype['type'] ? $filetype['type'] : 'image/svg+xml',
+				'post_title'     => __( 'GPD demo graphic', 'wc-generic-product-designer' ),
+				'post_status'    => 'inherit',
+			),
+			$dest
+		);
+
+		if ( is_wp_error( $attachment_id ) || ! $attachment_id ) {
+			return 0;
+		}
+
+		wp_generate_attachment_metadata( $attachment_id, $dest );
+		update_option( self::DEMO_ATTACHMENT_OPTION, $attachment_id );
+
+		return absint( $attachment_id );
 	}
 
 	/**

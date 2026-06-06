@@ -1296,6 +1296,8 @@
 			const menu = document.createElement( 'div' );
 			menu.className = 'wc-gpd-color-menu';
 			menu.hidden = true;
+			menu.addEventListener( 'mousedown', ( event ) => event.stopPropagation() );
+			menu.addEventListener( 'click', ( event ) => event.stopPropagation() );
 
 			const swatchRow = document.createElement( 'div' );
 			swatchRow.className = 'wc-gpd-color-role-swatches';
@@ -1308,7 +1310,8 @@
 				btn.setAttribute( 'aria-label', color );
 				const activeColor = String( currentColor || '' ).toLowerCase();
 				btn.classList.toggle( 'is-active', ! isNoColor( activeColor ) && color.toLowerCase() === activeColor );
-				btn.addEventListener( 'click', () => {
+				btn.addEventListener( 'click', ( event ) => {
+					event.stopPropagation();
 					if ( ! activeText ) {
 						return;
 					}
@@ -1320,8 +1323,14 @@
 							ui.textColor.value = color;
 						}
 					}
+					if ( isNoColor( color ) ) {
+						triggerSwatch.classList.add( 'is-none' );
+						triggerSwatch.style.backgroundColor = '';
+					} else {
+						triggerSwatch.classList.remove( 'is-none' );
+						triggerSwatch.style.backgroundColor = color;
+					}
 					closeColorMenus();
-					renderColorSwatches( activeText );
 					canvas.requestRenderAll();
 				} );
 				swatchRow.appendChild( btn );
@@ -1333,7 +1342,8 @@
 			noneBtn.className = 'wc-gpd-color-none-btn';
 			noneBtn.textContent = config.i18n.noColor || 'No color';
 			noneBtn.classList.toggle( 'is-active', isNoColor( currentColor ) );
-			noneBtn.addEventListener( 'click', () => {
+			noneBtn.addEventListener( 'click', ( event ) => {
+				event.stopPropagation();
 				if ( ! activeText ) {
 					return;
 				}
@@ -1342,8 +1352,9 @@
 				} else {
 					activeText.set( 'fill', 'transparent' );
 				}
+				triggerSwatch.classList.add( 'is-none' );
+				triggerSwatch.style.backgroundColor = '';
 				closeColorMenus();
-				renderColorSwatches( activeText );
 				canvas.requestRenderAll();
 			} );
 			menu.appendChild( noneBtn );
@@ -1354,7 +1365,8 @@
 			customInput.type = 'color';
 			customInput.className = 'wc-gpd-color-custom-input';
 			customInput.value = normalizePickerColor( currentColor );
-			customInput.addEventListener( 'input', () => {
+			customInput.addEventListener( 'input', ( event ) => {
+				event.stopPropagation();
 				if ( ! activeText ) {
 					return;
 				}
@@ -1367,7 +1379,8 @@
 						ui.textColor.value = color;
 					}
 				}
-				renderColorSwatches( activeText );
+				triggerSwatch.classList.remove( 'is-none' );
+				triggerSwatch.style.backgroundColor = color;
 				canvas.requestRenderAll();
 			} );
 			customWrap.appendChild( customInput );
@@ -1391,7 +1404,12 @@
 		} );
 	}
 
-	document.addEventListener( 'click', () => closeColorMenus() );
+	document.addEventListener( 'mousedown', ( event ) => {
+		if ( event.target.closest( '.wc-gpd-color-picker-row' ) ) {
+			return;
+		}
+		closeColorMenus();
+	} );
 
 	const canvas = new fabric.Canvas( 'wc-gpd-canvas', {
 		selection: true,

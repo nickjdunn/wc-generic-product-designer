@@ -26,15 +26,26 @@
 		}
 	}
 
-	function persist() {
+	function syncHidden() {
 		if ( hidden ) {
 			hidden.value = JSON.stringify( libraries );
 		}
-		render();
+	}
+
+	function persist( options ) {
+		const opts = options || {};
+		syncHidden();
+		if ( opts.render !== false ) {
+			render();
+		}
 	}
 
 	function isProtectedLibrary( lib ) {
 		return lib && lib.id === 'bootstrap_all';
+	}
+
+	function findLibrary( libId ) {
+		return libraries.find( ( row ) => row.id === libId );
 	}
 
 	function renderIconSlugList( lib, container ) {
@@ -52,15 +63,36 @@
 		searchBtn.className = 'button button-small';
 		searchBtn.textContent = config.i18n?.search || 'Search';
 
+		const loadAllBtn = document.createElement( 'button' );
+		loadAllBtn.type = 'button';
+		loadAllBtn.className = 'button button-small';
+		loadAllBtn.textContent = config.i18n?.loadAllIcons || 'Browse all icons';
+
 		const results = document.createElement( 'div' );
 		results.className = 'wc-gpd-library-icon-results';
+
+		const loadMoreWrap = document.createElement( 'p' );
+		loadMoreWrap.className = 'wc-gpd-library-icon-load-more';
+		loadMoreWrap.hidden = true;
+		const loadMoreBtn = document.createElement( 'button' );
+		loadMoreBtn.type = 'button';
+		loadMoreBtn.className = 'button button-small';
+		loadMoreBtn.textContent = config.i18n?.loadMoreIcons || 'Load more icons';
+		loadMoreWrap.appendChild( loadMoreBtn );
 
 		const slugList = document.createElement( 'ul' );
 		slugList.className = 'wc-gpd-library-icon-slugs';
 
+		const browseState = {
+			query: '',
+			offset: 0,
+			total: 0,
+			loading: false,
+		};
+
 		function renderSlugs() {
 			slugList.innerHTML = '';
-			( lib.icon_slugs || [] ).forEach( ( slug, slugIndex ) => {
+			( lib.icon_slugs || [] ).forEach( ( slug ) => {
 				const li = document.createElement( 'li' );
 				li.className = 'wc-gpd-library-icon-slug';
 				const baseUrl = config.iconBaseUrl || '';
@@ -80,74 +112,149 @@
 				rm.className = 'button-link-delete';
 				rm.textContent = '×';
 				rm.addEventListener( 'click', () => {
-					lib.icon_slugs.splice( slugIndex, 1 );
-					persist();
+					lib.icon_slugs = ( lib.icon_slugs || [] ).filter( ( row ) => row !== slug );
+					syncHidden();
+					renderSlugs();
 				} );
 				li.appendChild( rm );
 				slugList.appendChild( li );
 			} );
 		}
 
-		function searchIcons() {
-			if ( ! config.ajaxUrl ) {
+		function appendIconButton( slug ) {
+			if ( ( lib.icon_slugs || [] ).includes( slug ) ) {
 				return;
 			}
-			results.innerHTML = '<p class="description">' + ( config.i18n?.searching || 'Loading…' ) + '</p>';
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-library-icon-pick';
+			btn.dataset.slug = slug;
+			const baseUrl = config.iconBaseUrl || '';
+			if ( baseUrl ) {
+				btn.innerHTML = '<img src="' + baseUrl + slug + '.svg" alt="" width="24" height="24" /><span>' + slug + '</span>';
+			} else {
+				btn.textContent = slug;
+			}
+			btn.addEventListener( 'click', () => {
+				if ( ! lib.icon_slugs ) {
+					lib.icon_slugs = [];
+				}
+				if ( ! lib.icon_slugs.includes( slug ) ) {
+					lib.icon_slugs.push( slug );
+					syncHidden();
+					renderSlugs();
+					btn.remove();
+				}
+			} );
+			results.appendChild( btn );
+		}
+
+		function fetchIcons( append ) {
+			if ( browseState.loading || ! config.ajaxUrl ) {
+				return;
+			}
+			if ( ! append ) {
+				browseState.offset = 0;
+				results.innerHTML = '<p class="description">' + ( config.i18n?.searching || 'Loading…' ) + '</p>';
+			}
+			browseState.loading = true;
+			loadMoreWrap.hidden = true;
+
 			const url = new URL( config.ajaxUrl, window.location.origin );
 			url.searchParams.set( 'action', config.ajaxAction || 'wc_gpd_search_bootstrap_icons' );
 			url.searchParams.set( 'nonce', config.nonce || '' );
-			url.searchParams.set( 'q', searchInput.value.trim() );
-			url.searchParams.set( 'limit', '40' );
+			url.searchParams.set( 'q', browseState.query );
+			url.searchParams.set( 'limit', '60' );
+			url.searchParams.set( 'offset', String( browseState.offset ) );
+
 			fetch( url.toString(), { credentials: 'same-origin' } )
 				.then( ( response ) => response.json() )
 				.then( ( payload ) => {
-					results.innerHTML = '';
 					if ( ! payload || ! payload.success || ! payload.data || ! payload.data.icons ) {
 						results.textContent = config.i18n?.noResults || 'No icons found.';
 						return;
 					}
-					payload.data.icons.forEach( ( slug ) => {
-						if ( ( lib.icon_slugs || [] ).includes( slug ) ) {
-							return;
-						}
-						const btn = document.createElement( 'button' );
-						btn.type = 'button';
-						btn.className = 'wc-gpd-library-icon-pick';
-						const baseUrl = config.iconBaseUrl || '';
-						if ( baseUrl ) {
-							btn.innerHTML = '<img src="' + baseUrl + slug + '.svg" alt="" width="24" height="24" /><span>' + slug + '</span>';
-						} else {
-							btn.textContent = slug;
-						}
-						btn.addEventListener( 'click', () => {
-							if ( ! lib.icon_slugs ) {
-								lib.icon_slugs = [];
-							}
-							lib.icon_slugs.push( slug );
-							persist();
-						} );
-						results.appendChild( btn );
-					} );
+					if ( ! append ) {
+						results.innerHTML = '';
+					}
+					browseState.total = payload.data.total || 0;
+					payload.data.icons.forEach( appendIconButton );
+					browseState.offset = results.querySelectorAll( '.wc-gpd-library-icon-pick' ).length;
+					loadMoreWrap.hidden = browseState.offset >= browseState.total;
 				} )
 				.catch( () => {
-					results.textContent = config.i18n?.noResults || 'No icons found.';
+					if ( ! append ) {
+						results.textContent = config.i18n?.noResults || 'No icons found.';
+					}
+				} )
+				.finally( () => {
+					browseState.loading = false;
 				} );
 		}
 
-		searchBtn.addEventListener( 'click', searchIcons );
+		searchBtn.addEventListener( 'click', () => {
+			browseState.query = searchInput.value.trim();
+			fetchIcons( false );
+		} );
+		loadAllBtn.addEventListener( 'click', () => {
+			searchInput.value = '';
+			browseState.query = '';
+			fetchIcons( false );
+		} );
+		loadMoreBtn.addEventListener( 'click', () => {
+			browseState.offset = results.querySelectorAll( '.wc-gpd-library-icon-pick' ).length;
+			fetchIcons( true );
+		} );
 		searchInput.addEventListener( 'keydown', ( event ) => {
 			if ( event.key === 'Enter' ) {
 				event.preventDefault();
-				searchIcons();
+				browseState.query = searchInput.value.trim();
+				fetchIcons( false );
 			}
 		} );
 
 		toolbar.appendChild( searchInput );
 		toolbar.appendChild( searchBtn );
+		toolbar.appendChild( loadAllBtn );
 		container.appendChild( toolbar );
 		container.appendChild( results );
+		container.appendChild( loadMoreWrap );
 		container.appendChild( slugList );
 		renderSlugs();
+	}
+
+	function renderMediaPreview( lib, preview ) {
+		preview.innerHTML = '';
+		( lib.ids || [] ).forEach( ( id ) => {
+			if ( ! window.wp || ! wp.media ) {
+				return;
+			}
+			wp.media.attachment( id ).fetch().then( () => {
+				const att = wp.media.attachment( id );
+				const url = att.get( 'url' );
+				if ( ! url ) {
+					return;
+				}
+				const li = document.createElement( 'li' );
+				li.className = 'wc-gpd-library-thumb-wrap';
+				const img = document.createElement( 'img' );
+				img.src = url;
+				img.alt = att.get( 'title' ) || '';
+				const rm = document.createElement( 'button' );
+				rm.type = 'button';
+				rm.className = 'wc-gpd-library-thumb-remove';
+				rm.textContent = '×';
+				rm.title = 'Remove';
+				rm.addEventListener( 'click', () => {
+					lib.ids = ( lib.ids || [] ).filter( ( rowId ) => rowId !== id );
+					syncHidden();
+					li.remove();
+				} );
+				li.appendChild( img );
+				li.appendChild( rm );
+				preview.appendChild( li );
+			} );
+		} );
 	}
 
 	function render() {
@@ -162,8 +269,10 @@
 
 		libraries.forEach( ( lib, index ) => {
 			const type = lib.type || 'graphic';
+			const protectedLib = isProtectedLibrary( lib );
 			const card = document.createElement( 'div' );
 			card.className = 'wc-gpd-library-admin-card wc-gpd-library-admin-card--' + type;
+			card.dataset.libraryId = lib.id;
 
 			const header = document.createElement( 'div' );
 			header.className = 'wc-gpd-library-admin-card__header';
@@ -177,7 +286,7 @@
 				opt.selected = type === key;
 				typeSelect.appendChild( opt );
 			} );
-			if ( isProtectedLibrary( lib ) ) {
+			if ( protectedLib ) {
 				typeSelect.disabled = true;
 			}
 			typeSelect.addEventListener( 'change', () => {
@@ -196,28 +305,22 @@
 			nameInput.className = 'regular-text wc-gpd-library-name-input';
 			nameInput.value = lib.name || '';
 			nameInput.placeholder = config.i18n?.libraryName || 'Library name';
-			if ( isProtectedLibrary( lib ) ) {
+			if ( protectedLib ) {
 				nameInput.readOnly = true;
 			}
 			nameInput.addEventListener( 'input', () => {
 				lib.name = nameInput.value;
-				persist();
+				syncHidden();
 			} );
-
-			const addBtn = document.createElement( 'button' );
-			addBtn.type = 'button';
-			addBtn.className = 'button button-small';
-			addBtn.textContent = type === 'photo'
-				? ( config.i18n?.addPhotos || 'Add photos' )
-				: ( config.i18n?.addImages || 'Add images' );
-			addBtn.hidden = type === 'icon';
-			addBtn.addEventListener( 'click', () => openMedia( lib ) );
 
 			const removeBtn = document.createElement( 'button' );
 			removeBtn.type = 'button';
-			removeBtn.className = 'button button-link-delete';
+			removeBtn.className = 'button button-link-delete wc-gpd-library-remove-btn';
 			removeBtn.textContent = config.i18n?.removeLibrary || 'Remove';
-			removeBtn.hidden = isProtectedLibrary( lib );
+			if ( protectedLib ) {
+				removeBtn.hidden = true;
+				removeBtn.disabled = true;
+			}
 			removeBtn.addEventListener( 'click', () => {
 				libraries.splice( index, 1 );
 				persist();
@@ -225,8 +328,9 @@
 
 			header.appendChild( typeSelect );
 			header.appendChild( nameInput );
-			header.appendChild( addBtn );
-			header.appendChild( removeBtn );
+			if ( ! protectedLib ) {
+				header.appendChild( removeBtn );
+			}
 
 			card.appendChild( header );
 
@@ -234,7 +338,13 @@
 				const iconBody = document.createElement( 'div' );
 				iconBody.className = 'wc-gpd-library-icon-body';
 
-				if ( ! isProtectedLibrary( lib ) ) {
+				if ( protectedLib ) {
+					const note = document.createElement( 'p' );
+					note.className = 'description';
+					note.textContent = config.i18n?.allIconsNote || 'This library includes every bundled Bootstrap icon.';
+					iconBody.appendChild( note );
+					lib.all_icons = true;
+				} else {
 					const allLabel = document.createElement( 'label' );
 					allLabel.className = 'wc-gpd-library-all-icons';
 					const allCheck = document.createElement( 'input' );
@@ -250,51 +360,30 @@
 					allLabel.appendChild( allCheck );
 					allLabel.appendChild( document.createTextNode( ' ' + ( config.i18n?.allIcons || 'Include all Bootstrap icons' ) ) );
 					iconBody.appendChild( allLabel );
-				} else {
-					const note = document.createElement( 'p' );
-					note.className = 'description';
-					note.textContent = config.i18n?.allIconsNote || 'This library includes every bundled Bootstrap icon.';
-					iconBody.appendChild( note );
-					lib.all_icons = true;
-				}
 
-				if ( ! lib.all_icons ) {
-					renderIconSlugList( lib, iconBody );
+					if ( ! lib.all_icons ) {
+						renderIconSlugList( lib, iconBody );
+					}
 				}
 
 				card.appendChild( iconBody );
 			} else {
+				const actions = document.createElement( 'div' );
+				actions.className = 'wc-gpd-library-admin-card__actions';
+
+				const addBtn = document.createElement( 'button' );
+				addBtn.type = 'button';
+				addBtn.className = 'button button-small';
+				addBtn.textContent = type === 'photo'
+					? ( config.i18n?.addPhotos || 'Add photos' )
+					: ( config.i18n?.addImages || 'Add images' );
+				addBtn.addEventListener( 'click', () => openMedia( lib ) );
+				actions.appendChild( addBtn );
+				card.appendChild( actions );
+
 				const preview = document.createElement( 'ul' );
 				preview.className = 'wc-gpd-graphic-library-preview';
-				( lib.ids || [] ).forEach( ( id ) => {
-					if ( ! window.wp || ! wp.media ) {
-						return;
-					}
-					wp.media.attachment( id ).fetch().then( () => {
-						const att = wp.media.attachment( id );
-						const url = att.get( 'url' );
-						if ( ! url ) {
-							return;
-						}
-						const li = document.createElement( 'li' );
-						li.className = 'wc-gpd-library-thumb-wrap';
-						const img = document.createElement( 'img' );
-						img.src = url;
-						img.alt = att.get( 'title' ) || '';
-						const rm = document.createElement( 'button' );
-						rm.type = 'button';
-						rm.className = 'wc-gpd-library-thumb-remove';
-						rm.textContent = '×';
-						rm.title = 'Remove';
-						rm.addEventListener( 'click', () => {
-							lib.ids = ( lib.ids || [] ).filter( ( rowId ) => rowId !== id );
-							persist();
-						} );
-						li.appendChild( img );
-						li.appendChild( rm );
-						preview.appendChild( li );
-					} );
-				} );
+				renderMediaPreview( lib, preview );
 				card.appendChild( preview );
 			}
 
