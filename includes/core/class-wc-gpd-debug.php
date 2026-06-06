@@ -182,16 +182,16 @@ class WC_GPD_Debug implements WC_GPD_Module {
 			</p>
 
 			<div class="wc-gpd-debug-panel wc-gpd-debug-panel--poc">
-				<h2><?php esc_html_e( 'Frontend troubleshoot test product', 'wc-generic-product-designer' ); ?></h2>
-				<p><?php esc_html_e( 'A sample product with labeled layers (all editable, color-only, locked, shape) is created on install. Open it on the storefront, select each layer, then click “Copy diagnostics” in the designer footer and paste the report when asking for help.', 'wc-generic-product-designer' ); ?></p>
+				<h2><?php esc_html_e( 'Demo product & template', 'wc-generic-product-designer' ); ?></h2>
+				<p><?php esc_html_e( 'On install/update the plugin creates GPD Demo Template (4 test layers) and GPD Demo Product linked to it. If you deleted your content, update the plugin or click the button below.', 'wc-generic-product-designer' ); ?></p>
 				<p>
-					<a href="<?php echo esc_url( $sample_url ); ?>" class="button button-primary"><?php esc_html_e( 'Create / refresh test product', 'wc-generic-product-designer' ); ?></a>
+					<a href="<?php echo esc_url( $sample_url ); ?>" class="button button-primary"><?php esc_html_e( 'Create / refresh demo content', 'wc-generic-product-designer' ); ?></a>
 				</p>
 				<?php if ( $sample && ! empty( $sample['product_url'] ) ) : ?>
 					<table class="widefat striped">
 						<tbody>
 							<tr>
-								<th scope="row"><?php esc_html_e( 'Test product', 'wc-generic-product-designer' ); ?></th>
+								<th scope="row"><?php esc_html_e( 'Demo product', 'wc-generic-product-designer' ); ?></th>
 								<td>
 									<a href="<?php echo esc_url( $sample['product_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open on storefront', 'wc-generic-product-designer' ); ?></a>
 									|
@@ -200,14 +200,14 @@ class WC_GPD_Debug implements WC_GPD_Module {
 							</tr>
 							<?php if ( ! empty( $sample['template_edit_url'] ) ) : ?>
 								<tr>
-									<th scope="row"><?php esc_html_e( 'Test template', 'wc-generic-product-designer' ); ?></th>
+									<th scope="row"><?php esc_html_e( 'Demo template', 'wc-generic-product-designer' ); ?></th>
 									<td><a href="<?php echo esc_url( $sample['template_edit_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Edit template', 'wc-generic-product-designer' ); ?></a></td>
 								</tr>
 							<?php endif; ?>
 						</tbody>
 					</table>
 				<?php else : ?>
-					<p class="wc-gpd-poc-warning"><?php esc_html_e( 'Test product not installed yet. Click “Create / refresh test product” above.', 'wc-generic-product-designer' ); ?></p>
+					<p class="wc-gpd-poc-warning"><?php esc_html_e( 'Demo content not installed yet. Click “Create / refresh demo content” above.', 'wc-generic-product-designer' ); ?></p>
 				<?php endif; ?>
 			</div>
 

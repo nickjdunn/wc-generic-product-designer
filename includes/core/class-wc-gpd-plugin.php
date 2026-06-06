@@ -157,6 +157,9 @@ final class WC_GPD_Plugin {
 		}
 
 		WC_GPD_Sample_Content::schedule_install();
+		WC_GPD_Design_Template::register_post_type();
+		WC_GPD_Sample_Content::install();
+		delete_option( WC_GPD_Sample_Content::PENDING_OPTION );
 	}
 
 	/**

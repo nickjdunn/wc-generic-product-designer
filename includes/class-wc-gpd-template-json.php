@@ -195,7 +195,10 @@ class WC_GPD_Template_Json {
 			$uid = ! empty( $object['wcGpdUid'] ) ? sanitize_text_field( (string) $object['wcGpdUid'] ) : 'gpd-' . wp_generate_password( 10, false );
 
 			if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
-				$clean[] = self::sanitize_text_object( $object, $type, $uid );
+				$clean_obj = self::sanitize_text_object( $object, $type, $uid );
+				if ( $clean_obj ) {
+					$clean[] = $clean_obj;
+				}
 				continue;
 			}
 
