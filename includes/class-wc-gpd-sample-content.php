@@ -141,13 +141,17 @@ class WC_GPD_Sample_Content {
 	 * @return int
 	 */
 	private static function upsert_template( $template_id ) {
-		if ( $template_id && get_post( $template_id ) ) {
+		$reuse = $template_id
+			&& get_post( $template_id )
+			&& 'yes' === get_post_meta( $template_id, self::META_FLAG, true );
+
+		if ( $reuse ) {
 			$post_id = $template_id;
 			wp_update_post(
 				array(
-					'ID'         => $post_id,
-					'post_title' => self::TEMPLATE_TITLE,
-					'post_status'=> 'publish',
+					'ID'          => $post_id,
+					'post_title'  => self::TEMPLATE_TITLE,
+					'post_status' => 'publish',
 				)
 			);
 		} else {

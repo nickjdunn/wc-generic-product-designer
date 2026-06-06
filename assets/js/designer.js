@@ -340,6 +340,7 @@
 			isSampleProduct: !! config.isSampleProduct,
 			userAgent: navigator.userAgent,
 			productSettings: config.productSettings || {},
+			productSettingsNote: 'Merged WooCommerce product settings over template defaults. Template layer locks still apply per layer.',
 			templateViews: summarizeTemplateViews(),
 			canvasLayers: canvas.getObjects().map( ( obj ) => buildLayerPermissionReport( obj ) ),
 			activeLayer: buildLayerPermissionReport( activeText ),
@@ -1075,6 +1076,12 @@
 
 	function isTemplateShape( obj ) {
 		if ( ! obj || ! obj.wcGpdTemplateLayer || obj.wcGpdBoundingBox ) {
+			return false;
+		}
+		if ( obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline' ) {
+			return false;
+		}
+		if ( obj.wcGpdLayerType && obj.wcGpdLayerType !== 'shape' ) {
 			return false;
 		}
 		if ( isMockupImage( obj ) || isTemplateGraphic( obj ) || isGraphicSlotMarker( obj ) ) {

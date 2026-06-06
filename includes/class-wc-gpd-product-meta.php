@@ -67,7 +67,11 @@ class WC_GPD_Product_Meta {
 		if ( $template_ref ) {
 			$template = WC_GPD_Design_Template::get_settings( $template_ref );
 			if ( $template ) {
-				$product_settings = $template['product_settings'];
+				// Storefront uses the WooCommerce product's designer settings; template supplies canvas/export defaults.
+				$product_settings = array_merge(
+					$template['product_settings'],
+					WC_GPD_Product_Settings::get( $product_id )
+				);
 				$product_settings['replace_product_gallery'] = false;
 
 				return array(
