@@ -182,6 +182,7 @@
 		addImage: document.getElementById( 'wc-gpd-add-image' ),
 		addImageFile: document.getElementById( 'wc-gpd-add-image-file' ),
 		addGraphicLibrary: document.getElementById( 'wc-gpd-add-graphic-library' ),
+		addPhotoLibrary: document.getElementById( 'wc-gpd-add-photo-library' ),
 		iconFeatured: document.getElementById( 'wc-gpd-customer-icon-featured' ),
 		iconSearch: document.getElementById( 'wc-gpd-customer-icon-search' ),
 		iconSearchBtn: document.getElementById( 'wc-gpd-customer-icon-search-btn' ),
@@ -400,9 +401,23 @@
 	}
 
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
+	const photoLibrary = Array.isArray( config.photoLibrary ) ? config.photoLibrary : [];
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
 	const bootstrapIcons = config.bootstrapIcons || {};
 	const demoGraphics = Array.isArray( config.demoGraphics ) ? config.demoGraphics : [];
+
+	function resolveAddPhotoItems() {
+		const items = [];
+		const seen = new Set();
+		photoLibrary.forEach( ( item ) => {
+			if ( ! item || ! item.url || seen.has( item.url ) ) {
+				return;
+			}
+			seen.add( item.url );
+			items.push( item );
+		} );
+		return items;
+	}
 
 	function resolveAddGraphicItems() {
 		const items = [];
@@ -420,7 +435,17 @@
 	}
 
 	function getBootstrapIconSlugs() {
-		return Array.isArray( bootstrapIcons.featured ) ? bootstrapIcons.featured : [];
+		if ( Array.isArray( bootstrapIcons.featured ) && bootstrapIcons.featured.length ) {
+			return bootstrapIcons.featured;
+		}
+		return [];
+	}
+
+	function iconSearchLibraryParam() {
+		if ( ! bootstrapIcons.restrictIcons || ! Array.isArray( bootstrapIcons.iconLibraryIds ) || ! bootstrapIcons.iconLibraryIds.length ) {
+			return '';
+		}
+		return bootstrapIcons.iconLibraryIds.join( ',' );
 	}
 
 	function isAddGroupEnabled( key ) {
@@ -430,6 +455,9 @@
 	function isAddGroupReady( key ) {
 		if ( key === 'graphic' ) {
 			return isAddGroupEnabled( 'graphic' ) && resolveAddGraphicItems().length > 0;
+		}
+		if ( key === 'image' ) {
+			return isAddGroupEnabled( 'image' );
 		}
 		if ( key === 'icon' ) {
 			return isAddGroupEnabled( 'icon' ) && !! bootstrapIcons.iconBaseUrl;
@@ -782,6 +810,12 @@
 			ui.addGraphicLibrary.innerHTML = '';
 		}
 
+		if ( isAddGroupEnabled( 'image' ) ) {
+			renderAddPhotoLibrary();
+		} else if ( ui.addPhotoLibrary ) {
+			ui.addPhotoLibrary.innerHTML = '';
+		}
+
 		if ( isAddGroupEnabled( 'icon' ) ) {
 			initCustomerIconBrowser();
 		}
@@ -806,6 +840,67 @@
 			return productSettings[ settingKey ] !== false;
 		}
 		return productSettings[ settingKey ] !== false;
+	}
+
+	function renderAddPhotoLibrary() {
+		if ( ! ui.addPhotoLibrary ) {
+			return;
+		}
+		const items = resolveAddPhotoItems();
+		ui.addPhotoLibrary.innerHTML = '';
+		if ( ! items.length ) {
+			return;
+		}
+		const row = document.createElement( 'div' );
+		row.className = 'wc-gpd-graphic-thumb-row';
+		items.forEach( ( item ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-graphic-thumb';
+			btn.title = item.title || '';
+			btn.innerHTML = `<img src="${ item.url }" alt="" loading="lazy" />`;
+			btn.addEventListener( 'click', () => addPhotoFromLibrary( item ) );
+			row.appendChild( btn );
+		} );
+		ui.addPhotoLibrary.appendChild( row );
+	}
+
+	function addPhotoFromLibrary( item ) {
+		if ( ! item || ! item.url ) {
+			return;
+		}
+		const region = getConstraintRect();
+		fabric.Image.fromURL(
+			item.url,
+			( img ) => {
+				if ( ! img ) {
+					return;
+				}
+				const maxW = Math.min( region.width * 0.55, 320 );
+				const scale = maxW / Math.max( img.width || 1, 1 );
+				img.set( {
+					left: region.left + region.width / 2,
+					top: region.top + region.height / 2,
+					originX: 'center',
+					originY: 'center',
+					scaleX: scale,
+					scaleY: scale,
+					wcGpdGraphicLayer: true,
+					wcGpdLayerType: 'graphic',
+					wcGpdCustomerUpload: false,
+					wcGpdAttachmentId: item.id || 0,
+					wcGpdLayerLabel: item.title || ( config.i18n.layerImage || 'Photo' ),
+				} );
+				applyGraphicInteractivity( img );
+				canvas.add( img );
+				canvas.setActiveObject( img );
+				canvas.requestRenderAll();
+				syncToolbar( img );
+				syncLayersList();
+				openCustomerSection( 'context' );
+			},
+			{ crossOrigin: 'anonymous' }
+		);
 	}
 
 	function renderAddGraphicLibrary() {
@@ -939,6 +1034,10 @@
 		url.searchParams.set( 'q', query );
 		url.searchParams.set( 'limit', String( iconBrowserState.limit ) );
 		url.searchParams.set( 'offset', String( iconBrowserState.offset ) );
+		const libraries = iconSearchLibraryParam();
+		if ( libraries ) {
+			url.searchParams.set( 'libraries', libraries );
+		}
 
 		fetch( url.toString(), { credentials: 'same-origin' } )
 			.then( ( response ) => response.json() )
@@ -1058,11 +1157,92 @@
 		}
 	}
 
+	let openColorMenu = null;
+
+	function closeColorMenus() {
+		if ( openColorMenu ) {
+			openColorMenu.hidden = true;
+			openColorMenu = null;
+		}
+	}
+
+	function uniqueColors( colors ) {
+		const seen = new Set();
+		const list = [];
+		( colors || [] ).forEach( ( color ) => {
+			const normalized = String( color || '' ).toLowerCase();
+			if ( ! normalized || seen.has( normalized ) ) {
+				return;
+			}
+			seen.add( normalized );
+			list.push( color );
+		} );
+		return list;
+	}
+
+	function allTemplatePaletteColors() {
+		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
+			return templatePalettes.global_colors && templatePalettes.global_colors.length
+				? templatePalettes.global_colors
+				: [ '#000000' ];
+		}
+		const colors = [];
+		( templatePalettes.palettes || [] ).forEach( ( palette ) => {
+			if ( palette && Array.isArray( palette.colors ) ) {
+				colors.push( ...palette.colors );
+			}
+		} );
+		return colors.length ? colors : [ '#000000' ];
+	}
+
+	function shapeRoleColor( obj, role ) {
+		if ( ! obj ) {
+			return 'transparent';
+		}
+		if ( role === 'stroke' ) {
+			return obj.stroke || 'transparent';
+		}
+		return obj.fill || 'transparent';
+	}
+
+	function isNoColor( color ) {
+		const value = String( color || '' ).toLowerCase();
+		return ! value || value === 'transparent' || value === 'none';
+	}
+
+	function normalizePickerColor( color ) {
+		if ( isNoColor( color ) ) {
+			return '#ffffff';
+		}
+		if ( String( color ).startsWith( '#' ) && String( color ).length >= 7 ) {
+			return color;
+		}
+		return '#000000';
+	}
+
+	function applyShapeRoleColor( obj, role, color ) {
+		if ( ! obj ) {
+			return;
+		}
+		const value = isNoColor( color ) ? 'transparent' : color;
+		if ( role === 'stroke' ) {
+			applyShapeStrokeColor( obj, value );
+			if ( isNoColor( value ) ) {
+				obj.set( 'strokeWidth', 0 );
+			} else if ( ! obj.strokeWidth ) {
+				obj.set( 'strokeWidth', productSettings.outline_stroke_width || 2 );
+			}
+		} else {
+			applyShapeFillColor( obj, value );
+		}
+	}
+
 	function renderColorSwatches( obj ) {
 		if ( ! ui.colorSwatches ) {
 			return;
 		}
 		ui.colorSwatches.innerHTML = '';
+		closeColorMenus();
 		if ( ! textColorAllowed( obj ) ) {
 			return;
 		}
@@ -1076,59 +1256,142 @@
 		const roles = isShapeLayer
 			? [ shapeUsesFill( obj ) ? 'fill' : null, shapeUsesStroke( obj ) ? 'stroke' : null ].filter( Boolean )
 			: [ 'fill' ];
-		const currentFill = ( obj && obj.fill ) ? String( obj.fill ).toLowerCase() : defaultTextColor( obj ).toLowerCase();
+		const extras = allTemplatePaletteColors();
 
 		roles.forEach( ( role ) => {
 			const group = document.createElement( 'div' );
-			group.className = 'wc-gpd-color-role-group';
-			if ( isShapeLayer && roles.length > 1 ) {
-				const roleLabel = document.createElement( 'span' );
-				roleLabel.className = 'wc-gpd-color-role-label';
-				roleLabel.textContent = role === 'stroke'
+			group.className = 'wc-gpd-color-role-group wc-gpd-color-role-group--stacked';
+
+			const roleLabel = document.createElement( 'span' );
+			roleLabel.className = 'wc-gpd-color-role-label';
+			roleLabel.textContent = isShapeLayer
+				? ( role === 'stroke'
 					? ( config.i18n.outlineColor || 'Outline' )
-					: ( config.i18n.fillColor || 'Fill' );
-				group.appendChild( roleLabel );
+					: ( config.i18n.fillColor || 'Fill' ) )
+				: ( config.i18n.textColor || 'Color' );
+			group.appendChild( roleLabel );
+
+			const pickerRow = document.createElement( 'div' );
+			pickerRow.className = 'wc-gpd-color-picker-row';
+
+			const currentColor = shapeRoleColor( obj, role );
+			const paletteColors = uniqueColors( paletteColorsForObject( obj, role ) );
+			const menuColors = uniqueColors( paletteColors.concat( extras ) );
+
+			const trigger = document.createElement( 'button' );
+			trigger.type = 'button';
+			trigger.className = 'wc-gpd-color-trigger';
+			trigger.setAttribute( 'aria-haspopup', 'true' );
+			trigger.title = config.i18n.chooseColor || 'Choose color';
+
+			const triggerSwatch = document.createElement( 'span' );
+			triggerSwatch.className = 'wc-gpd-color-trigger__swatch';
+			if ( isNoColor( currentColor ) ) {
+				triggerSwatch.classList.add( 'is-none' );
+			} else {
+				triggerSwatch.style.backgroundColor = currentColor;
 			}
+			trigger.appendChild( triggerSwatch );
+
+			const menu = document.createElement( 'div' );
+			menu.className = 'wc-gpd-color-menu';
+			menu.hidden = true;
+
 			const swatchRow = document.createElement( 'div' );
 			swatchRow.className = 'wc-gpd-color-role-swatches';
-			const colors = paletteColorsForObject( obj, role );
-			const currentStroke = ( obj && obj.stroke ) ? String( obj.stroke ).toLowerCase() : '';
-			colors.forEach( ( color ) => {
+			menuColors.forEach( ( color ) => {
 				const btn = document.createElement( 'button' );
 				btn.type = 'button';
 				btn.className = 'wc-gpd-color-swatch';
 				btn.style.backgroundColor = color;
 				btn.title = color;
 				btn.setAttribute( 'aria-label', color );
-				const isActive = isShapeLayer
-					? ( role === 'stroke' ? color.toLowerCase() === currentStroke : color.toLowerCase() === currentFill )
-					: color.toLowerCase() === currentFill;
-				btn.classList.toggle( 'is-active', isActive );
+				const activeColor = String( currentColor || '' ).toLowerCase();
+				btn.classList.toggle( 'is-active', ! isNoColor( activeColor ) && color.toLowerCase() === activeColor );
 				btn.addEventListener( 'click', () => {
 					if ( ! activeText ) {
 						return;
 					}
 					if ( isShapeLayer ) {
-						if ( role === 'stroke' ) {
-							applyShapeStrokeColor( activeText, color );
-						} else {
-							applyShapeFillColor( activeText, color );
-						}
+						applyShapeRoleColor( activeText, role, color );
 					} else {
 						activeText.set( 'fill', color );
 						if ( ui.textColor ) {
 							ui.textColor.value = color;
 						}
 					}
+					closeColorMenus();
 					renderColorSwatches( activeText );
 					canvas.requestRenderAll();
 				} );
 				swatchRow.appendChild( btn );
 			} );
-			group.appendChild( swatchRow );
+			menu.appendChild( swatchRow );
+
+			const noneBtn = document.createElement( 'button' );
+			noneBtn.type = 'button';
+			noneBtn.className = 'wc-gpd-color-none-btn';
+			noneBtn.textContent = config.i18n.noColor || 'No color';
+			noneBtn.classList.toggle( 'is-active', isNoColor( currentColor ) );
+			noneBtn.addEventListener( 'click', () => {
+				if ( ! activeText ) {
+					return;
+				}
+				if ( isShapeLayer ) {
+					applyShapeRoleColor( activeText, role, 'transparent' );
+				} else {
+					activeText.set( 'fill', 'transparent' );
+				}
+				closeColorMenus();
+				renderColorSwatches( activeText );
+				canvas.requestRenderAll();
+			} );
+			menu.appendChild( noneBtn );
+
+			const customWrap = document.createElement( 'label' );
+			customWrap.className = 'wc-gpd-color-custom-wrap';
+			const customInput = document.createElement( 'input' );
+			customInput.type = 'color';
+			customInput.className = 'wc-gpd-color-custom-input';
+			customInput.value = normalizePickerColor( currentColor );
+			customInput.addEventListener( 'input', () => {
+				if ( ! activeText ) {
+					return;
+				}
+				const color = customInput.value;
+				if ( isShapeLayer ) {
+					applyShapeRoleColor( activeText, role, color );
+				} else {
+					activeText.set( 'fill', color );
+					if ( ui.textColor ) {
+						ui.textColor.value = color;
+					}
+				}
+				renderColorSwatches( activeText );
+				canvas.requestRenderAll();
+			} );
+			customWrap.appendChild( customInput );
+			customWrap.appendChild( document.createTextNode( ' ' + ( config.i18n.customColor || 'Custom color' ) ) );
+			menu.appendChild( customWrap );
+
+			trigger.addEventListener( 'click', ( event ) => {
+				event.stopPropagation();
+				const willOpen = menu.hidden;
+				closeColorMenus();
+				if ( willOpen ) {
+					menu.hidden = false;
+					openColorMenu = menu;
+				}
+			} );
+
+			pickerRow.appendChild( trigger );
+			pickerRow.appendChild( menu );
+			group.appendChild( pickerRow );
 			ui.colorSwatches.appendChild( group );
 		} );
 	}
+
+	document.addEventListener( 'click', () => closeColorMenus() );
 
 	const canvas = new fabric.Canvas( 'wc-gpd-canvas', {
 		selection: true,

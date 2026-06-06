@@ -323,14 +323,19 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'productName'        => get_the_title( $product_id ),
 				'productPrice'       => wc_get_product( $product_id ) ? wc_get_product( $product_id )->get_price_html() : '',
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
-				'graphicLibrary'     => self::graphic_library_for_product( $product_id, $settings ),
-				'graphicLibraries'   => ! empty( $settings['graphic_libraries'] ) ? $settings['graphic_libraries'] : array(),
+				'graphicLibrary'       => self::graphic_library_for_product( $product_id, $settings ),
+				'photoLibrary'         => self::photo_library_for_product( $product_id, $settings ),
+				'graphicLibraries'     => ! empty( $settings['graphic_libraries'] ) ? $settings['graphic_libraries'] : array(),
+				'libraryAssignments'   => ! empty( $settings['library_assignments'] ) ? $settings['library_assignments'] : array(),
+				'iconSlugs'            => ! empty( $settings['icon_slugs'] ) ? $settings['icon_slugs'] : array(),
 				'bootstrapIcons'     => array(
-					'featured'    => WC_GPD_Bootstrap_Icons::featured_slugs(),
-					'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
-					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
-					'ajaxAction'  => WC_GPD_Bootstrap_Icons::AJAX_SEARCH,
-					'nonce'       => wp_create_nonce( self::NONCE_ACTION ),
+					'featured'       => self::featured_icons_for_product( $product_id, $settings ),
+					'iconBaseUrl'    => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
+					'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+					'ajaxAction'     => WC_GPD_Bootstrap_Icons::AJAX_SEARCH,
+					'nonce'          => wp_create_nonce( self::NONCE_ACTION ),
+					'iconLibraryIds' => self::icon_library_ids_for_product( $settings ),
+					'restrictIcons'  => self::icon_search_is_restricted( $settings ),
 				),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
@@ -368,6 +373,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'layerImage'    => __( 'Uploaded image', 'wc-generic-product-designer' ),
 					'fillColor'     => __( 'Fill', 'wc-generic-product-designer' ),
 					'outlineColor'  => __( 'Outline', 'wc-generic-product-designer' ),
+					'noColor'       => __( 'No color', 'wc-generic-product-designer' ),
+					'customColor'   => __( 'Custom color', 'wc-generic-product-designer' ),
+					'chooseColor'   => __( 'Choose color', 'wc-generic-product-designer' ),
+					'noPhotosAvailable' => __( 'No photos in your assigned libraries. Add photo libraries in the admin or upload your own image.', 'wc-generic-product-designer' ),
 					'noGraphicsAvailable' => __( 'No graphics are available yet. Add images under WooCommerce → Graphic Libraries, or attach graphics to this template.', 'wc-generic-product-designer' ),
 					'noIconsAvailable' => __( 'Icons are not available. Ensure Bootstrap Icons are bundled with the plugin.', 'wc-generic-product-designer' ),
 					'graphicLayerHint' => __( 'Drag to move. Use the corner handles to resize.', 'wc-generic-product-designer' ),
@@ -579,6 +588,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 								<div class="wc-gpd-add-menu__group" data-add-group="image" hidden>
 									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Images', 'wc-generic-product-designer' ); ?></button>
 									<div class="wc-gpd-add-menu__body" hidden>
+										<div class="wc-gpd-add-photo-library" id="wc-gpd-add-photo-library" role="group" aria-label="<?php esc_attr_e( 'Choose a photo', 'wc-generic-product-designer' ); ?>"></div>
 										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-image"><?php esc_html_e( 'Upload image', 'wc-generic-product-designer' ); ?></button>
 										<input type="file" id="wc-gpd-add-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
 									</div>
@@ -891,6 +901,72 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		}
 
 		return array();
+	}
+
+	/**
+	 * Photo library items for the storefront Add menu.
+	 *
+	 * @param int   $product_id Product ID.
+	 * @param array $settings   Resolved product settings.
+	 * @return array<int,array{id:int,url:string,title:string}>
+	 */
+	private static function photo_library_for_product( $product_id, $settings ) {
+		unset( $product_id );
+		return ! empty( $settings['photo_library'] ) && is_array( $settings['photo_library'] )
+			? $settings['photo_library']
+			: array();
+	}
+
+	/**
+	 * Featured icons filtered by template icon libraries.
+	 *
+	 * @param int   $product_id Product ID.
+	 * @param array $settings   Resolved product settings.
+	 * @return string[]
+	 */
+	private static function featured_icons_for_product( $product_id, $settings ) {
+		unset( $product_id );
+		$allowed = ! empty( $settings['icon_slugs'] ) && is_array( $settings['icon_slugs'] )
+			? $settings['icon_slugs']
+			: array();
+		return WC_GPD_Bootstrap_Icons::featured_slugs( $allowed );
+	}
+
+	/**
+	 * @param array $settings Resolved product settings.
+	 * @return string[]
+	 */
+	private static function icon_library_ids_for_product( $settings ) {
+		if ( empty( $settings['library_assignments']['icon'] ) || ! is_array( $settings['library_assignments']['icon'] ) ) {
+			return array();
+		}
+		return array_values(
+			array_map(
+				'sanitize_key',
+				$settings['library_assignments']['icon']
+			)
+		);
+	}
+
+	/**
+	 * @param array $settings Resolved product settings.
+	 * @return bool
+	 */
+	private static function icon_search_is_restricted( $settings ) {
+		$library_ids = self::icon_library_ids_for_product( $settings );
+		if ( empty( $library_ids ) ) {
+			return false;
+		}
+		foreach ( $library_ids as $library_id ) {
+			if ( WC_GPD_Graphic_Libraries::ALL_ICONS_ID === $library_id ) {
+				return false;
+			}
+			$library = WC_GPD_Graphic_Libraries::get_by_id( $library_id );
+			if ( $library && ! empty( $library['all_icons'] ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

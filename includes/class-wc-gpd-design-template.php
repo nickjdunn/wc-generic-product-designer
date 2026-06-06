@@ -115,8 +115,11 @@ class WC_GPD_Design_Template {
 			'template_json'    => $template_json,
 			'template_views'   => WC_GPD_Template_Json::parse( $template_json ),
 			'max_views'        => $max_views,
-			'graphic_library'    => self::get_graphic_library( $template_id ),
-			'graphic_libraries'  => self::get_graphic_libraries( $template_id ),
+			'graphic_library'       => self::get_graphic_library( $template_id ),
+			'photo_library'           => self::get_photo_library( $template_id ),
+			'graphic_libraries'       => self::get_assigned_libraries( $template_id, WC_GPD_Graphic_Libraries::TYPE_GRAPHIC ),
+			'library_assignments'     => self::get_library_assignments( $template_id ),
+			'icon_slugs'              => self::get_icon_slugs_for_template( $template_id ),
 			'template_fonts'     => self::get_template_fonts( $template_id ),
 			'template_palettes'  => self::get_palettes( $template_id ),
 			'product_settings'   => WC_GPD_Product_Settings::get( $template_id ),
@@ -331,8 +334,15 @@ class WC_GPD_Design_Template {
 		$max_views = min( WC_GPD_Product_Meta::MAX_VIEWS, max( WC_GPD_Product_Meta::MIN_VIEWS, $max_views ) );
 		update_post_meta( $template_id, self::META_MAX_DESIGN_VIEWS, $max_views );
 
-		$flat_ids = WC_GPD_Graphic_Libraries::all_attachment_ids();
-		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( $flat_ids ) );
+		$assignments_raw = isset( $_POST['wc_gpd_library_assignments'] ) ? wp_unslash( $_POST['wc_gpd_library_assignments'] ) : '';
+		$assignments     = self::sanitize_library_assignments( is_string( $assignments_raw ) ? $assignments_raw : '' );
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, wp_slash( wp_json_encode( $assignments ) ) );
+
+		$graphic_ids = WC_GPD_Graphic_Libraries::attachment_ids_for_libraries(
+			$assignments['graphic'],
+			WC_GPD_Graphic_Libraries::TYPE_GRAPHIC
+		);
+		update_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, wp_json_encode( $graphic_ids ) );
 
 		$fonts_raw = isset( $_POST['wc_gpd_template_fonts'] ) ? wp_unslash( $_POST['wc_gpd_template_fonts'] ) : '';
 		$fonts     = self::sanitize_template_fonts( is_string( $fonts_raw ) ? $fonts_raw : '' );
@@ -385,12 +395,132 @@ class WC_GPD_Design_Template {
 	}
 
 	/**
-	 * @param int $template_id Template ID.
-	 * @return array<int,array{id:string,name:string,ids:int[]}>
+	 * @return array{graphic:string[],photo:string[],icon:string[]}
 	 */
-	public static function get_graphic_libraries( $template_id ) {
-		unset( $template_id );
-		return WC_GPD_Graphic_Libraries::get_all();
+	public static function default_library_assignments() {
+		return array(
+			'graphic' => array(),
+			'photo'   => array(),
+			'icon'    => array( WC_GPD_Graphic_Libraries::ALL_ICONS_ID ),
+		);
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array{graphic:string[],photo:string[],icon:string[]}
+	 */
+	public static function get_library_assignments( $template_id ) {
+		$template_id = absint( $template_id );
+		$defaults    = self::default_library_assignments();
+		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARIES, true );
+
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$data = json_decode( $raw, true );
+			if ( is_array( $data ) && isset( $data['graphic'] ) ) {
+				return self::sanitize_library_assignments_array( $data );
+			}
+			if ( is_array( $data ) && isset( $data[0]['id'] ) ) {
+				$legacy_ids = array();
+				foreach ( $data as $row ) {
+					if ( is_array( $row ) && ! empty( $row['id'] ) ) {
+						$legacy_ids[] = sanitize_key( (string) $row['id'] );
+					}
+				}
+				$defaults['graphic'] = $legacy_ids;
+				return $defaults;
+			}
+		}
+
+		return $defaults;
+	}
+
+	/**
+	 * @param string $json Assignments JSON.
+	 * @return array{graphic:string[],photo:string[],icon:string[]}
+	 */
+	public static function sanitize_library_assignments( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::default_library_assignments();
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::default_library_assignments();
+		}
+		return self::sanitize_library_assignments_array( $data );
+	}
+
+	/**
+	 * @param array $data Raw assignments.
+	 * @return array{graphic:string[],photo:string[],icon:string[]}
+	 */
+	public static function sanitize_library_assignments_array( array $data ) {
+		$clean = self::default_library_assignments();
+		foreach ( array( 'graphic', 'photo', 'icon' ) as $type ) {
+			if ( empty( $data[ $type ] ) || ! is_array( $data[ $type ] ) ) {
+				continue;
+			}
+			$ids = array();
+			foreach ( $data[ $type ] as $library_id ) {
+				$library_id = sanitize_key( (string) $library_id );
+				if ( $library_id && WC_GPD_Graphic_Libraries::get_by_id( $library_id ) ) {
+					$ids[] = $library_id;
+				}
+			}
+			$clean[ $type ] = array_values( array_unique( $ids ) );
+		}
+		return $clean;
+	}
+
+	/**
+	 * Resolve assigned library IDs for a type (empty = all libraries of that type).
+	 *
+	 * @param int    $template_id Template ID.
+	 * @param string $type        Library type.
+	 * @return string[]
+	 */
+	public static function resolved_library_ids_for_type( $template_id, $type ) {
+		$assignments = self::get_library_assignments( $template_id );
+		$type        = WC_GPD_Graphic_Libraries::sanitize_type( $type );
+		$assigned    = ! empty( $assignments[ $type ] ) ? $assignments[ $type ] : array();
+		if ( ! empty( $assigned ) ) {
+			return $assigned;
+		}
+		return array_map(
+			static function ( $library ) {
+				return $library['id'] ?? '';
+			},
+			WC_GPD_Graphic_Libraries::libraries_for_type( $type )
+		);
+	}
+
+	/**
+	 * @param int    $template_id Template ID.
+	 * @param string $type        Library type.
+	 * @return array<int,array{id:string,name:string,type:string,ids:int[],icon_slugs:string[],all_icons:bool}>
+	 */
+	public static function get_assigned_libraries( $template_id, $type ) {
+		$type    = WC_GPD_Graphic_Libraries::sanitize_type( $type );
+		$allowed = array_flip( self::resolved_library_ids_for_type( $template_id, $type ) );
+		$clean   = array();
+		foreach ( WC_GPD_Graphic_Libraries::get_all() as $library ) {
+			if ( ( $library['type'] ?? WC_GPD_Graphic_Libraries::TYPE_GRAPHIC ) !== $type ) {
+				continue;
+			}
+			if ( ! isset( $allowed[ $library['id'] ?? '' ] ) ) {
+				continue;
+			}
+			$clean[] = $library;
+		}
+		return $clean;
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return string[]
+	 */
+	public static function get_icon_slugs_for_template( $template_id ) {
+		$library_ids = self::resolved_library_ids_for_type( $template_id, WC_GPD_Graphic_Libraries::TYPE_ICON );
+		return WC_GPD_Graphic_Libraries::icon_slugs_for_libraries( $library_ids );
 	}
 
 	/**
@@ -453,42 +583,25 @@ class WC_GPD_Design_Template {
 	 * @return array<int,array{id:int,url:string,title:string}>
 	 */
 	public static function get_graphic_library( $template_id ) {
-		$site = WC_GPD_Graphic_Libraries::flat_for_frontend();
-		if ( ! empty( $site ) ) {
-			return $site;
-		}
+		$library_ids = self::resolved_library_ids_for_type( $template_id, WC_GPD_Graphic_Libraries::TYPE_GRAPHIC );
+		return WC_GPD_Graphic_Libraries::media_items_for_libraries( $library_ids, WC_GPD_Graphic_Libraries::TYPE_GRAPHIC );
+	}
 
-		$template_id = absint( $template_id );
-		$raw         = get_post_meta( $template_id, self::META_GRAPHIC_LIBRARY, true );
-		$ids         = array();
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array<int,array{id:int,url:string,title:string}>
+	 */
+	public static function get_photo_library( $template_id ) {
+		$library_ids = self::resolved_library_ids_for_type( $template_id, WC_GPD_Graphic_Libraries::TYPE_PHOTO );
+		return WC_GPD_Graphic_Libraries::media_items_for_libraries( $library_ids, WC_GPD_Graphic_Libraries::TYPE_PHOTO );
+	}
 
-		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
-			$decoded = json_decode( $raw, true );
-			if ( is_array( $decoded ) ) {
-				$ids = $decoded;
-			}
-		} elseif ( is_array( $raw ) ) {
-			$ids = $raw;
-		}
-
-		$library = array();
-		foreach ( $ids as $id ) {
-			$attachment_id = absint( $id );
-			if ( ! $attachment_id ) {
-				continue;
-			}
-			$url = wp_get_attachment_url( $attachment_id );
-			if ( ! $url ) {
-				continue;
-			}
-			$library[] = array(
-				'id'    => $attachment_id,
-				'url'   => $url,
-				'title' => get_the_title( $attachment_id ),
-			);
-		}
-
-		return $library;
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array<int,array{id:string,name:string,ids:int[]}>
+	 */
+	public static function get_graphic_libraries( $template_id ) {
+		return self::get_assigned_libraries( $template_id, WC_GPD_Graphic_Libraries::TYPE_GRAPHIC );
 	}
 
 	/**

@@ -145,6 +145,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			true
 		);
 		$template_id = isset( $_GET['template_id'] ) ? absint( $_GET['template_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$template_settings = $template_id ? WC_GPD_Design_Template::get_settings( $template_id ) : null;
 		wp_localize_script(
 			'wc-gpd-admin-template-editor',
 			'wcGpdTemplateEditor',
@@ -153,6 +154,9 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				'fonts'    => WC_GPD_Font_Registry::font_families_for_js( $template_id ),
 				'fontOptions' => WC_GPD_Font_Registry::fonts_for_template( $template_id ),
 				'defaultFont'   => WC_GPD_Font_Registry::default_font_family(),
+				'libraryAssignments' => ( $template_settings && ! empty( $template_settings['library_assignments'] ) )
+					? $template_settings['library_assignments']
+					: WC_GPD_Design_Template::default_library_assignments(),
 				'siteLibraries' => WC_GPD_Graphic_Libraries::get_all(),
 				'bootstrapIcons' => array(
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
@@ -482,6 +486,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 		}
 
 		$ps            = $settings['product_settings'];
+		$assignments   = ! empty( $settings['library_assignments'] ) ? $settings['library_assignments'] : WC_GPD_Design_Template::default_library_assignments();
+		$assignments_json = wp_json_encode( $assignments );
 		$template_json = $settings['template_json'];
 		if ( '' === trim( $template_json ) ) {
 			$template_json = wp_json_encode( WC_GPD_Template_Json::empty_document() );
@@ -569,6 +575,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
 			<textarea id="wc_gpd_template_fonts" name="wc_gpd_template_fonts" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_fonts_json ? $template_fonts_json : '[]' ); ?></textarea>
 			<textarea id="wc_gpd_template_palettes" name="wc_gpd_template_palettes" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_palettes_json ? $template_palettes_json : '{}' ); ?></textarea>
+			<input type="hidden" id="wc_gpd_library_assignments" name="wc_gpd_library_assignments" value="<?php echo esc_attr( $assignments_json ? $assignments_json : '{}' ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
 			<input type="hidden" id="wc_gpd_max_design_views" name="wc_gpd_max_design_views" value="<?php echo esc_attr( (string) $settings['max_views'] ); ?>" />
@@ -801,12 +808,17 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</div>
 		<div class="wc-gpd-settings-grid wc-gpd-settings-grid--customer-global">
 			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
+				<h4><?php esc_html_e( 'Assigned libraries', 'wc-generic-product-designer' ); ?></h4>
+				<p class="description"><?php esc_html_e( 'Choose which graphic, photo, and icon libraries customers can use on this template. Create libraries under Template Designer → Libraries.', 'wc-generic-product-designer' ); ?></p>
+				<div id="wc-gpd-library-assignments" class="wc-gpd-library-assignments"></div>
+			</div>
+			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
 				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
 				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_shape" value="1" <?php checked( ! empty( $ps['allow_add_shape'] ) ); ?> /> <?php esc_html_e( 'Shapes (rectangle, circle, polygon, heart)', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_graphic" value="1" <?php checked( ! empty( $ps['allow_add_graphic'] ) ); ?> /> <?php esc_html_e( 'Graphics from your library', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_image" value="1" <?php checked( ! empty( $ps['allow_add_image'] ) ); ?> /> <?php esc_html_e( 'Upload their own image', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_graphic" value="1" <?php checked( ! empty( $ps['allow_add_graphic'] ) ); ?> /> <?php esc_html_e( 'Graphics from assigned libraries', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_image" value="1" <?php checked( ! empty( $ps['allow_add_image'] ) ); ?> /> <?php esc_html_e( 'Photos from libraries and/or upload their own image', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_icon" value="1" <?php checked( ! empty( $ps['allow_add_icon'] ) ); ?> /> <?php esc_html_e( 'Icons (Bootstrap Icons)', 'wc-generic-product-designer' ); ?></label></p>
 			</div>
 			<div class="wc-gpd-settings-card">

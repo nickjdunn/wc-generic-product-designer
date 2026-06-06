@@ -89,13 +89,25 @@ class WC_GPD_Bootstrap_Icons {
 	}
 
 	/**
-	 * @param string $query  Search query.
-	 * @param int    $limit  Page size.
-	 * @param int    $offset Offset.
+	 * @param string   $query         Search query.
+	 * @param int      $limit         Page size.
+	 * @param int      $offset        Offset.
+	 * @param string[] $allowed_slugs Optional allowlist (empty = all icons).
 	 * @return array{icons:string[],total:int,offset:int,limit:int}
 	 */
-	public static function search( $query = '', $limit = 60, $offset = 0 ) {
-		$all    = self::all_slugs();
+	public static function search( $query = '', $limit = 60, $offset = 0, array $allowed_slugs = array() ) {
+		$all = self::all_slugs();
+		if ( ! empty( $allowed_slugs ) ) {
+			$allowed = array_flip( $allowed_slugs );
+			$all     = array_values(
+				array_filter(
+					$all,
+					static function ( $slug ) use ( $allowed ) {
+						return isset( $allowed[ $slug ] );
+					}
+				)
+			);
+		}
 		$query  = strtolower( trim( (string) $query ) );
 		$limit  = min( 200, max( 12, absint( $limit ) ) );
 		$offset = max( 0, absint( $offset ) );
@@ -127,9 +139,10 @@ class WC_GPD_Bootstrap_Icons {
 	/**
 	 * Featured icon slugs for quick access in the shapes panel.
 	 *
+	 * @param string[] $allowed_slugs Optional allowlist.
 	 * @return string[]
 	 */
-	public static function featured_slugs() {
+	public static function featured_slugs( array $allowed_slugs = array() ) {
 		$wanted = array(
 			'heart-fill',
 			'star-fill',
@@ -148,7 +161,9 @@ class WC_GPD_Bootstrap_Icons {
 		$found  = array();
 		foreach ( $wanted as $slug ) {
 			if ( isset( $all[ $slug ] ) ) {
-				$found[] = $slug;
+				if ( empty( $allowed_slugs ) || in_array( $slug, $allowed_slugs, true ) ) {
+					$found[] = $slug;
+				}
 			}
 		}
 		return $found;
@@ -201,21 +216,48 @@ class WC_GPD_Bootstrap_Icons {
 			return;
 		}
 
-		$query  = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
-		$limit  = isset( $_GET['limit'] ) ? absint( $_GET['limit'] ) : 60;
-		$offset = isset( $_GET['offset'] ) ? absint( $_GET['offset'] ) : 0;
+		$query   = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$limit   = isset( $_GET['limit'] ) ? absint( $_GET['limit'] ) : 60;
+		$offset  = isset( $_GET['offset'] ) ? absint( $_GET['offset'] ) : 0;
+		$allowed = self::allowed_slugs_from_libraries_request();
 
-		$results = self::search( $query, $limit, $offset );
+		$results = self::search( $query, $limit, $offset, $allowed );
 		wp_send_json_success(
 			array_merge(
 				$results,
 				array(
-					'featured' => self::featured_slugs(),
+					'featured' => self::featured_slugs( $allowed ),
 					'source'   => 'Bootstrap Icons',
 					'license'  => 'MIT',
 				)
 			)
 		);
+	}
+
+	/**
+	 * Parse optional icon library filter from storefront AJAX.
+	 *
+	 * @return string[]
+	 */
+	private static function allowed_slugs_from_libraries_request() {
+		if ( empty( $_GET['libraries'] ) ) {
+			return array();
+		}
+		$raw = sanitize_text_field( wp_unslash( (string) $_GET['libraries'] ) );
+		if ( '' === $raw ) {
+			return array();
+		}
+		$library_ids = array();
+		foreach ( explode( ',', $raw ) as $part ) {
+			$id = sanitize_key( trim( $part ) );
+			if ( $id ) {
+				$library_ids[] = $id;
+			}
+		}
+		if ( empty( $library_ids ) ) {
+			return array();
+		}
+		return WC_GPD_Graphic_Libraries::icon_slugs_for_libraries( $library_ids );
 	}
 
 	/**

@@ -582,6 +582,75 @@
 	cursor: pointer;
 }
 
+.wc-gpd-library-type-select {
+	min-width: 150px;
+}
+
+.wc-gpd-library-icon-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+.wc-gpd-library-icon-results {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.wc-gpd-library-icon-pick {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	width: 72px;
+	padding: 4px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+	font-size: 10px;
+}
+
+.wc-gpd-library-icon-slugs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wc-gpd-library-icon-slug {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 6px;
+	border: 1px solid #dcdcde;
+	border-radius: 999px;
+	background: #fff;
+	font-size: 11px;
+}
+
+.wc-gpd-library-assignments {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 220px, 1fr ) );
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.wc-gpd-library-assign-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.wc-gpd-library-assign-group .description {
+	margin-bottom: 0;
+}
+
 /* Template canvas area — accordion sidebar + canvas */
 .wc-gpd-template-designer-panel .wc-gpd-tpl-layout {
 	grid-template-columns: minmax( 220px, 280px ) minmax( 0, 1fr );

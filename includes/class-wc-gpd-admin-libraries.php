@@ -79,12 +79,26 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 			'wc-gpd-admin-libraries',
 			'wcGpdLibrariesAdmin',
 			array(
+				'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+				'ajaxAction'  => WC_GPD_Bootstrap_Icons::AJAX_SEARCH,
+				'nonce'       => wp_create_nonce( WC_GPD_Bootstrap_Icons::NONCE_ACTION ),
+				'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
 				'i18n' => array(
 					'addLibrary'    => __( 'Add library', 'wc-generic-product-designer' ),
 					'removeLibrary' => __( 'Remove library', 'wc-generic-product-designer' ),
 					'addImages'     => __( 'Add images', 'wc-generic-product-designer' ),
+					'addPhotos'     => __( 'Add photos', 'wc-generic-product-designer' ),
 					'libraryName'   => __( 'Library name', 'wc-generic-product-designer' ),
 					'emptyLibrary'  => __( 'No libraries yet. Add one to get started.', 'wc-generic-product-designer' ),
+					'typeGraphic'   => __( 'Graphics library', 'wc-generic-product-designer' ),
+					'typePhoto'     => __( 'Photo library', 'wc-generic-product-designer' ),
+					'typeIcon'      => __( 'Icon library', 'wc-generic-product-designer' ),
+					'allIcons'      => __( 'Include all Bootstrap icons', 'wc-generic-product-designer' ),
+					'allIconsNote'  => __( 'This library includes every bundled Bootstrap icon.', 'wc-generic-product-designer' ),
+					'searchIcons'   => __( 'Search icons to add…', 'wc-generic-product-designer' ),
+					'search'        => __( 'Search', 'wc-generic-product-designer' ),
+					'searching'     => __( 'Loading icons…', 'wc-generic-product-designer' ),
+					'noResults'     => __( 'No icons found.', 'wc-generic-product-designer' ),
 				),
 			)
 		);
@@ -111,8 +125,8 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 		$json = wp_json_encode( $libraries );
 		?>
 		<div class="wrap wc-gpd-templates-wrap wc-gpd-libraries-admin">
-			<h1><?php esc_html_e( 'Graphic libraries', 'wc-generic-product-designer' ); ?></h1>
-			<p class="description"><?php esc_html_e( 'Create named image sets (paw prints, flowers, etc.). Assign libraries to customer pick areas in each template.', 'wc-generic-product-designer' ); ?></p>
+			<h1><?php esc_html_e( 'Libraries', 'wc-generic-product-designer' ); ?></h1>
+			<p class="description"><?php esc_html_e( 'Create graphics, photo, and icon libraries. Assign them to individual templates on the Customer tools tab.', 'wc-generic-product-designer' ); ?></p>
 
 			<form method="post" id="wc-gpd-libraries-form">
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>

@@ -2630,6 +2630,76 @@
 		graphicLibraries = Array.isArray( site ) ? site : [];
 	}
 
+	function renderLibraryAssignments() {
+		const container = document.getElementById( 'wc-gpd-library-assignments' );
+		const hidden = document.getElementById( 'wc_gpd_library_assignments' );
+		if ( ! container || ! hidden ) {
+			return;
+		}
+		let assignments = editorConfig.libraryAssignments || { graphic: [], photo: [], icon: [] };
+		const libraries = Array.isArray( editorConfig.siteLibraries ) ? editorConfig.siteLibraries : [];
+		const groups = [
+			{ key: 'graphic', label: 'Graphics libraries' },
+			{ key: 'photo', label: 'Photo libraries' },
+			{ key: 'icon', label: 'Icon libraries' },
+		];
+
+		function persist() {
+			hidden.value = JSON.stringify( assignments );
+		}
+
+		function render() {
+			container.innerHTML = '';
+			groups.forEach( ( group ) => {
+				const section = document.createElement( 'div' );
+				section.className = 'wc-gpd-library-assign-group';
+				const heading = document.createElement( 'h5' );
+				heading.className = 'wc-gpd-tpl-subheading';
+				heading.textContent = group.label;
+				section.appendChild( heading );
+
+				const matches = libraries.filter( ( lib ) => ( lib.type || 'graphic' ) === group.key );
+				if ( ! matches.length ) {
+					const empty = document.createElement( 'p' );
+					empty.className = 'description';
+					empty.textContent = 'No libraries of this type yet. Create them under Libraries.';
+					section.appendChild( empty );
+				} else {
+					const list = document.createElement( 'div' );
+					list.className = 'wc-gpd-library-assign-list';
+					matches.forEach( ( lib ) => {
+						const label = document.createElement( 'label' );
+						label.className = 'wc-gpd-tpl-check';
+						const input = document.createElement( 'input' );
+						input.type = 'checkbox';
+						input.value = lib.id;
+						input.checked = ( assignments[ group.key ] || [] ).includes( lib.id );
+						input.addEventListener( 'change', () => {
+							if ( ! assignments[ group.key ] ) {
+								assignments[ group.key ] = [];
+							}
+							if ( input.checked ) {
+								assignments[ group.key ].push( lib.id );
+								assignments[ group.key ] = Array.from( new Set( assignments[ group.key ] ) );
+							} else {
+								assignments[ group.key ] = assignments[ group.key ].filter( ( id ) => id !== lib.id );
+							}
+							persist();
+						} );
+						label.appendChild( input );
+						label.appendChild( document.createTextNode( ' ' + ( lib.name || lib.id ) ) );
+						list.appendChild( label );
+					} );
+					section.appendChild( list );
+				}
+				container.appendChild( section );
+			} );
+		}
+
+		persist();
+		render();
+	}
+
 	function saveTemplateFonts() {
 		if ( ! templateFontsInput ) {
 			return;
@@ -3556,6 +3626,7 @@
 	bindCustomerAccessPanel();
 	bindImagePropInputs();
 	loadGraphicLibraries();
+	renderLibraryAssignments();
 	loadJson();
 	updateRulers();
 	syncCustomerMockup();

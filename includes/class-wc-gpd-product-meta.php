@@ -84,8 +84,11 @@ class WC_GPD_Product_Meta {
 					'template_json'     => $template['template_json'],
 					'template_views'    => $template['template_views'],
 					'max_views'         => $template['max_views'],
-					'graphic_library'   => $template['graphic_library'],
-					'graphic_libraries' => $template['graphic_libraries'],
+					'graphic_library'     => $template['graphic_library'],
+					'photo_library'       => $template['photo_library'],
+					'graphic_libraries'   => $template['graphic_libraries'],
+					'library_assignments' => $template['library_assignments'],
+					'icon_slugs'          => $template['icon_slugs'],
 					'template_palettes' => $template['template_palettes'],
 					'product_settings'  => $product_settings,
 				);
