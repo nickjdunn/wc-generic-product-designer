@@ -295,12 +295,21 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		$template_ref = ! empty( $settings['template_ref'] ) ? absint( $settings['template_ref'] ) : 0;
 		WC_GPD_Font_Registry::enqueue_for_designer( $template_ref );
 
+		$diagnostics_enabled = WC_GPD_Settings::is_js_debug_enabled()
+			|| current_user_can( 'manage_woocommerce' )
+			|| WC_GPD_Sample_Content::is_sample_product( $product_id );
+
 		wp_localize_script(
 			'wc-gpd-designer',
 			'wcGpdDesigner',
 			array(
 				'canvasWidth'  => $settings['width'],
 				'canvasHeight' => $settings['height'],
+				'pluginVersion'      => WC_GPD_VERSION,
+				'productId'          => $product_id,
+				'templateRef'        => $template_ref,
+				'diagnosticsEnabled' => $diagnostics_enabled,
+				'isSampleProduct'    => WC_GPD_Sample_Content::is_sample_product( $product_id ),
 				'templateUrl'        => $settings['template_url'],
 				'templateJson'       => $settings['template_json'],
 				'templateViews'      => self::template_views_for_js( $settings ),
@@ -373,6 +382,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'panelDetails'    => __( 'Your details', 'wc-generic-product-designer' ),
 					'panelContext'    => __( 'Edit', 'wc-generic-product-designer' ),
 					'panelLayers'     => __( 'Layers', 'wc-generic-product-designer' ),
+					'copyDiagnostics' => __( 'Copy diagnostics', 'wc-generic-product-designer' ),
+					'diagnosticsCopied' => __( 'Diagnostics copied to clipboard. Paste this into your support message.', 'wc-generic-product-designer' ),
+					'diagnosticsCopyFailed' => __( 'Could not copy diagnostics. Open the browser console and run wcGpdGetDiagnostics().', 'wc-generic-product-designer' ),
+					'sampleProductHint' => __( 'Troubleshoot test product — select each labeled layer, then copy diagnostics from the footer.', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => WC_GPD_Font_Registry::font_families_for_js( $template_ref ),
 				'fontOptions'  => WC_GPD_Font_Registry::fonts_for_template( $template_ref ),
@@ -441,6 +454,11 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			? __( 'Update cart with design', 'wc-generic-product-designer' )
 			: __( 'Add to cart', 'wc-generic-product-designer' );
 
+		$show_diagnostics = WC_GPD_Settings::is_js_debug_enabled()
+			|| current_user_can( 'manage_woocommerce' )
+			|| WC_GPD_Sample_Content::is_sample_product( $product->get_id() );
+		$is_sample_product = WC_GPD_Sample_Content::is_sample_product( $product->get_id() );
+
 		?>
 		<div
 			class="<?php echo esc_attr( implode( ' ', $designer_classes ) ); ?>"
@@ -458,6 +476,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			<?php elseif ( $edit_context ) : ?>
 				<p class="wc-gpd-designer__notice wc-gpd-designer__notice--inline" role="status">
 					<?php esc_html_e( 'You are editing a design from your cart. Update when finished.', 'wc-generic-product-designer' ); ?>
+				</p>
+			<?php elseif ( $is_sample_product ) : ?>
+				<p class="wc-gpd-designer__notice wc-gpd-designer__notice--inline wc-gpd-designer__notice--sample" role="status">
+					<?php esc_html_e( 'Troubleshoot test product — select each labeled layer, then copy diagnostics from the footer.', 'wc-generic-product-designer' ); ?>
 				</p>
 			<?php endif; ?>
 			<header class="wc-gpd-studio-chrome" id="wc-gpd-popout-chrome" hidden>
@@ -577,7 +599,14 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</main>
 			</div>
 			<footer class="wc-gpd-studio-footer" id="wc-gpd-studio-footer">
-				<div class="wc-gpd-studio-footer__price" id="wc-gpd-studio-price"><?php echo wp_kses_post( $product->get_price_html() ); ?></div>
+				<div class="wc-gpd-studio-footer__left">
+					<div class="wc-gpd-studio-footer__price" id="wc-gpd-studio-price"><?php echo wp_kses_post( $product->get_price_html() ); ?></div>
+					<?php if ( $show_diagnostics ) : ?>
+						<button type="button" class="wc-gpd-studio-footer__diagnostics" id="wc-gpd-copy-diagnostics" title="<?php esc_attr_e( 'Copy a JSON report for troubleshooting', 'wc-generic-product-designer' ); ?>">
+							<?php esc_html_e( 'Copy diagnostics', 'wc-generic-product-designer' ); ?>
+						</button>
+					<?php endif; ?>
+				</div>
 				<button type="button" class="wc-gpd-studio-footer__atc" id="wc-gpd-designer-atc"><?php echo esc_html( $atc_label ); ?></button>
 			</footer>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />

@@ -106,6 +106,8 @@ final class WC_GPD_Plugin {
 
 		$this->load_modules();
 
+		WC_GPD_Sample_Content::register();
+
 		load_plugin_textdomain(
 			'wc-generic-product-designer',
 			false,
@@ -153,6 +155,8 @@ final class WC_GPD_Plugin {
 		if ( false === get_option( WC_GPD_Settings::OPTION_KEY, false ) ) {
 			WC_GPD_Settings::update( WC_GPD_Settings::DEFAULTS );
 		}
+
+		WC_GPD_Sample_Content::schedule_install();
 	}
 
 	/**

@@ -213,6 +213,7 @@
 		navDetails: document.getElementById( 'wc-gpd-nav-details' ),
 		navLayers: document.getElementById( 'wc-gpd-nav-layers' ),
 		designerAtc: document.getElementById( 'wc-gpd-designer-atc' ),
+		copyDiagnostics: document.getElementById( 'wc-gpd-copy-diagnostics' ),
 		placeholderFields: document.getElementById( 'wc-gpd-placeholder-fields' ),
 		graphicPickers: document.getElementById( 'wc-gpd-graphic-pickers' ),
 	};
@@ -226,6 +227,147 @@
 
 	let designerOpen = false;
 	const isStartDesigningMode = config.launchMode === 'start_designing';
+	const diagnosticsEnabled = !! config.diagnosticsEnabled;
+	const diagnosticsLog = [];
+
+	function logDiagnostic( type, data ) {
+		if ( ! diagnosticsEnabled ) {
+			return;
+		}
+		const entry = {
+			at: new Date().toISOString(),
+			type,
+			data,
+		};
+		diagnosticsLog.push( entry );
+		if ( diagnosticsLog.length > 80 ) {
+			diagnosticsLog.shift();
+		}
+		log.debug( '[GPD diagnostics]', type, data );
+	}
+
+	function pickLockProps( obj ) {
+		if ( ! obj ) {
+			return {};
+		}
+		return {
+			font: obj.wcGpdLockFont,
+			size: obj.wcGpdLockSize,
+			color: obj.wcGpdLockColor,
+			bold: obj.wcGpdLockBold,
+			italic: obj.wcGpdLockItalic,
+			underline: obj.wcGpdLockUnderline,
+			align: obj.wcGpdLockAlign,
+			lineHeight: obj.wcGpdLockLineHeight,
+			letterSpacing: obj.wcGpdLockLetterSpacing,
+			text: obj.wcGpdLockText,
+			move: obj.wcGpdLockMove,
+			scale: obj.wcGpdLockScale,
+		};
+	}
+
+	function summarizeTemplateViews() {
+		return ( config.templateViews || [] ).map( ( view ) => ( {
+			id: view.id,
+			label: view.label,
+			objectCount: ( view.objects || [] ).length,
+			objects: ( view.objects || [] ).map( ( obj ) => ( {
+				uid: obj.wcGpdUid,
+				type: obj.type,
+				layerType: obj.wcGpdLayerType,
+				layerLabel: obj.wcGpdLayerLabel,
+				customerEditable: obj.wcGpdCustomerEditable,
+				locks: pickLockProps( obj ),
+			} ) ),
+		} ) );
+	}
+
+	function buildLayerPermissionReport( obj ) {
+		if ( ! obj ) {
+			return null;
+		}
+		const isText = isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer );
+		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		return {
+			uid: obj.wcGpdUid,
+			type: obj.type,
+			layerType: obj.wcGpdLayerType,
+			layerLabel: obj.wcGpdLayerLabel,
+			templateLayer: obj.wcGpdTemplateLayer,
+			customerEditable: obj.wcGpdCustomerEditable,
+			locks: pickLockProps( obj ),
+			allows: {
+				font: layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ),
+				size: layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ),
+				bold: layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ),
+				italic: layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' ),
+				underline: layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' ),
+				align: layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' ),
+				lineHeight: layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' ),
+				letterSpacing: layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' ),
+				color: textColorAllowed( obj ),
+			},
+			uiVisible: {
+				fontRow: ! getPropRow( ui.fontFamily )?.hidden,
+				sizeRow: ! getPropRow( ui.fontSize )?.hidden,
+				styleRow: ! getPropRow( ui.boldBtn )?.hidden,
+				alignRow: ! getPropRow( ui.alignRow )?.hidden,
+				colorRow: ! designerRoot.querySelector( '.wc-gpd-control-text-color' )?.hidden,
+				lineHeightRow: ! getPropRow( ui.lineHeight )?.hidden,
+				letterSpacingRow: ! getPropRow( ui.letterSpacing )?.hidden,
+			},
+			canvas: {
+				selectable: obj.selectable,
+				evented: obj.evented,
+				editable: obj.editable,
+				lockMovementX: obj.lockMovementX,
+				lockMovementY: obj.lockMovementY,
+				lockScalingX: obj.lockScalingX,
+				lockScalingY: obj.lockScalingY,
+			},
+			isText,
+			isShapeLayer,
+		};
+	}
+
+	function buildDiagnosticsReport() {
+		return {
+			pluginVersion: config.pluginVersion || null,
+			generatedAt: new Date().toISOString(),
+			pageUrl: window.location.href,
+			productId: config.productId || null,
+			templateRef: config.templateRef || null,
+			isSampleProduct: !! config.isSampleProduct,
+			userAgent: navigator.userAgent,
+			productSettings: config.productSettings || {},
+			templateViews: summarizeTemplateViews(),
+			canvasLayers: canvas.getObjects().map( ( obj ) => buildLayerPermissionReport( obj ) ),
+			activeLayer: buildLayerPermissionReport( activeText ),
+			recentEvents: diagnosticsLog.slice(),
+		};
+	}
+
+	function copyDiagnosticsReport() {
+		const report = JSON.stringify( buildDiagnosticsReport(), null, 2 );
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			return navigator.clipboard.writeText( report );
+		}
+		const textarea = document.createElement( 'textarea' );
+		textarea.value = report;
+		textarea.setAttribute( 'readonly', '' );
+		textarea.style.position = 'absolute';
+		textarea.style.left = '-9999px';
+		document.body.appendChild( textarea );
+		textarea.select();
+		let copied = false;
+		try {
+			copied = document.execCommand( 'copy' );
+		} catch ( error ) {
+			copied = false;
+		}
+		document.body.removeChild( textarea );
+		return copied ? Promise.resolve() : Promise.reject( new Error( 'copy failed' ) );
+	}
 
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
@@ -1182,6 +1324,23 @@
 						objects.forEach( ( obj, index ) => {
 							applyTemplateMetadata( obj, templateObjects[ index ] );
 							obj.wcGpdTemplateLayer = true;
+							const source = templateObjects[ index ] || {};
+							logDiagnostic( 'template_object_loaded', {
+								index,
+								uid: obj.wcGpdUid,
+								type: obj.type,
+								sourceLocks: pickLockProps( source ),
+								canvasLocks: pickLockProps( obj ),
+								customerEditable: {
+									source: source.wcGpdCustomerEditable,
+									canvas: obj.wcGpdCustomerEditable,
+								},
+								recognizedAs: {
+									editableText: isCustomerEditableTemplateText( obj ),
+									editableShape: isCustomerEditableTemplateShape( obj ),
+									fixedText: isFixedTemplateText( obj ),
+								},
+							} );
 							if ( isMockupImage( obj ) ) {
 								if ( obj.wcGpdMockupVisible === false ) {
 									return;
@@ -1767,6 +1926,7 @@
 
 		renderColorSwatches( obj );
 		applyLayerToolSettings( obj );
+		logDiagnostic( 'toolbar_synced', buildLayerPermissionReport( obj ) );
 	}
 
 	/**
@@ -2428,6 +2588,30 @@
 	applyProductToolSettings();
 	bindAddToCart();
 	openCustomerSection( 'add' );
+
+	if ( ui.copyDiagnostics ) {
+		ui.copyDiagnostics.addEventListener( 'click', () => {
+			copyDiagnosticsReport()
+				.then( () => {
+					window.alert( config.i18n?.diagnosticsCopied || 'Diagnostics copied to clipboard.' );
+				} )
+				.catch( () => {
+					window.alert( config.i18n?.diagnosticsCopyFailed || 'Could not copy diagnostics.' );
+					log.info( 'Diagnostics report', buildDiagnosticsReport() );
+				} );
+		} );
+	}
+
+	if ( diagnosticsEnabled ) {
+		window.wcGpdGetDiagnostics = buildDiagnosticsReport;
+		window.wcGpdCopyDiagnostics = copyDiagnosticsReport;
+		logDiagnostic( 'designer_boot', {
+			pluginVersion: config.pluginVersion,
+			productId: config.productId,
+			isSampleProduct: config.isSampleProduct,
+			templateViews: summarizeTemplateViews(),
+		} );
+	}
 
 	if ( config.isEditing || config.orderEdit || config.autoOpenDesigner ) {
 		setTimeout( () => openDesigner(), 120 );

@@ -39,6 +39,12 @@
 	border-bottom: 1px solid #bfdbfe;
 }
 
+.wc-gpd-designer__notice--sample {
+	background: #fefce8;
+	border-bottom-color: #fde047;
+	color: #713f12;
+}
+
 /* Compact studio bar */
 .wc-gpd-studio-bar {
 	display: flex;
