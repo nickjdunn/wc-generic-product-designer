@@ -203,6 +203,14 @@
 	resize: vertical;
 }
 
+.wc-gpd-tpl-text-editor .wc-gpd-rich-text-box {
+	margin-top: 0.25rem;
+}
+
+.wc-gpd-tpl-text-editor .wc-gpd-rich-toolbar {
+	padding: 8px 10px;
+}
+
 .wc-gpd-tpl-panel--text .wc-gpd-tpl-hint {
 	margin-top: 8px;
 }

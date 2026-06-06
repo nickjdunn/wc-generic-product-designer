@@ -20,10 +20,10 @@
 	const strokeColorInput = document.getElementById( 'wc_gpd_template_stroke_color' );
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
-	const shapePropsHint = document.getElementById( 'wc-gpd-shape-props-hint' );
+	const shapeStrokeWidthRow = document.getElementById( 'wc-gpd-shape-stroke-width-row' );
+	const shapeFillNote = document.getElementById( 'wc-gpd-shape-fill-note' );
 	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
 	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
-	const textEditorHint = document.getElementById( 'wc-gpd-text-editor-hint' );
 	const layerColorsPanel = document.getElementById( 'wc-gpd-layer-colors-panel' );
 	const contextNavBtn = document.getElementById( 'wc-gpd-nav-context' );
 	const contextEmpty = document.getElementById( 'wc-gpd-context-empty' );
@@ -248,12 +248,76 @@
 		return documentData.views.find( ( view ) => view.id === activeViewId ) || documentData.views[ 0 ];
 	}
 
-	function isShape( obj ) {
+	function isShapeType( obj ) {
 		if ( ! obj || obj.wcGpdLayerType === 'graphic_slot' || obj.wcGpdGraphicSlot ) {
 			return false;
 		}
-		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline', 'group' ];
-		return shapeTypes.indexOf( obj.type ) >= 0 && obj.wcGpdTemplateLayer;
+		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline', 'group', 'line' ];
+		return shapeTypes.indexOf( obj.type ) >= 0;
+	}
+
+	function isShape( obj ) {
+		return isShapeType( obj ) && !! obj.wcGpdTemplateLayer;
+	}
+
+	function shapeIsFillBased( obj ) {
+		if ( ! obj ) {
+			return false;
+		}
+		if ( obj.type === 'group' ) {
+			return true;
+		}
+		const hasFill = obj.fill && obj.fill !== 'transparent';
+		const hasStroke = obj.stroke && obj.stroke !== 'transparent' && ( obj.strokeWidth || 0 ) > 0;
+		return hasFill && ! hasStroke;
+	}
+
+	function getShapeDisplayColor( obj ) {
+		if ( ! obj ) {
+			return defaultOutlineColor();
+		}
+		if ( obj.type === 'group' && obj.getObjects ) {
+			const children = obj.getObjects();
+			for ( let i = 0; i < children.length; i++ ) {
+				const childColor = getShapeDisplayColor( children[ i ] );
+				if ( childColor ) {
+					return childColor;
+				}
+			}
+		}
+		if ( obj.stroke && obj.stroke !== 'transparent' ) {
+			return obj.stroke;
+		}
+		if ( obj.fill && obj.fill !== 'transparent' ) {
+			return obj.fill;
+		}
+		return defaultOutlineColor();
+	}
+
+	function applyShapeColor( obj, color ) {
+		if ( ! obj || ! isShape( obj ) || obj.wcGpdBoundingBox ) {
+			return;
+		}
+		if ( obj.type === 'group' ) {
+			styleShapeForEngraving( obj, color );
+			return;
+		}
+		if ( shapeIsFillBased( obj ) ) {
+			obj.set( { fill: color, stroke: null, strokeWidth: 0 } );
+			return;
+		}
+		obj.set( { stroke: color, fill: 'transparent' } );
+	}
+
+	function applyShapeStrokeWidth( obj, width ) {
+		if ( ! obj || ! isShape( obj ) || shapeIsFillBased( obj ) ) {
+			return;
+		}
+		if ( obj.type === 'group' && obj.getObjects ) {
+			obj.getObjects().forEach( ( child ) => applyShapeStrokeWidth( child, width ) );
+			return;
+		}
+		obj.set( 'strokeWidth', width );
 	}
 
 	function isTemplateImage( obj ) {
@@ -361,7 +425,7 @@
 	}
 
 	function applyStrokeToObject( obj, isBbox ) {
-		if ( ! obj || ! isShape( obj ) ) {
+		if ( ! obj || ! isShapeType( obj ) ) {
 			return;
 		}
 		obj.set( {
@@ -370,6 +434,25 @@
 			fill: 'transparent',
 			strokeDashArray: isBbox ? [ 6, 4 ] : null,
 		} );
+	}
+
+	function syncShapeAppearancePanel( obj ) {
+		if ( ! obj || ! isShape( obj ) ) {
+			return;
+		}
+		const fillBased = shapeIsFillBased( obj );
+		if ( shapeStrokeWidthRow ) {
+			shapeStrokeWidthRow.hidden = fillBased;
+		}
+		if ( shapeFillNote ) {
+			shapeFillNote.hidden = ! fillBased;
+		}
+		if ( strokeColorInput ) {
+			strokeColorInput.value = getShapeDisplayColor( obj );
+		}
+		if ( strokeWidthInput && ! fillBased ) {
+			strokeWidthInput.value = String( obj.strokeWidth || defaultOutlineWidth() );
+		}
 	}
 
 	function persistCanvasToActiveView() {
@@ -388,14 +471,19 @@
 	}
 
 	function syncShapeFlags( obj ) {
-		if ( ! obj || ! isShape( obj ) ) {
+		if ( ! isShapeType( obj ) ) {
 			return;
 		}
 		obj.wcGpdTemplateLayer = true;
 		if ( ! obj.wcGpdUid ) {
 			obj.wcGpdUid = uid();
 		}
-		if ( outlineToggle ) {
+		if ( typeof obj.wcGpdOutlineLayer === 'undefined' ) {
+			obj.wcGpdOutlineLayer = true;
+			obj.wcGpdLayerType = 'outline';
+		}
+		const active = canvas.getActiveObject();
+		if ( outlineToggle && active === obj ) {
 			obj.wcGpdOutlineLayer = outlineToggle.checked;
 			obj.wcGpdLayerType = outlineToggle.checked ? 'outline' : 'shape';
 		}
@@ -427,14 +515,28 @@
 	}
 
 	function hideAllPropPanels() {
-		[ shapePropsFields, imagePropsPanel, textEditorPanel, graphicSlotPropsPanel ].forEach( ( el ) => {
-			if ( el ) {
-				el.hidden = true;
-			}
-		} );
-		if ( textEditorHint ) {
-			textEditorHint.hidden = false;
+		// Layer-type panels are shown via showContextBlocks(); no inner toggles needed.
+	}
+
+	function initContextAccordions() {
+		if ( ! contextPane ) {
+			return;
 		}
+		contextPane.querySelectorAll( '.wc-gpd-context-accordion__toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const accordion = toggle.closest( '.wc-gpd-context-accordion' );
+				if ( ! accordion ) {
+					return;
+				}
+				const body = accordion.querySelector( '.wc-gpd-context-accordion__body' );
+				const open = ! accordion.classList.contains( 'is-open' );
+				accordion.classList.toggle( 'is-open', open );
+				toggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+				if ( body ) {
+					body.hidden = ! open;
+				}
+			} );
+		} );
 	}
 
 	const adminStudioNav = document.getElementById( 'wc-gpd-admin-studio-nav' );
@@ -509,7 +611,7 @@
 
 	function showContextBlocks( active ) {
 		const type = contextTypeForObject( active );
-		const blocks = contextPane ? contextPane.querySelectorAll( '.wc-gpd-context-block' ) : [];
+		const blocks = contextPane ? contextPane.querySelectorAll( '.wc-gpd-context-accordion, .wc-gpd-context-block' ) : [];
 		blocks.forEach( ( block ) => {
 			const forTypes = ( block.dataset.contextFor || '' ).split( ',' ).map( ( part ) => part.trim() );
 			if ( forTypes.includes( 'all' ) ) {
@@ -1191,26 +1293,16 @@
 
 		hideAllPropPanels();
 
-		if ( shapePropsHint ) {
-			shapePropsHint.hidden = shapeSelected || imageSelected || textSelected || slotSelected;
-		}
-
-		if ( shapeSelected && shapePropsFields ) {
-			shapePropsFields.hidden = false;
+		if ( shapeSelected ) {
+			syncShapeAppearancePanel( active );
 		}
 		if ( imageSelected && imagePropsPanel ) {
-			imagePropsPanel.hidden = false;
 			syncImagePropsPanel( active );
 		}
-		if ( isTextLayer( active ) && textEditorPanel ) {
-			textEditorPanel.hidden = false;
-			if ( textEditorHint ) {
-				textEditorHint.hidden = true;
-			}
+		if ( textSelected && textEditorPanel ) {
 			syncTextEditorPanel( active );
 		}
 		if ( slotSelected && graphicSlotPropsPanel ) {
-			graphicSlotPropsPanel.hidden = false;
 			syncGraphicSlotPropsPanel( active );
 		}
 
@@ -1222,12 +1314,6 @@
 		}
 		if ( outlineToggle && shapeSelected ) {
 			outlineToggle.checked = !! active.wcGpdOutlineLayer;
-		}
-		if ( shapeSelected && strokeColorInput ) {
-			strokeColorInput.value = active.stroke || defaultOutlineColor();
-		}
-		if ( shapeSelected && strokeWidthInput ) {
-			strokeWidthInput.value = String( active.strokeWidth || defaultOutlineWidth() );
 		}
 		if ( imageSelected && mockupVisibleToggle ) {
 			mockupVisibleToggle.checked = active.wcGpdMockupVisible !== false;
@@ -1930,6 +2016,7 @@
 			fontSize: 32,
 			fill: '#000000',
 			textAlign: 'center',
+			editable: true,
 			wcGpdUid: uid(),
 			wcGpdTemplateLayer: true,
 			wcGpdLayerType: 'text',
@@ -2578,6 +2665,22 @@
 	canvas.on( 'selection:created', updateSelectionPanels );
 	canvas.on( 'selection:updated', updateSelectionPanels );
 	canvas.on( 'selection:cleared', updateSelectionPanels );
+	canvas.on( 'text:changed', ( event ) => {
+		const obj = event.target;
+		const content = document.getElementById( 'wc_gpd_tpl_text_content' );
+		if ( ! isTextLayer( obj ) || ! content || canvas.getActiveObject() !== obj ) {
+			return;
+		}
+		content.value = obj.text || '';
+		renderLayersList();
+		updateAccordionTitles();
+	} );
+	canvas.on( 'text:editing:exited', ( event ) => {
+		const obj = event.target;
+		if ( isTextLayer( obj ) && canvas.getActiveObject() === obj ) {
+			syncTextEditorPanel( obj );
+		}
+	} );
 	canvas.on( 'object:modified', () => {
 		sortLayers();
 		const active = canvas.getActiveObject();
@@ -2630,7 +2733,7 @@
 			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
 				return;
 			}
-			active.set( 'stroke', strokeColorInput.value );
+			applyShapeColor( active, strokeColorInput.value );
 			canvas.requestRenderAll();
 		} );
 	}
@@ -2638,10 +2741,10 @@
 	if ( strokeWidthInput ) {
 		strokeWidthInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox || shapeIsFillBased( active ) ) {
 				return;
 			}
-			active.set( 'strokeWidth', parseFloat( strokeWidthInput.value ) || 1 );
+			applyShapeStrokeWidth( active, parseFloat( strokeWidthInput.value ) || defaultOutlineWidth() );
 			canvas.requestRenderAll();
 		} );
 	}
@@ -2820,6 +2923,7 @@
 	initMockupStudioNav();
 	initAdminStudioNav();
 	initAccordion();
+	initContextAccordions();
 	updateUnitSuffixes();
 	loadPalettesFromInput();
 	if ( useSameColorsCheckbox ) {
