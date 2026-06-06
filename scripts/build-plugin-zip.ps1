@@ -4,7 +4,7 @@
 #   .\scripts\build-plugin-zip.ps1
 #
 param(
-	[string] $PluginSlug = 'wc-generic-product-designer'
+	[string] $PluginSlug = 'wc-generic-product-designer-main'
 )
 
 $ErrorActionPreference = 'Stop'

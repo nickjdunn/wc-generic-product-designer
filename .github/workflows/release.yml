@@ -17,7 +17,8 @@ jobs:
 
       - name: Build installable zip
         run: |
-          PLUGIN_SLUG="wc-generic-product-designer"
+          # Match GitHub "main" branch archive folder name so WordPress treats uploads as updates.
+          PLUGIN_SLUG="wc-generic-product-designer-main"
           mkdir -p "build/${PLUGIN_SLUG}"
           rsync -a \
             --exclude='.git' \
@@ -35,5 +36,5 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: wc-generic-product-designer.zip
+          files: wc-generic-product-designer-main.zip
           generate_release_notes: true
