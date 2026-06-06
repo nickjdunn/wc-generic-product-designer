@@ -16,12 +16,19 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '4';
+	const SAMPLE_VERSION     = '5';
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
 	const TEMPLATE_TITLE     = 'GPD Demo Template';
 	const PRODUCT_TITLE      = 'GPD Demo Product';
+
+	/**
+	 * Prevent recursive install within one request.
+	 *
+	 * @var bool
+	 */
+	private static $installing = false;
 
 	/**
 	 * Register hooks.
@@ -47,13 +54,19 @@ class WC_GPD_Sample_Content {
 	 * @param bool $force Recreate sample posts from scratch.
 	 */
 	public static function maybe_install( $force = false ) {
+		if ( self::$installing ) {
+			return;
+		}
+
 		if ( ! class_exists( 'WooCommerce' ) ) {
 			return;
 		}
 
 		$pending = get_option( self::PENDING_OPTION );
 		if ( $force || $pending || self::needs_refresh() ) {
+			self::$installing = true;
 			self::install( $force );
+			self::$installing = false;
 			delete_option( self::PENDING_OPTION );
 		}
 	}
@@ -345,7 +358,21 @@ class WC_GPD_Sample_Content {
 			return;
 		}
 
-		update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_JSON, $json );
+		WC_GPD_Design_Template::update_template_json( $post_id, $json );
+
+		$stored_count = self::template_object_count( $post_id );
+		if ( $stored_count < 4 ) {
+			WC_GPD_Logger::error(
+				'Demo template JSON did not persist correctly after save',
+				array(
+					'template_id'   => $post_id,
+					'expected'      => 4,
+					'stored_count'  => $stored_count,
+					'payload_count' => self::json_object_count( $json ),
+					'json_bytes'    => strlen( $json ),
+				)
+			);
+		}
 	}
 
 	/**
@@ -542,7 +569,7 @@ class WC_GPD_Sample_Content {
 			'originX'                => 'left',
 			'originY'                => 'top',
 			'text'                   => $text,
-			'fontFamily'             => '"Times New Roman", Times, serif',
+			'fontFamily'             => 'Times New Roman, Times, serif',
 			'fontSize'               => 28,
 			'fontWeight'             => 'normal',
 			'fontStyle'              => 'normal',

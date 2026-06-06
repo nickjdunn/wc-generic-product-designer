@@ -561,7 +561,7 @@ class WC_GPD_Design_Template {
 		if ( is_string( $json ) && '' !== trim( $json ) ) {
 			$sanitized = WC_GPD_Template_Json::sanitize( $json );
 			if ( false !== $sanitized ) {
-				update_post_meta( $template_id, self::META_TEMPLATE_JSON, $sanitized );
+				self::update_template_json( $template_id, $sanitized );
 			}
 		}
 
@@ -670,6 +670,26 @@ class WC_GPD_Design_Template {
 				'products_unlinked'  => count( $product_ids ),
 			)
 		);
+
+		return true;
+	}
+
+	/**
+	 * Persist sanitized template JSON to post meta (WordPress-safe slashes).
+	 *
+	 * @param int    $template_id Template post ID.
+	 * @param string $json        Sanitized JSON string.
+	 * @return bool
+	 */
+	public static function update_template_json( $template_id, $json ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id || ! is_string( $json ) || '' === trim( $json ) ) {
+			return false;
+		}
+
+		delete_post_meta( $template_id, self::META_TEMPLATE_JSON );
+		update_post_meta( $template_id, self::META_TEMPLATE_JSON, wp_slash( $json ) );
+		clean_post_cache( $template_id );
 
 		return true;
 	}
