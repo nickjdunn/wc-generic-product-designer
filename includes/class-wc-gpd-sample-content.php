@@ -16,7 +16,9 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '3';
+	const SAMPLE_VERSION     = '4';
+	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
+	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
 	const TEMPLATE_TITLE     = 'GPD Demo Template';
 	const PRODUCT_TITLE      = 'GPD Demo Product';
@@ -79,8 +81,25 @@ class WC_GPD_Sample_Content {
 			return true;
 		}
 
+		if ( ! self::template_has_demo_markers( $template_id ) ) {
+			return true;
+		}
+
 		$sample_version = isset( $ids['sample_version'] ) ? (string) $ids['sample_version'] : '';
 		return self::SAMPLE_VERSION !== $sample_version;
+	}
+
+	/**
+	 * @param int $template_id Template post ID.
+	 * @return bool
+	 */
+	private static function template_has_demo_markers( $template_id ) {
+		$json = get_post_meta( absint( $template_id ), WC_GPD_Design_Template::META_TEMPLATE_JSON, true );
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return false;
+		}
+
+		return false !== strpos( $json, self::DEMO_MARKER_UID );
 	}
 
 	/**
@@ -106,21 +125,28 @@ class WC_GPD_Sample_Content {
 	}
 
 	/**
-	 * @param bool $force When true, create new sample posts even if old IDs exist.
+	 * @param bool $force Unused; kept for backward compatibility with debug refresh.
 	 * @return array{product_id:int,template_id:int,product_url:string,edit_url:string}
 	 */
 	public static function install( $force = false ) {
 		WC_GPD_Design_Template::register_post_type();
 
 		$ids         = self::get_ids();
-		$template_id = $force ? 0 : absint( $ids['template_id'] ?? 0 );
-		$product_id  = $force ? 0 : absint( $ids['product_id'] ?? 0 );
+		$template_id = absint( $ids['template_id'] ?? 0 );
+		$product_id  = absint( $ids['product_id'] ?? 0 );
 
 		if ( $template_id && ( ! get_post( $template_id ) || 'yes' !== get_post_meta( $template_id, self::META_FLAG, true ) ) ) {
 			$template_id = 0;
 		}
 		if ( $product_id && ( ! get_post( $product_id ) || 'yes' !== get_post_meta( $product_id, self::META_FLAG, true ) ) ) {
 			$product_id = 0;
+		}
+
+		if ( ! $template_id ) {
+			$template_id = self::find_sample_template_id();
+		}
+		if ( ! $product_id ) {
+			$product_id = self::find_sample_product_id();
 		}
 
 		$template_id = self::upsert_template( $template_id );
@@ -149,10 +175,13 @@ class WC_GPD_Sample_Content {
 			)
 		);
 
-		if ( $object_count < 1 ) {
+		if ( $object_count < 4 ) {
 			WC_GPD_Logger::error(
-				'Demo template saved without layers — check template JSON sanitizer',
-				array( 'template_id' => $template_id )
+				'Demo template missing expected layers — check bundled demo JSON',
+				array(
+					'template_id'  => $template_id,
+					'object_count' => $object_count,
+				)
 			);
 		}
 
@@ -216,6 +245,47 @@ class WC_GPD_Sample_Content {
 	}
 
 	/**
+	 * @return int
+	 */
+	private static function find_sample_template_id() {
+		$posts = get_posts(
+			array(
+				'post_type'      => WC_GPD_Design_Template::POST_TYPE,
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'meta_key'       => self::META_FLAG,
+				'meta_value'     => 'yes',
+				'fields'         => 'ids',
+			)
+		);
+
+		return ! empty( $posts[0] ) ? absint( $posts[0] ) : 0;
+	}
+
+	/**
+	 * @return int
+	 */
+	private static function find_sample_product_id() {
+		$existing = get_page_by_path( self::PRODUCT_SLUG, OBJECT, 'product' );
+		if ( $existing && 'yes' === get_post_meta( $existing->ID, self::META_FLAG, true ) ) {
+			return absint( $existing->ID );
+		}
+
+		$posts = get_posts(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				'meta_key'       => self::META_FLAG,
+				'meta_value'     => 'yes',
+				'fields'         => 'ids',
+			)
+		);
+
+		return ! empty( $posts[0] ) ? absint( $posts[0] ) : 0;
+	}
+
+	/**
 	 * @param int $template_id Existing sample template ID or 0.
 	 * @return int
 	 */
@@ -248,7 +318,7 @@ class WC_GPD_Sample_Content {
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_CANVAS_HEIGHT, 600 );
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_MAX_DESIGN_VIEWS, 1 );
 
-		self::persist_template_json( $post_id, self::build_template_document() );
+		self::persist_template_json( $post_id );
 
 		$palettes = WC_GPD_Design_Template::default_palettes_data();
 		$palettes['palettes'][] = array(
@@ -263,23 +333,63 @@ class WC_GPD_Sample_Content {
 	}
 
 	/**
-	 * @param int   $post_id  Template post ID.
-	 * @param array $document Template document array.
+	 * @param int $post_id Template post ID.
 	 */
-	private static function persist_template_json( $post_id, array $document ) {
-		$encoded = wp_json_encode( $document );
-		if ( ! $encoded ) {
+	private static function persist_template_json( $post_id ) {
+		$json = self::get_demo_template_json();
+		if ( '' === $json ) {
+			WC_GPD_Logger::error(
+				'Demo template JSON could not be built',
+				array( 'template_id' => $post_id )
+			);
 			return;
+		}
+
+		update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_JSON, $json );
+	}
+
+	/**
+	 * @return string Sanitized demo template JSON.
+	 */
+	private static function get_demo_template_json() {
+		$bundled_path = WC_GPD_PLUGIN_DIR . self::BUNDLED_JSON;
+		if ( is_readable( $bundled_path ) ) {
+			$raw       = file_get_contents( $bundled_path );
+			$sanitized = is_string( $raw ) ? WC_GPD_Template_Json::sanitize( $raw ) : false;
+			if ( $sanitized && self::json_object_count( $sanitized ) >= 4 ) {
+				return $sanitized;
+			}
+		}
+
+		$encoded = wp_json_encode( self::build_template_document() );
+		if ( ! $encoded ) {
+			return '';
 		}
 
 		$sanitized = WC_GPD_Template_Json::sanitize( $encoded );
-		if ( $sanitized ) {
-			update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_JSON, $sanitized );
-			return;
+		if ( $sanitized && self::json_object_count( $sanitized ) >= 4 ) {
+			return $sanitized;
 		}
 
 		$parsed = WC_GPD_Template_Json::parse( $encoded );
-		update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_JSON, wp_json_encode( $parsed ) );
+		return wp_json_encode( $parsed );
+	}
+
+	/**
+	 * @param string $json Template JSON.
+	 * @return int
+	 */
+	private static function json_object_count( $json ) {
+		$parsed = WC_GPD_Template_Json::parse( $json );
+		$count  = 0;
+		foreach ( $parsed['views'] ?? array() as $view ) {
+			if ( ! is_array( $view ) ) {
+				continue;
+			}
+			$count += count( $view['objects'] ?? array() );
+		}
+
+		return $count;
 	}
 
 	/**

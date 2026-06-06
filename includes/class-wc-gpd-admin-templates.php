@@ -17,9 +17,11 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 */
 	private static $instance = null;
 
-	const PAGE_SLUG      = 'wc-gpd-templates';
-	const NONCE_ACTION   = 'wc_gpd_save_template';
-	const NONCE_NAME     = 'wc_gpd_template_nonce';
+	const PAGE_SLUG           = 'wc-gpd-templates';
+	const NONCE_ACTION        = 'wc_gpd_save_template';
+	const NONCE_NAME          = 'wc_gpd_template_nonce';
+	const NONCE_DELETE        = 'wc_gpd_delete_template';
+	const NONCE_DELETE_CONFIRM = 'wc_gpd_delete_template_confirm';
 
 	/**
 	 * @return WC_GPD_Admin_Templates
@@ -194,6 +196,16 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			return;
 		}
 
+		if ( isset( $_GET['action'] ) && 'delete' === sanitize_key( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$this->process_delete();
+			return;
+		}
+
+		if ( isset( $_GET['action'] ) && 'delete_confirm' === sanitize_key( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$this->render_delete_confirm_screen();
+			return;
+		}
+
 		$this->render_list_screen();
 	}
 
@@ -220,6 +232,10 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			add_query_arg( array( 'page' => self::PAGE_SLUG, 'action' => 'new' ), admin_url( 'admin.php' ) ),
 			'wc_gpd_new_template'
 		);
+
+		if ( isset( $_GET['deleted'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['deleted'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Template deleted.', 'wc-generic-product-designer' ) . '</p></div>';
+		}
 		?>
 		<div class="wrap wc-gpd-templates-wrap">
 			<h1 class="wp-heading-inline"><?php esc_html_e( 'Design templates', 'wc-generic-product-designer' ); ?></h1>
@@ -242,13 +258,20 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<tr><td colspan="5"><?php esc_html_e( 'No templates yet. Create one to get started.', 'wc-generic-product-designer' ); ?></td></tr>
 					<?php else : ?>
 						<?php foreach ( $templates as $row ) : ?>
+							<?php
+							$product_count = WC_GPD_Design_Template::count_products_using( $row['id'] );
+							$delete_link   = $this->get_delete_link( $row['id'], $product_count );
+							?>
 							<tr>
 								<td><strong><?php echo esc_html( $row['title'] ); ?></strong></td>
 								<td><?php echo esc_html( $row['width'] . ' × ' . $row['height'] . ' px' ); ?></td>
 								<td><?php echo esc_html( (string) $row['views'] ); ?></td>
-								<td><?php echo esc_html( (string) WC_GPD_Design_Template::count_products_using( $row['id'] ) ); ?></td>
-								<td>
+								<td><?php echo esc_html( (string) $product_count ); ?></td>
+								<td class="wc-gpd-template-actions">
 									<a href="<?php echo esc_url( WC_GPD_Design_Template::edit_url( $row['id'] ) ); ?>" class="button button-small"><?php esc_html_e( 'Edit template', 'wc-generic-product-designer' ); ?></a>
+									<?php if ( $delete_link ) : ?>
+										<a href="<?php echo esc_url( $delete_link['url'] ); ?>" class="button button-small button-link-delete wc-gpd-template-delete"<?php echo $delete_link['attrs']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php esc_html_e( 'Delete', 'wc-generic-product-designer' ); ?></a>
+									<?php endif; ?>
 								</td>
 							</tr>
 						<?php endforeach; ?>
@@ -257,6 +280,185 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</table>
 		</div>
 		<?php
+	}
+
+	/**
+	 * @param int $template_id   Template ID.
+	 * @param int $product_count Assigned product count.
+	 * @return array{url:string,attrs:string}|null
+	 */
+	private function get_delete_link( $template_id, $product_count ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id ) {
+			return null;
+		}
+
+		if ( $product_count > 0 ) {
+			return array(
+				'url'   => wp_nonce_url(
+					add_query_arg(
+						array(
+							'page'        => self::PAGE_SLUG,
+							'action'      => 'delete_confirm',
+							'template_id' => $template_id,
+						),
+						admin_url( 'admin.php' )
+					),
+					self::NONCE_DELETE . '_' . $template_id
+				),
+				'attrs' => '',
+			);
+		}
+
+		$confirm = sprintf(
+			/* translators: %s: template name */
+			__( 'Delete "%s"? This cannot be undone.', 'wc-generic-product-designer' ),
+			get_the_title( $template_id )
+		);
+
+		return array(
+			'url'   => wp_nonce_url(
+				add_query_arg(
+					array(
+						'page'        => self::PAGE_SLUG,
+						'action'      => 'delete',
+						'template_id' => $template_id,
+					),
+					admin_url( 'admin.php' )
+				),
+				self::NONCE_DELETE . '_' . $template_id
+			),
+			'attrs' => ' onclick="return confirm(' . wp_json_encode( $confirm ) . ');"',
+		);
+	}
+
+	/**
+	 * Delete an unassigned template (GET + nonce, after JS confirm).
+	 */
+	private function process_delete() {
+		$template_id = isset( $_GET['template_id'] ) ? absint( $_GET['template_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! $template_id ) {
+			wp_die( esc_html__( 'Template not found.', 'wc-generic-product-designer' ) );
+		}
+
+		check_admin_referer( self::NONCE_DELETE . '_' . $template_id );
+
+		if ( WC_GPD_Design_Template::count_products_using( $template_id ) > 0 ) {
+			wp_safe_redirect(
+				wp_nonce_url(
+					add_query_arg(
+						array(
+							'page'        => self::PAGE_SLUG,
+							'action'      => 'delete_confirm',
+							'template_id' => $template_id,
+						),
+						admin_url( 'admin.php' )
+					),
+					self::NONCE_DELETE . '_' . $template_id
+				)
+			);
+			exit;
+		}
+
+		$this->execute_delete( $template_id );
+	}
+
+	/**
+	 * Confirm deletion when a template is assigned to products.
+	 */
+	private function render_delete_confirm_screen() {
+		$template_id = isset( $_GET['template_id'] ) ? absint( $_GET['template_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! $template_id ) {
+			wp_die( esc_html__( 'Template not found.', 'wc-generic-product-designer' ) );
+		}
+
+		check_admin_referer( self::NONCE_DELETE . '_' . $template_id );
+
+		$settings = WC_GPD_Design_Template::get_settings( $template_id );
+		if ( ! $settings ) {
+			wp_die( esc_html__( 'Template not found.', 'wc-generic-product-designer' ) );
+		}
+
+		if ( isset( $_POST['wc_gpd_confirm_delete'] ) ) {
+			check_admin_referer( self::NONCE_DELETE_CONFIRM . '_' . $template_id );
+			$this->execute_delete( $template_id );
+		}
+
+		$products  = WC_GPD_Design_Template::get_products_using( $template_id );
+		$list_url  = add_query_arg( array( 'page' => self::PAGE_SLUG ), admin_url( 'admin.php' ) );
+		$edit_url  = WC_GPD_Design_Template::edit_url( $template_id );
+		?>
+		<div class="wrap wc-gpd-templates-wrap">
+			<h1><?php esc_html_e( 'Delete template', 'wc-generic-product-designer' ); ?></h1>
+			<p>
+				<a href="<?php echo esc_url( $list_url ); ?>">&larr; <?php esc_html_e( 'All templates', 'wc-generic-product-designer' ); ?></a>
+			</p>
+
+			<div class="notice notice-warning">
+				<p>
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: 1: template name, 2: number of products */
+							_n(
+								'"%1$s" is assigned to %2$d product. Delete it anyway? The product will lose its template assignment.',
+								'"%1$s" is assigned to %2$d products. Delete it anyway? Those products will lose their template assignment.',
+								count( $products ),
+								'wc-generic-product-designer'
+							),
+							$settings['title'],
+							count( $products )
+						)
+					);
+					?>
+				</p>
+			</div>
+
+			<?php if ( ! empty( $products ) ) : ?>
+				<ul class="wc-gpd-template-delete-products">
+					<?php foreach ( $products as $product ) : ?>
+						<li>
+							<?php if ( ! empty( $product['edit_url'] ) ) : ?>
+								<a href="<?php echo esc_url( $product['edit_url'] ); ?>"><?php echo esc_html( $product['title'] ); ?></a>
+							<?php else : ?>
+								<?php echo esc_html( $product['title'] ); ?>
+							<?php endif; ?>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
+
+			<form method="post" class="wc-gpd-template-delete-form">
+				<?php wp_nonce_field( self::NONCE_DELETE_CONFIRM . '_' . $template_id ); ?>
+				<input type="hidden" name="wc_gpd_confirm_delete" value="1" />
+				<p>
+					<button type="submit" class="button button-primary button-link-delete"><?php esc_html_e( 'Yes, delete this template', 'wc-generic-product-designer' ); ?></button>
+					<a href="<?php echo esc_url( $edit_url ); ?>" class="button"><?php esc_html_e( 'Cancel', 'wc-generic-product-designer' ); ?></a>
+				</p>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 */
+	private function execute_delete( $template_id ) {
+		$result = WC_GPD_Design_Template::delete( $template_id );
+		if ( is_wp_error( $result ) ) {
+			wp_die( esc_html( $result->get_error_message() ) );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'    => self::PAGE_SLUG,
+					'deleted' => '1',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	/**
@@ -285,13 +487,36 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			$template_json = wp_json_encode( WC_GPD_Template_Json::empty_document() );
 		}
 
-		$list_url = add_query_arg( array( 'page' => self::PAGE_SLUG ), admin_url( 'admin.php' ) );
+		$list_url       = add_query_arg( array( 'page' => self::PAGE_SLUG ), admin_url( 'admin.php' ) );
+		$product_count  = WC_GPD_Design_Template::count_products_using( $template_id );
+		$delete_link    = $this->get_delete_link( $template_id, $product_count );
 		?>
 		<div class="wrap wc-gpd-template-edit-wrap">
 			<h1>
 				<?php esc_html_e( 'Edit template', 'wc-generic-product-designer' ); ?>
 				<a href="<?php echo esc_url( $list_url ); ?>" class="page-title-action"><?php esc_html_e( 'All templates', 'wc-generic-product-designer' ); ?></a>
+				<?php if ( $delete_link ) : ?>
+					<a href="<?php echo esc_url( $delete_link['url'] ); ?>" class="page-title-action button-link-delete wc-gpd-template-delete"<?php echo $delete_link['attrs']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>><?php esc_html_e( 'Delete template', 'wc-generic-product-designer' ); ?></a>
+				<?php endif; ?>
 			</h1>
+			<?php if ( $product_count > 0 ) : ?>
+				<p class="description">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %d: number of products */
+							_n(
+								'This template is assigned to %d product.',
+								'This template is assigned to %d products.',
+								$product_count,
+								'wc-generic-product-designer'
+							),
+							$product_count
+						)
+					);
+					?>
+				</p>
+			<?php endif; ?>
 
 			<form method="post" id="wc-gpd-template-form" class="wc-gpd-template-form" novalidate>
 				<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>

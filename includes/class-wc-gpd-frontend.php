@@ -385,7 +385,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'copyDiagnostics' => __( 'Copy diagnostics', 'wc-generic-product-designer' ),
 					'diagnosticsCopied' => __( 'Diagnostics copied to clipboard. Paste this into your support message.', 'wc-generic-product-designer' ),
 					'diagnosticsCopyFailed' => __( 'Could not copy diagnostics. Open the browser console and run wcGpdGetDiagnostics().', 'wc-generic-product-designer' ),
-					'sampleProductHint' => __( 'Troubleshoot test product — select each labeled layer, then copy diagnostics from the footer.', 'wc-generic-product-designer' ),
+					'sampleProductHint' => __( 'Demo product — select each labeled layer to test permissions, then copy diagnostics from the footer.', 'wc-generic-product-designer' ),
 				),
 				'fonts'        => WC_GPD_Font_Registry::font_families_for_js( $template_ref ),
 				'fontOptions'  => WC_GPD_Font_Registry::fonts_for_template( $template_ref ),
@@ -479,7 +479,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				</p>
 			<?php elseif ( $is_sample_product ) : ?>
 				<p class="wc-gpd-designer__notice wc-gpd-designer__notice--inline wc-gpd-designer__notice--sample" role="status">
-					<?php esc_html_e( 'Troubleshoot test product — select each labeled layer, then copy diagnostics from the footer.', 'wc-generic-product-designer' ); ?>
+					<?php esc_html_e( 'Demo product — select each labeled layer to test permissions, then copy diagnostics from the footer.', 'wc-generic-product-designer' ); ?>
 				</p>
 			<?php endif; ?>
 			<header class="wc-gpd-studio-chrome" id="wc-gpd-popout-chrome" hidden>

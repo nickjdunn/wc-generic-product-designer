@@ -158,7 +158,7 @@ class WC_GPD_Debug implements WC_GPD_Module {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Log buffer cleared.', 'wc-generic-product-designer' ) . '</p></div>';
 		}
 		if ( isset( $_GET['wc_gpd_sample_recreated'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Troubleshoot test product refreshed.', 'wc-generic-product-designer' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Demo product and template refreshed.', 'wc-generic-product-designer' ) . '</p></div>';
 		}
 
 		$test_url  = wp_nonce_url(

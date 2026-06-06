@@ -2,6 +2,31 @@
  * Full-page Template Designer admin UI.
  */
 
+.wc-gpd-templates-wrap .wc-gpd-template-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.5rem;
+}
+
+.wc-gpd-templates-wrap .wc-gpd-template-delete {
+	color: #b32d2e;
+}
+
+.wc-gpd-template-delete-products {
+	margin: 0 0 1rem 1.25rem;
+	list-style: disc;
+}
+
+.wc-gpd-template-delete-form .button-link-delete {
+	color: #b32d2e;
+	border-color: #b32d2e;
+}
+
+.wc-gpd-template-edit-wrap .wc-gpd-template-delete.page-title-action {
+	color: #b32d2e;
+}
+
 .wc-gpd-template-edit-wrap {
 	max-width: none;
 }

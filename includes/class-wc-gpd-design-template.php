@@ -574,28 +574,104 @@ class WC_GPD_Design_Template {
 	}
 
 	/**
+	 * @param int $template_id Template ID.
+	 * @return int[]
+	 */
+	public static function get_product_ids_using( $template_id ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id ) {
+			return array();
+		}
+
+		$query = new WP_Query(
+			array(
+				'post_type'      => 'product',
+				'post_status'    => 'any',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => WC_GPD_Product_Meta::META_TEMPLATE_REF,
+						'value' => $template_id,
+					),
+				),
+			)
+		);
+
+		return array_map( 'absint', $query->posts );
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array<int,array{id:int,title:string,edit_url:string}>
+	 */
+	public static function get_products_using( $template_id ) {
+		$products = array();
+		foreach ( self::get_product_ids_using( $template_id ) as $product_id ) {
+			if ( ! $product_id ) {
+				continue;
+			}
+			$products[] = array(
+				'id'       => $product_id,
+				'title'    => get_the_title( $product_id ) ?: sprintf(
+					/* translators: %d: product ID */
+					__( 'Product #%d', 'wc-generic-product-designer' ),
+					$product_id
+				),
+				'edit_url' => (string) get_edit_post_link( $product_id, 'raw' ),
+			);
+		}
+
+		return $products;
+	}
+
+	/**
 	 * Count products using a template.
 	 *
 	 * @param int $template_id Template ID.
 	 * @return int
 	 */
 	public static function count_products_using( $template_id ) {
-		$query = new WP_Query(
+		return count( self::get_product_ids_using( $template_id ) );
+	}
+
+	/**
+	 * Permanently delete a template and clear product assignments.
+	 *
+	 * @param int $template_id Template ID.
+	 * @return true|WP_Error
+	 */
+	public static function delete( $template_id ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id || ! current_user_can( 'manage_woocommerce' ) ) {
+			return new WP_Error( 'gpd_forbidden', __( 'Permission denied.', 'wc-generic-product-designer' ) );
+		}
+
+		$post = get_post( $template_id );
+		if ( ! $post || self::POST_TYPE !== $post->post_type ) {
+			return new WP_Error( 'gpd_not_found', __( 'Template not found.', 'wc-generic-product-designer' ) );
+		}
+
+		$product_ids = self::get_product_ids_using( $template_id );
+		foreach ( $product_ids as $product_id ) {
+			delete_post_meta( $product_id, WC_GPD_Product_Meta::META_TEMPLATE_REF );
+		}
+
+		$deleted = wp_delete_post( $template_id, true );
+		if ( ! $deleted ) {
+			return new WP_Error( 'gpd_delete_failed', __( 'Could not delete the template.', 'wc-generic-product-designer' ) );
+		}
+
+		WC_GPD_Logger::info(
+			'Design template deleted',
 			array(
-				'post_type'      => 'product',
-				'post_status'    => 'any',
-				'posts_per_page' => 1,
-				'fields'         => 'ids',
-				'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-					array(
-						'key'   => WC_GPD_Product_Meta::META_TEMPLATE_REF,
-						'value' => absint( $template_id ),
-					),
-				),
+				'template_id'        => $template_id,
+				'products_unlinked'  => count( $product_ids ),
 			)
 		);
 
-		return (int) $query->found_posts;
+		return true;
 	}
 
 	/**

@@ -341,6 +341,9 @@
 			userAgent: navigator.userAgent,
 			productSettings: config.productSettings || {},
 			productSettingsNote: 'Merged WooCommerce product settings over template defaults. Template layer locks still apply per layer.',
+			demoContentSeeded: ( config.templateViews || [] ).some( ( view ) =>
+				( view.objects || [] ).some( ( obj ) => obj.wcGpdUid === 'gpd-demo-text-all' )
+			),
 			templateViews: summarizeTemplateViews(),
 			canvasLayers: canvas.getObjects().map( ( obj ) => buildLayerPermissionReport( obj ) ),
 			activeLayer: buildLayerPermissionReport( activeText ),

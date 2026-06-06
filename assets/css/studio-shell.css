@@ -837,6 +837,11 @@
 	text-align: left;
 }
 
+.wc-gpd-context-empty[hidden],
+.wc-gpd-context-pane[hidden] {
+	display: none !important;
+}
+
 .wc-gpd-context-empty {
 	margin: 0 0 0.75rem;
 	font-size: 0.8125rem;
