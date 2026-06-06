@@ -386,7 +386,21 @@
 .wc-gpd-tools-panel--rows .wc-gpd-prop-row {
 	margin-bottom: 0.75rem;
 }
+
+.wc-gpd-tools-panel.is-disabled {
 	opacity: 0.5;
+	pointer-events: none;
+}
+
+.wc-gpd-prop-row.is-disabled,
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled {
+	opacity: 0.45;
+}
+
+.wc-gpd-prop-row.is-disabled input,
+.wc-gpd-prop-row.is-disabled select,
+.wc-gpd-prop-row.is-disabled button,
+.wc-gpd-prop-row.is-disabled textarea {
 	pointer-events: none;
 }
 

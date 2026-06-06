@@ -511,19 +511,19 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 							<div class="wc-gpd-graphic-pickers" id="wc-gpd-graphic-pickers"></div>
 						</div>
 						<div class="wc-gpd-studio-panel-section" data-section="context" id="wc-gpd-section-context" hidden>
-							<p class="wc-gpd-context-empty" id="wc-gpd-context-empty"><?php esc_html_e( 'Select text on the canvas to edit its properties.', 'wc-generic-product-designer' ); ?></p>
+							<p class="wc-gpd-context-empty" id="wc-gpd-context-empty"><?php esc_html_e( 'Select a layer on the canvas to edit its properties.', 'wc-generic-product-designer' ); ?></p>
 							<div class="wc-gpd-context-pane" id="wc-gpd-context-pane" hidden>
 								<p class="wc-gpd-context-layer-name" id="wc-gpd-context-layer-name"></p>
 								<div class="wc-gpd-tools-panel wc-gpd-tools-panel--rows" id="wc-gpd-tools-panel">
-									<div class="wc-gpd-prop-row">
+									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-font-family"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
 										<select id="wc-gpd-font-family" class="wc-gpd-prop-control wc-gpd-tool-select"></select>
 									</div>
-									<div class="wc-gpd-prop-row">
+									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-font-size"><?php esc_html_e( 'Font size', 'wc-generic-product-designer' ); ?></label>
 										<input type="number" id="wc-gpd-font-size" class="wc-gpd-prop-control wc-gpd-tool-size" min="8" max="400" step="1" value="32" />
 									</div>
-									<div class="wc-gpd-prop-row">
+									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<span class="wc-gpd-prop-label"><?php esc_html_e( 'Style', 'wc-generic-product-designer' ); ?></span>
 										<div class="wc-gpd-prop-btn-group" role="group" aria-label="<?php esc_attr_e( 'Text style', 'wc-generic-product-designer' ); ?>">
 											<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-bold-btn" data-prop="bold" title="<?php esc_attr_e( 'Bold', 'wc-generic-product-designer' ); ?>"><strong>B</strong></button>
@@ -531,7 +531,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 											<button type="button" class="wc-gpd-tool-toggle" id="wc-gpd-underline-btn" data-prop="underline" title="<?php esc_attr_e( 'Underline', 'wc-generic-product-designer' ); ?>"><span class="wc-gpd-u">U</span></button>
 										</div>
 									</div>
-									<div class="wc-gpd-prop-row">
+									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<span class="wc-gpd-prop-label"><?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></span>
 										<div class="wc-gpd-prop-btn-group wc-gpd-control-align" role="group" aria-label="<?php esc_attr_e( 'Alignment', 'wc-generic-product-designer' ); ?>">
 											<button type="button" class="wc-gpd-align wc-gpd-tool-toggle" data-align="left" aria-pressed="true" title="<?php esc_attr_e( 'Align left', 'wc-generic-product-designer' ); ?>">L</button>
@@ -544,11 +544,11 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 										<div class="wc-gpd-tool-group wc-gpd-color-swatches" id="wc-gpd-color-swatches" role="group" aria-label="<?php esc_attr_e( 'Palette colors', 'wc-generic-product-designer' ); ?>"></div>
 										<input type="color" id="wc-gpd-text-color" class="wc-gpd-prop-color wc-gpd-control-color-picker" value="#000000" title="<?php esc_attr_e( 'Pick any color', 'wc-generic-product-designer' ); ?>" />
 									</div>
-									<div class="wc-gpd-prop-row wc-gpd-control-line-height">
+									<div class="wc-gpd-prop-row wc-gpd-control-line-height" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-line-height"><?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?></label>
 										<input type="number" id="wc-gpd-line-height" class="wc-gpd-prop-control wc-gpd-tool-mini" min="0.5" max="3" step="0.05" value="1.16" />
 									</div>
-									<div class="wc-gpd-prop-row wc-gpd-control-letter-spacing">
+									<div class="wc-gpd-prop-row wc-gpd-control-letter-spacing" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-letter-spacing"><?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></label>
 										<input type="number" id="wc-gpd-letter-spacing" class="wc-gpd-prop-control wc-gpd-tool-mini" min="-50" max="200" step="1" value="0" />
 									</div>

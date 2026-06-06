@@ -205,6 +205,9 @@
 	}
 
 	function textColorAllowed( obj ) {
+		if ( isCustomerEditableTemplateShape( obj ) ) {
+			return !! obj && ! obj.wcGpdLockColor;
+		}
 		return layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 	}
 
@@ -219,6 +222,27 @@
 		if ( el ) {
 			el.hidden = ! visible;
 		}
+	}
+
+	function setPropRowState( controlEl, enabled ) {
+		if ( ! controlEl ) {
+			return;
+		}
+		const row = controlEl.closest( '.wc-gpd-prop-row' );
+		if ( ! row ) {
+			controlEl.hidden = ! enabled;
+			return;
+		}
+		row.classList.toggle( 'is-disabled', ! enabled );
+		row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( input ) => {
+			input.disabled = ! enabled;
+		} );
+	}
+
+	function setTextContextVisible( visible ) {
+		designerRoot.querySelectorAll( '[data-customer-context="text"]' ).forEach( ( row ) => {
+			row.hidden = ! visible;
+		} );
 	}
 
 	function isDesignerOpen() {
@@ -317,18 +341,28 @@
 		const colorAllowed = textColorAllowed( obj );
 		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
 		const pickerAllowed = colorAllowed && ! paletteOnly;
-		setToolVisible( ui.colorSwatches, paletteOnly && paletteColorsForObject( obj ).length > 0 );
-		setToolVisible( ui.textColor, pickerAllowed );
-		setToolVisible( ui.fontFamily, layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ) );
-		setToolVisible( ui.fontSize, layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ) );
-		setToolVisible( ui.boldBtn, layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ) );
-		setToolVisible( ui.italicBtn, layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' ) );
-		setToolVisible( ui.underlineBtn, layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' ) );
-		setToolVisible( ui.lineHeightLabel || ui.lineHeight, layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' ) );
-		setToolVisible( ui.letterSpacingLabel || ui.letterSpacing, layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' ) );
-		setToolVisible( ui.alignRow, layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' ) );
+		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		const colorRow = designerRoot.querySelector( '.wc-gpd-control-text-color' );
+		if ( colorRow ) {
+			colorRow.classList.toggle( 'is-disabled', ! colorAllowed );
+		}
+		if ( ui.colorSwatches ) {
+			ui.colorSwatches.hidden = ! colorAllowed || ( ! paletteOnly && ! isShapeLayer );
+		}
 		if ( ui.textColor ) {
-			ui.textColor.value = defaultTextColor( obj );
+			ui.textColor.disabled = ! pickerAllowed;
+			ui.textColor.hidden = ! pickerAllowed;
+		}
+		setPropRowState( ui.fontFamily, layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ) );
+		setPropRowState( ui.fontSize, layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ) );
+		setPropRowState( ui.boldBtn, layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ) );
+		setPropRowState( ui.italicBtn, layerAllowsTool( obj, 'wcGpdLockItalic', 'allow_italic' ) );
+		setPropRowState( ui.underlineBtn, layerAllowsTool( obj, 'wcGpdLockUnderline', 'allow_underline' ) );
+		setPropRowState( ui.lineHeightLabel || ui.lineHeight, layerAllowsTool( obj, 'wcGpdLockLineHeight', 'allow_line_height' ) );
+		setPropRowState( ui.letterSpacingLabel || ui.letterSpacing, layerAllowsTool( obj, 'wcGpdLockLetterSpacing', 'allow_letter_spacing' ) );
+		setPropRowState( ui.alignRow, layerAllowsTool( obj, 'wcGpdLockAlign', 'allow_text_align' ) );
+		if ( ui.textColor && obj && isTextLayer( obj ) ) {
+			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
 	}
 
@@ -343,33 +377,52 @@
 			return;
 		}
 		ui.colorSwatches.innerHTML = '';
-		if ( ! textColorAllowed( obj ) || ! textColorUsesPalette( obj ) ) {
-			ui.colorSwatches.hidden = true;
+		if ( ! textColorAllowed( obj ) ) {
 			return;
 		}
-		ui.colorSwatches.hidden = false;
-		const colors = paletteColorsForObject( obj );
-		const current = ( obj && obj.fill ) ? String( obj.fill ).toLowerCase() : defaultTextColor( obj ).toLowerCase();
-		colors.forEach( ( color ) => {
-			const btn = document.createElement( 'button' );
-			btn.type = 'button';
-			btn.className = 'wc-gpd-color-swatch';
-			btn.style.backgroundColor = color;
-			btn.title = color;
-			btn.setAttribute( 'aria-label', color );
-			btn.classList.toggle( 'is-active', color.toLowerCase() === current );
-			btn.addEventListener( 'click', () => {
-				if ( ! activeText ) {
-					return;
-				}
-				activeText.set( 'fill', color );
-				if ( ui.textColor ) {
-					ui.textColor.value = color;
-				}
-				renderColorSwatches( activeText );
-				canvas.requestRenderAll();
+
+		const paletteOnly = textColorUsesPalette( obj );
+		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		if ( ! paletteOnly && ! isShapeLayer ) {
+			return;
+		}
+
+		const roles = isShapeLayer
+			? [ shapeUsesFill( obj ) ? 'fill' : null, shapeUsesStroke( obj ) ? 'stroke' : null ].filter( Boolean )
+			: [ 'fill' ];
+		const currentFill = ( obj && obj.fill ) ? String( obj.fill ).toLowerCase() : defaultTextColor( obj ).toLowerCase();
+
+		roles.forEach( ( role ) => {
+			const colors = paletteColorsForObject( obj, role );
+			colors.forEach( ( color ) => {
+				const btn = document.createElement( 'button' );
+				btn.type = 'button';
+				btn.className = 'wc-gpd-color-swatch';
+				btn.style.backgroundColor = color;
+				btn.title = color;
+				btn.setAttribute( 'aria-label', color );
+				btn.classList.toggle( 'is-active', ! isShapeLayer && color.toLowerCase() === currentFill );
+				btn.addEventListener( 'click', () => {
+					if ( ! activeText ) {
+						return;
+					}
+					if ( isShapeLayer ) {
+						if ( role === 'stroke' ) {
+							applyShapeStrokeColor( activeText, color );
+						} else {
+							applyShapeFillColor( activeText, color );
+						}
+					} else {
+						activeText.set( 'fill', color );
+						if ( ui.textColor ) {
+							ui.textColor.value = color;
+						}
+					}
+					renderColorSwatches( activeText );
+					canvas.requestRenderAll();
+				} );
+				ui.colorSwatches.appendChild( btn );
 			} );
-			ui.colorSwatches.appendChild( btn );
 		} );
 	}
 
@@ -728,6 +781,82 @@
 		return !! obj && obj.type === 'image' && obj.wcGpdLayerType === 'graphic' && ! obj.wcGpdTemplateLayer;
 	}
 
+	function isTemplateShape( obj ) {
+		if ( ! obj || ! obj.wcGpdTemplateLayer || obj.wcGpdBoundingBox ) {
+			return false;
+		}
+		if ( isMockupImage( obj ) || isTemplateGraphic( obj ) || isGraphicSlotMarker( obj ) ) {
+			return false;
+		}
+		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline', 'group', 'line' ];
+		return shapeTypes.indexOf( obj.type ) >= 0;
+	}
+
+	function isCustomerEditableTemplateShape( obj ) {
+		return isTemplateShape( obj ) && layerVisibleToCustomer( obj );
+	}
+
+	function shapeUsesFill( obj ) {
+		return !! obj && obj.wcGpdShapeUseFill !== false;
+	}
+
+	function shapeUsesStroke( obj ) {
+		return !! obj && obj.wcGpdShapeUseStroke !== false;
+	}
+
+	function applyShapeFillColor( obj, color ) {
+		if ( ! obj ) {
+			return;
+		}
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( { fill: color } );
+		}
+		applyToTarget( obj );
+	}
+
+	function applyShapeStrokeColor( obj, color ) {
+		if ( ! obj ) {
+			return;
+		}
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( { stroke: color } );
+		}
+		applyToTarget( obj );
+	}
+
+	function applyShapeCustomerInteractivity( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		const lockMove = !! obj.wcGpdLockMove;
+		const lockScale = !! obj.wcGpdLockScale;
+		const visible = layerVisibleToCustomer( obj );
+		obj.set( {
+			selectable: visible,
+			evented: visible,
+			hasControls: visible && ! lockScale,
+			hasBorders: visible && ! lockScale,
+			lockMovementX: lockMove,
+			lockMovementY: lockMove,
+			lockScalingX: lockScale,
+			lockScalingY: lockScale,
+		} );
+	}
+
 	function isExportTemplateGraphic( obj ) {
 		return isTemplateGraphic( obj ) && obj.wcGpdExportGraphic !== false;
 	}
@@ -946,6 +1075,11 @@
 								}
 								shrinkTextToFit( obj );
 								applyTextCustomerInteractivity( obj );
+								canvas.add( obj );
+								return;
+							}
+							if ( isCustomerEditableTemplateShape( obj ) ) {
+								applyShapeCustomerInteractivity( obj );
 								canvas.add( obj );
 								return;
 							}
@@ -1234,6 +1368,9 @@
 			if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
 				return true;
 			}
+			if ( isCustomerEditableTemplateShape( obj ) ) {
+				return true;
+			}
 			if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
 				return true;
 			}
@@ -1252,6 +1389,9 @@
 			return false;
 		}
 		if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
+			return true;
+		}
+		if ( isCustomerEditableTemplateShape( obj ) ) {
 			return true;
 		}
 		if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
@@ -1326,9 +1466,18 @@
 
 		const ordered = layers.slice().reverse();
 		ordered.forEach( ( obj, index ) => {
-			const label = ( obj.text && String( obj.text ).trim() )
+			let label = ( obj.text && String( obj.text ).trim() )
 				? String( obj.text ).trim().slice( 0, 40 )
-				: ( config.i18n.layerText || 'Text layer' ) + ' ' + ( index + 1 );
+				: '';
+			if ( ! label && obj.wcGpdLayerLabel ) {
+				label = obj.wcGpdLayerLabel;
+			}
+			if ( ! label && isCustomerEditableTemplateShape( obj ) ) {
+				label = obj.type === 'group' ? ( config.i18n.layerIcon || 'Icon' ) : ( config.i18n.layerShape || 'Shape' );
+			}
+			if ( ! label ) {
+				label = ( config.i18n.layerText || 'Text layer' ) + ' ' + ( index + 1 );
+			}
 
 			const li = document.createElement( 'li' );
 			const btn = document.createElement( 'button' );
@@ -1376,7 +1525,9 @@
 	 */
 	function syncToolbar( obj ) {
 		activeText = obj;
-		const enabled = !! obj;
+		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
+		const isShapeLayer = !! obj && isCustomerEditableTemplateShape( obj );
+		const enabled = isText || isShapeLayer;
 
 		if ( ui.toolsPanel ) {
 			ui.toolsPanel.classList.toggle( 'is-disabled', ! enabled );
@@ -1387,68 +1538,76 @@
 		if ( ui.contextPane ) {
 			ui.contextPane.hidden = ! enabled;
 		}
-		if ( ui.contextLayerName && enabled ) {
-			const label = ( obj.text && String( obj.text ).trim() )
-				? String( obj.text ).trim().slice( 0, 48 )
-				: ( config.i18n.layerText || 'Text layer' );
-			ui.contextLayerName.textContent = label;
-		}
+		setTextContextVisible( isText );
 
 		if ( ! enabled ) {
 			renderColorSwatches( null );
 			return;
 		}
 
+		if ( ui.contextLayerName ) {
+			let label = config.i18n.layerText || 'Layer';
+			if ( isText && obj.text && String( obj.text ).trim() ) {
+				label = String( obj.text ).trim().slice( 0, 48 );
+			} else if ( obj.wcGpdLayerLabel ) {
+				label = obj.wcGpdLayerLabel;
+			} else if ( isShapeLayer ) {
+				label = obj.type === 'group' ? ( config.i18n.layerIcon || 'Icon' ) : ( config.i18n.layerShape || 'Shape' );
+			}
+			ui.contextLayerName.textContent = label;
+		}
+
 		syncContextNav( obj );
 		openCustomerSection( 'context' );
 
-		if ( ui.fontFamily ) {
-			ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
+		if ( isText ) {
+			if ( ui.fontFamily ) {
+				ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
+			}
+			if ( ui.fontSize ) {
+				ui.fontSize.value = String( Math.round( obj.fontSize || 32 ) );
+			}
+			const isBold = obj.fontWeight === 'bold';
+			const isItalic = obj.fontStyle === 'italic';
+			const isUnderline = !! obj.underline;
+			if ( ui.bold ) {
+				ui.bold.checked = isBold;
+			}
+			if ( ui.italic ) {
+				ui.italic.checked = isItalic;
+			}
+			if ( ui.boldBtn ) {
+				ui.boldBtn.classList.toggle( 'is-active', isBold );
+			}
+			if ( ui.italicBtn ) {
+				ui.italicBtn.classList.toggle( 'is-active', isItalic );
+			}
+			if ( ui.underlineBtn ) {
+				ui.underlineBtn.classList.toggle( 'is-active', isUnderline );
+			}
+			if ( ui.underline ) {
+				ui.underline.checked = !! obj.underline;
+			}
+			if ( ui.lineHeight ) {
+				ui.lineHeight.value = String( obj.lineHeight || 1.16 );
+			}
+			if ( ui.letterSpacing ) {
+				ui.letterSpacing.value = String( obj.charSpacing || 0 );
+			}
+			const align = obj.textAlign || 'left';
+			ui.alignButtons.forEach( ( btn ) => {
+				const isActive = btn.dataset.align === align;
+				btn.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+				btn.classList.toggle( 'is-active', isActive );
+			} );
+			enforcePaletteColor( obj );
 		}
-		if ( ui.fontSize ) {
-			ui.fontSize.value = String( Math.round( obj.fontSize || 32 ) );
-		}
-		const isBold = obj.fontWeight === 'bold';
-		const isItalic = obj.fontStyle === 'italic';
-		const isUnderline = !! obj.underline;
-		if ( ui.bold ) {
-			ui.bold.checked = isBold;
-		}
-		if ( ui.italic ) {
-			ui.italic.checked = isItalic;
-		}
-		if ( ui.boldBtn ) {
-			ui.boldBtn.classList.toggle( 'is-active', isBold );
-		}
-		if ( ui.italicBtn ) {
-			ui.italicBtn.classList.toggle( 'is-active', isItalic );
-		}
-		if ( ui.underlineBtn ) {
-			ui.underlineBtn.classList.toggle( 'is-active', isUnderline );
-		}
-		if ( ui.textColor ) {
+
+		if ( ui.textColor && isText ) {
 			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
-		setToolVisible( ui.colorSwatches, textColorAllowed( obj ) );
+
 		renderColorSwatches( obj );
-		if ( ui.underline ) {
-			ui.underline.checked = !! obj.underline;
-		}
-		if ( ui.lineHeight ) {
-			ui.lineHeight.value = String( obj.lineHeight || 1.16 );
-		}
-		if ( ui.letterSpacing ) {
-			ui.letterSpacing.value = String( obj.charSpacing || 0 );
-		}
-
-		const align = obj.textAlign || 'left';
-		ui.alignButtons.forEach( ( btn ) => {
-			const isActive = btn.dataset.align === align;
-			btn.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
-			btn.classList.toggle( 'is-active', isActive );
-		} );
-
-		enforcePaletteColor( obj );
 		applyLayerToolSettings( obj );
 	}
 
@@ -2167,20 +2326,12 @@
 						if ( config.isEditing && ! config.orderEdit ) {
 							window.alert( config.i18n.loadDesignError );
 						}
-						if ( ! config.orderEdit ) {
-							if ( templateHasPlaceholders() || templateHasGraphicSlots() ) {
-								buildCustomerFields();
-							} else if ( productSettings.allow_free_text !== false ) {
-								startWithNewTextLayer();
-							}
+						if ( ! config.orderEdit && ( templateHasPlaceholders() || templateHasGraphicSlots() ) ) {
+							buildCustomerFields();
 						}
 					} );
-				} else if ( ! config.orderEdit ) {
-					if ( templateHasPlaceholders() || templateHasGraphicSlots() ) {
-						buildCustomerFields();
-					} else if ( productSettings.allow_free_text !== false ) {
-						startWithNewTextLayer();
-					}
+				} else if ( ! config.orderEdit && ( templateHasPlaceholders() || templateHasGraphicSlots() ) ) {
+					buildCustomerFields();
 				}
 
 				bindOrderSave();

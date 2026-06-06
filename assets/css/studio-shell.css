@@ -630,6 +630,17 @@
 	display: none !important;
 }
 
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled {
+	opacity: 0.45;
+}
+
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled input,
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled select,
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled button,
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row.is-disabled textarea {
+	pointer-events: none;
+}
+
 .wc-gpd-control-color-picker {
 	margin-top: 0.35rem;
 }

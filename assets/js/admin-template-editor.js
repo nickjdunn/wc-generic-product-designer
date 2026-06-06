@@ -629,9 +629,7 @@
 		if ( strokeWidthInput ) {
 			strokeWidthInput.value = String( getShapeStrokeWidth( obj ) );
 		}
-		if ( shapeStrokeWidthRow ) {
-			shapeStrokeWidthRow.hidden = ! shapeUsesStroke( obj );
-		}
+		setPropRowDisabled( shapeStrokeWidthRow, ! shapeUsesStroke( obj ) );
 	}
 
 	function persistCanvasToActiveView() {
@@ -975,19 +973,24 @@
 		picker.style.position = 'fixed';
 		picker.style.left = '-9999px';
 		document.body.appendChild( picker );
-		const finish = ( color ) => {
+		picker.addEventListener( 'change', () => {
+			const color = picker.value;
 			picker.remove();
 			if ( color ) {
 				onPick( color );
 			}
-		};
-		picker.addEventListener( 'input', () => {
-			finish( picker.value );
-		}, { once: true } );
-		picker.addEventListener( 'change', () => {
-			finish( picker.value );
 		}, { once: true } );
 		picker.click();
+	}
+
+	function setPropRowDisabled( row, disabled ) {
+		if ( ! row ) {
+			return;
+		}
+		row.classList.toggle( 'is-disabled', !! disabled );
+		row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( el ) => {
+			el.disabled = !! disabled;
+		} );
 	}
 
 	function getActiveColorForRole( obj, role ) {
@@ -1237,20 +1240,19 @@
 		const strokePanel = document.getElementById( 'wc-gpd-stroke-colors-panel' );
 		const strokeListRow = document.getElementById( 'wc-gpd-stroke-colors-list-row' );
 
-		if ( fillPanel ) {
-			fillPanel.hidden = ! useFill;
-		}
-		if ( fillListRow ) {
-			fillListRow.hidden = ! useFill;
-		}
+		setPropRowDisabled( fillPanel, isShapeLayer && ! useFill );
+		setPropRowDisabled( fillListRow, isShapeLayer && ! useFill );
+
 		if ( strokePanel ) {
-			strokePanel.hidden = ! isShapeLayer || ! useStroke || useGlobal;
+			strokePanel.hidden = ! isShapeLayer || useGlobal;
 		}
 		if ( strokeListRow ) {
-			strokeListRow.hidden = ! isShapeLayer || ! useStroke || useGlobal;
+			strokeListRow.hidden = ! isShapeLayer || useGlobal;
 		}
+		setPropRowDisabled( strokePanel, ! useStroke );
+		setPropRowDisabled( strokeListRow, ! useStroke );
 
-		if ( useFill ) {
+		if ( useFill || ! isShapeLayer ) {
 			renderColorRoleUI( obj, 'fill', {
 				selectId: 'wc_gpd_layer_palette_id',
 				listId: 'wc-gpd-layer-color-swatches',
@@ -1260,7 +1262,7 @@
 			} );
 		}
 
-		if ( isShapeLayer && useStroke && ! useGlobal ) {
+		if ( isShapeLayer && ! useGlobal ) {
 			renderColorRoleUI( obj, 'stroke', {
 				selectId: 'wc_gpd_stroke_layer_palette_id',
 				listId: 'wc-gpd-stroke-layer-color-swatches',
