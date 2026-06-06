@@ -16,7 +16,7 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '6';
+	const SAMPLE_VERSION     = '7';
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
@@ -143,6 +143,7 @@ class WC_GPD_Sample_Content {
 	 */
 	public static function install( $force = false ) {
 		WC_GPD_Design_Template::register_post_type();
+		WC_GPD_Graphic_Libraries::maybe_seed_demo_libraries();
 
 		$ids         = self::get_ids();
 		$template_id = absint( $ids['template_id'] ?? 0 );
@@ -341,8 +342,40 @@ class WC_GPD_Sample_Content {
 		);
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_TEMPLATE_PALETTES, wp_json_encode( $palettes ) );
 		WC_GPD_Product_Settings::save( $post_id, self::demo_product_settings() );
+		self::persist_demo_library_assignments( $post_id );
 
 		return (int) $post_id;
+	}
+
+	/**
+	 * Assign demo graphic, photo, and icon libraries to the sample template.
+	 *
+	 * @param int $template_id Template post ID.
+	 */
+	private static function persist_demo_library_assignments( $template_id ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id ) {
+			return;
+		}
+
+		WC_GPD_Graphic_Libraries::maybe_seed_demo_libraries();
+
+		$assignments = array(
+			'graphic' => array( WC_GPD_Graphic_Libraries::DEMO_GRAPHIC_ID ),
+			'photo'   => array( WC_GPD_Graphic_Libraries::DEMO_PHOTO_ID ),
+			'icon'    => array(
+				WC_GPD_Graphic_Libraries::DEMO_ICON_ID,
+				WC_GPD_Graphic_Libraries::ALL_ICONS_ID,
+			),
+		);
+
+		update_post_meta( $template_id, WC_GPD_Design_Template::META_GRAPHIC_LIBRARIES, wp_slash( wp_json_encode( $assignments ) ) );
+
+		$graphic_ids = WC_GPD_Graphic_Libraries::attachment_ids_for_libraries(
+			$assignments['graphic'],
+			WC_GPD_Graphic_Libraries::TYPE_GRAPHIC
+		);
+		update_post_meta( $template_id, WC_GPD_Design_Template::META_GRAPHIC_LIBRARY, wp_json_encode( $graphic_ids ) );
 	}
 
 	/**

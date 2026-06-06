@@ -210,7 +210,8 @@
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
-	padding: 1rem 1.25rem;
+	padding: 1rem 1.25rem 1.35rem;
+	overflow: visible;
 }
 
 /* Footer */
@@ -393,8 +394,12 @@
 }
 
 .wc-gpd-designer__canvas-wrap canvas,
-.wc-gpd-designer__canvas-wrap #wc-gpd-canvas {
-	box-shadow: 0 0 0 1px rgba( 15, 23, 42, 0.1 ), 0 2px 10px rgba( 15, 23, 42, 0.12 );
+.wc-gpd-designer__canvas-wrap #wc-gpd-canvas,
+.wc-gpd-designer__canvas-wrap .canvas-container {
+	box-shadow:
+		0 0 0 1px rgba( 15, 23, 42, 0.1 ),
+		0 2px 8px rgba( 15, 23, 42, 0.08 ),
+		0 8px 20px rgba( 15, 23, 42, 0.1 );
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-studio-drawer {

@@ -332,8 +332,10 @@
 	background: #f3f4f6;
 	border: 1px solid var(--wc-gpd-border);
 	border-radius: var(--wc-gpd-radius);
-	overflow: hidden;
-	box-shadow: var(--wc-gpd-shadow);
+	overflow: visible;
+	padding: 10px 10px 14px;
+	box-sizing: border-box;
+	box-shadow: none;
 }
 
 .wc-gpd-designer--replaces-gallery .wc-gpd-designer__canvas-stage {
@@ -352,6 +354,9 @@
 	justify-content: center;
 	align-items: center;
 	min-height: 100px;
+	padding: 4px;
+	box-sizing: border-box;
+	overflow: visible;
 }
 
 .wc-gpd-designer--replaces-gallery .wc-gpd-designer__canvas-wrap {
@@ -763,6 +768,8 @@ body.wc-gpd-popout-open {
 	background: transparent;
 	border: none;
 	box-shadow: none;
+	overflow: visible;
+	padding: 12px 12px 18px;
 }
 
 .wc-gpd-designer.wc-gpd-is-popout .wc-gpd-designer__canvas-wrap {
@@ -771,6 +778,8 @@ body.wc-gpd-popout-open {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	overflow: visible;
+	padding: 6px 6px 10px;
 }
 
 body.wc-gpd-studio-open {
