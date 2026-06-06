@@ -165,6 +165,7 @@
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'wcGpdCustomerPaletteOnly',
 	];
 
 	function paletteColorsForObject( obj ) {
@@ -194,10 +195,11 @@
 	}
 
 	function textColorAllowed( obj ) {
-		if ( ! layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' ) ) {
-			return false;
-		}
-		return paletteColorsForObject( obj ).length > 1;
+		return layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
+	}
+
+	function textColorUsesPalette( obj ) {
+		return !! obj && !! obj.wcGpdCustomerPaletteOnly;
 	}
 
 	/**
@@ -302,9 +304,11 @@
 	}
 
 	function applyLayerToolSettings( obj ) {
-		const showColor = textColorAllowed( obj );
-		setToolVisible( ui.colorSwatches, showColor );
-		setToolVisible( ui.textColor, showColor );
+		const colorAllowed = textColorAllowed( obj );
+		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
+		const pickerAllowed = colorAllowed && ! paletteOnly;
+		setToolVisible( ui.colorSwatches, paletteOnly && paletteColorsForObject( obj ).length > 0 );
+		setToolVisible( ui.textColor, pickerAllowed );
 		setToolVisible( ui.fontFamily, layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' ) );
 		setToolVisible( ui.fontSize, layerAllowsTool( obj, 'wcGpdLockSize', 'allow_font_size' ) );
 		setToolVisible( ui.boldBtn, layerAllowsTool( obj, 'wcGpdLockBold', 'allow_bold' ) );
@@ -329,7 +333,7 @@
 			return;
 		}
 		ui.colorSwatches.innerHTML = '';
-		if ( ! textColorAllowed( obj ) ) {
+		if ( ! textColorAllowed( obj ) || ! textColorUsesPalette( obj ) ) {
 			ui.colorSwatches.hidden = true;
 			return;
 		}

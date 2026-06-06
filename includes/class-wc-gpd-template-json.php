@@ -303,6 +303,7 @@ class WC_GPD_Template_Json {
 		$object['wcGpdLockText']           = ! empty( $object['wcGpdLockText'] );
 		$object['wcGpdCustomerEditable']   = ! isset( $object['wcGpdCustomerEditable'] ) || ! empty( $object['wcGpdCustomerEditable'] );
 		$object['wcGpdHideFromCustomerLayers'] = ! empty( $object['wcGpdHideFromCustomerLayers'] );
+		$object['wcGpdCustomerPaletteOnly']    = ! empty( $object['wcGpdCustomerPaletteOnly'] );
 		if ( ! empty( $object['wcGpdLayerLabel'] ) ) {
 			$object['wcGpdLayerLabel'] = sanitize_text_field( (string) $object['wcGpdLayerLabel'] );
 		} else {

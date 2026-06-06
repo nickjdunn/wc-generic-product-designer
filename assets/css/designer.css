@@ -376,7 +376,16 @@
 	display: none !important;
 }
 
-.wc-gpd-tools-panel.is-disabled {
+.wc-gpd-tools-panel--rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	padding: 0.25rem 0;
+}
+
+.wc-gpd-tools-panel--rows .wc-gpd-prop-row {
+	margin-bottom: 0.75rem;
+}
 	opacity: 0.5;
 	pointer-events: none;
 }

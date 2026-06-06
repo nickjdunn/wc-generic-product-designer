@@ -21,9 +21,7 @@
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
 	const shapeStrokeWidthRow = document.getElementById( 'wc-gpd-shape-stroke-width-row' );
-	const shapeFillNote = document.getElementById( 'wc-gpd-shape-fill-note' );
 	const imagePropsPanel = document.getElementById( 'wc-gpd-image-props' );
-	const textEditorPanel = document.getElementById( 'wc-gpd-text-editor' );
 	const layerColorsPanel = document.getElementById( 'wc-gpd-layer-colors-panel' );
 	const contextNavBtn = document.getElementById( 'wc-gpd-nav-context' );
 	const contextEmpty = document.getElementById( 'wc-gpd-context-empty' );
@@ -54,6 +52,7 @@
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockText', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'wcGpdCustomerPaletteOnly',
 		'strokeDashArray',
 	];
 
@@ -309,15 +308,45 @@
 		obj.set( { stroke: color, fill: 'transparent' } );
 	}
 
-	function applyShapeStrokeWidth( obj, width ) {
-		if ( ! obj || ! isShape( obj ) || shapeIsFillBased( obj ) ) {
-			return;
+	function getShapeStrokeWidth( obj ) {
+		if ( ! obj ) {
+			return defaultOutlineWidth();
 		}
 		if ( obj.type === 'group' && obj.getObjects ) {
-			obj.getObjects().forEach( ( child ) => applyShapeStrokeWidth( child, width ) );
+			const children = obj.getObjects();
+			for ( let i = 0; i < children.length; i++ ) {
+				const width = getShapeStrokeWidth( children[ i ] );
+				if ( width > 0 ) {
+					return width;
+				}
+			}
+			return defaultOutlineWidth();
+		}
+		return obj.strokeWidth || defaultOutlineWidth();
+	}
+
+	function applyShapeStrokeWidth( obj, width ) {
+		if ( ! obj || ! isShape( obj ) ) {
 			return;
 		}
-		obj.set( 'strokeWidth', width );
+		const strokeWidth = parseFloat( width ) || defaultOutlineWidth();
+		const color = getShapeDisplayColor( obj );
+		function applyToTarget( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( applyToTarget );
+				return;
+			}
+			target.set( {
+				stroke: color,
+				strokeWidth,
+				strokeLineJoin: 'round',
+				strokeLineCap: 'round',
+			} );
+		}
+		applyToTarget( obj );
 	}
 
 	function isTemplateImage( obj ) {
@@ -440,18 +469,11 @@
 		if ( ! obj || ! isShape( obj ) ) {
 			return;
 		}
-		const fillBased = shapeIsFillBased( obj );
-		if ( shapeStrokeWidthRow ) {
-			shapeStrokeWidthRow.hidden = fillBased;
-		}
-		if ( shapeFillNote ) {
-			shapeFillNote.hidden = ! fillBased;
-		}
 		if ( strokeColorInput ) {
 			strokeColorInput.value = getShapeDisplayColor( obj );
 		}
-		if ( strokeWidthInput && ! fillBased ) {
-			strokeWidthInput.value = String( obj.strokeWidth || defaultOutlineWidth() );
+		if ( strokeWidthInput ) {
+			strokeWidthInput.value = String( getShapeStrokeWidth( obj ) );
 		}
 	}
 
@@ -810,7 +832,10 @@
 		const useGlobal = palettesData.use_global_colors;
 
 		if ( paletteSelect ) {
-			paletteSelect.closest( 'p' ).hidden = useGlobal;
+			const paletteRow = paletteSelect.closest( '.wc-gpd-prop-row' );
+			if ( paletteRow ) {
+				paletteRow.hidden = useGlobal;
+			}
 			if ( ! useGlobal ) {
 				populateLayerPaletteSelect();
 				paletteSelect.value = obj.wcGpdPaletteId || 'pal_default';
@@ -822,7 +847,7 @@
 		}
 		swatchesEl.innerHTML = '';
 		const colors = colorsForLayer( obj );
-		const currentFill = obj.fill || '#000000';
+		const currentFill = isShape( obj ) ? getShapeDisplayColor( obj ) : ( obj.fill || '#000000' );
 		colors.forEach( ( color ) => {
 			const btn = document.createElement( 'button' );
 			btn.type = 'button';
@@ -831,8 +856,8 @@
 			btn.title = color;
 			btn.classList.toggle( 'is-active', color.toLowerCase() === String( currentFill ).toLowerCase() );
 			btn.addEventListener( 'click', () => {
-				if ( isShape( obj ) && obj.wcGpdOutlineLayer && obj.fill === 'transparent' ) {
-					obj.set( 'stroke', color );
+				if ( isShape( obj ) ) {
+					applyShapeColor( obj, color );
 				} else {
 					obj.set( 'fill', color );
 				}
@@ -1039,26 +1064,45 @@
 	function syncCustomerAccessPanel( obj ) {
 		const editableEl = document.getElementById( 'wc_gpd_customer_editable' );
 		const visibleEl = document.getElementById( 'wc_gpd_show_in_customer_layers' );
-		const customerBlock = document.getElementById( 'wc-gpd-context-block-customer' );
-		if ( ! obj || ! customerBlock ) {
+		if ( ! obj ) {
 			return;
 		}
 
 		const type = contextTypeForObject( obj );
-		document.querySelectorAll( '.wc-gpd-customer-access-type' ).forEach( ( panel ) => {
-			panel.hidden = panel.dataset.accessFor !== type;
-		} );
+		const editable = obj.wcGpdCustomerEditable !== false;
+
+		if ( contextPane ) {
+			contextPane.querySelectorAll( '[data-customer-for]' ).forEach( ( panel ) => {
+				const types = ( panel.dataset.customerFor || '' ).split( ',' ).map( ( part ) => part.trim() );
+				panel.hidden = ! type || ! types.includes( type );
+			} );
+		}
+
+		const shapeColorRow = document.getElementById( 'wc-gpd-prop-shape-color-row' );
+		if ( shapeColorRow ) {
+			shapeColorRow.hidden = type !== 'shape';
+		}
+
+		const paletteOnlyRow = document.getElementById( 'wc-gpd-customer-palette-only-row' );
+		if ( paletteOnlyRow ) {
+			paletteOnlyRow.hidden = type !== 'text' && type !== 'shape';
+		}
 
 		if ( editableEl ) {
-			editableEl.checked = obj.wcGpdCustomerEditable !== false;
+			editableEl.checked = editable;
 		}
 		if ( visibleEl ) {
 			visibleEl.checked = ! obj.wcGpdHideFromCustomerLayers;
 		}
 
-		const subDisabled = obj.wcGpdCustomerEditable === false;
-		customerBlock.querySelectorAll( '.wc-gpd-customer-access-type input' ).forEach( ( input ) => {
-			input.disabled = subDisabled;
+		const customerInputs = contextPane
+			? contextPane.querySelectorAll( '.wc-gpd-prop-customer-group input, .wc-gpd-prop-row--check input, #wc_gpd_customer_color_palette_only' )
+			: [];
+		customerInputs.forEach( ( input ) => {
+			if ( input.id === 'wc_gpd_customer_editable' || input.id === 'wc_gpd_show_in_customer_layers' ) {
+				return;
+			}
+			input.disabled = ! editable;
 		} );
 
 		if ( isTextLayer( obj ) ) {
@@ -1088,8 +1132,6 @@
 			const allowColor = document.getElementById( 'wc_gpd_shape_allow_color' );
 			const allowMove = document.getElementById( 'wc_gpd_shape_allow_move' );
 			const allowResize = document.getElementById( 'wc_gpd_shape_allow_resize' );
-			const outline = document.getElementById( 'wc_gpd_customer_shape_outline' );
-			const bbox = document.getElementById( 'wc_gpd_customer_shape_bbox' );
 			if ( allowColor ) {
 				allowColor.checked = ! obj.wcGpdLockColor;
 			}
@@ -1099,12 +1141,11 @@
 			if ( allowResize ) {
 				allowResize.checked = ! obj.wcGpdLockScale;
 			}
-			if ( outline ) {
-				outline.checked = !! obj.wcGpdOutlineLayer;
-			}
-			if ( bbox ) {
-				bbox.checked = !! obj.wcGpdBoundingBox;
-			}
+		}
+
+		const paletteOnly = document.getElementById( 'wc_gpd_customer_color_palette_only' );
+		if ( paletteOnly ) {
+			paletteOnly.checked = !! obj.wcGpdCustomerPaletteOnly;
 		}
 	}
 
@@ -1116,7 +1157,7 @@
 		canvas.requestRenderAll();
 		updateSelectionPanels();
 		openContextPane();
-		const block = document.getElementById( 'wc-gpd-context-block-customer' );
+		const block = document.getElementById( 'wc-gpd-context-block-layer' );
 		if ( block ) {
 			block.scrollIntoView( { behavior: 'smooth', block: 'nearest' } );
 		}
@@ -1299,7 +1340,7 @@
 		if ( imageSelected && imagePropsPanel ) {
 			syncImagePropsPanel( active );
 		}
-		if ( textSelected && textEditorPanel ) {
+		if ( textSelected ) {
 			syncTextEditorPanel( active );
 		}
 		if ( slotSelected && graphicSlotPropsPanel ) {
@@ -1876,6 +1917,7 @@
 			let obj = objects.length === 1 ? objects[ 0 ] : fabric.util.groupSVGElements( objects, options );
 			const color = defaultOutlineColor();
 			styleShapeForEngraving( obj, color );
+			applyShapeStrokeWidth( obj, defaultOutlineWidth() );
 			const targetSize = 96;
 			const bounds = obj.getBoundingRect( true, true );
 			const base = Math.max( bounds.width || 16, bounds.height || 16, 1 );
@@ -2559,8 +2601,18 @@
 		const shapeColor = document.getElementById( 'wc_gpd_shape_allow_color' );
 		const shapeMove = document.getElementById( 'wc_gpd_shape_allow_move' );
 		const shapeResize = document.getElementById( 'wc_gpd_shape_allow_resize' );
-		const shapeOutline = document.getElementById( 'wc_gpd_customer_shape_outline' );
-		const shapeBbox = document.getElementById( 'wc_gpd_customer_shape_bbox' );
+		const paletteOnly = document.getElementById( 'wc_gpd_customer_color_palette_only' );
+
+		if ( paletteOnly ) {
+			paletteOnly.addEventListener( 'change', () => {
+				const obj = canvas.getActiveObject();
+				if ( ! obj || ( ! isTextLayer( obj ) && ! isShape( obj ) ) ) {
+					return;
+				}
+				obj.wcGpdCustomerPaletteOnly = paletteOnly.checked;
+				syncCustomerMockup();
+			} );
+		}
 
 		if ( shapeColor ) {
 			shapeColor.addEventListener( 'change', () => {
@@ -2589,29 +2641,14 @@
 				}
 			} );
 		}
-		if ( shapeOutline ) {
-			shapeOutline.addEventListener( 'change', () => {
+
+		const textColorAllow = document.getElementById( 'wc_gpd_allow_color' );
+		if ( textColorAllow ) {
+			textColorAllow.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();
-				if ( isShape( obj ) ) {
-					obj.wcGpdOutlineLayer = shapeOutline.checked;
-					if ( outlineToggle ) {
-						outlineToggle.checked = shapeOutline.checked;
-					}
-					applyStrokeToObject( obj, shapeOutline.checked );
-					canvas.requestRenderAll();
-				}
-			} );
-		}
-		if ( shapeBbox ) {
-			shapeBbox.addEventListener( 'change', () => {
-				const obj = canvas.getActiveObject();
-				if ( isShape( obj ) ) {
-					obj.wcGpdBoundingBox = shapeBbox.checked;
-					if ( bboxToggle ) {
-						bboxToggle.checked = shapeBbox.checked;
-					}
-					applyStrokeToObject( obj, !! obj.wcGpdOutlineLayer );
-					canvas.requestRenderAll();
+				if ( isTextLayer( obj ) ) {
+					obj.wcGpdLockColor = ! textColorAllow.checked;
+					syncCustomerMockup();
 				}
 			} );
 		}
@@ -2759,10 +2796,10 @@
 		} );
 	}
 
-	if ( strokeWidthInput ) {
+		if ( strokeWidthInput ) {
 		strokeWidthInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox || shapeIsFillBased( active ) ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
 				return;
 			}
 			applyShapeStrokeWidth( active, parseFloat( strokeWidthInput.value ) || defaultOutlineWidth() );
