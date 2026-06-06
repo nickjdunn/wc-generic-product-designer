@@ -1,0 +1,39 @@
+name: Release plugin zip
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build installable zip
+        run: |
+          PLUGIN_SLUG="wc-generic-product-designer"
+          mkdir -p "build/${PLUGIN_SLUG}"
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='build' \
+            --exclude='.cursor' \
+            --exclude='.idea' \
+            --exclude='.vscode' \
+            --exclude='*.log' \
+            ./ "build/${PLUGIN_SLUG}/"
+          cd build
+          zip -r "../${PLUGIN_SLUG}.zip" "${PLUGIN_SLUG}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wc-generic-product-designer.zip
+          generate_release_notes: true

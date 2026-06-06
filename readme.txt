@@ -18,6 +18,7 @@ Allow customers to add styled text layers on a product canvas and export product
 == Installation ==
 
 1. Upload the plugin folder to `/wp-content/plugins/` or install via zip.
+2. For manual zip updates, download the **plugin zip** from GitHub Releases (not the source archive). The zip must contain a folder named `wc-generic-product-designer`.
 2. Activate through the **Plugins** screen.
 3. Requires WooCommerce.
 4. Edit a product → **Product Designer** tab → enable and configure canvas + template image.
