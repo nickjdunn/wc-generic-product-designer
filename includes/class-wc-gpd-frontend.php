@@ -596,13 +596,12 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 								<div class="wc-gpd-add-menu__group" data-add-group="icon" hidden>
 									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Icons', 'wc-generic-product-designer' ); ?></button>
 									<div class="wc-gpd-add-menu__body" hidden>
-										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-featured" id="wc-gpd-customer-icon-featured" role="group" aria-label="<?php esc_attr_e( 'Featured icons', 'wc-generic-product-designer' ); ?>"></div>
 										<div class="wc-gpd-bootstrap-icons-toolbar">
 											<input type="search" id="wc-gpd-customer-icon-search" class="wc-gpd-prop-control" placeholder="<?php esc_attr_e( 'Search icons…', 'wc-generic-product-designer' ); ?>" />
 											<button type="button" class="button button-small" id="wc-gpd-customer-icon-search-btn"><?php esc_html_e( 'Search', 'wc-generic-product-designer' ); ?></button>
 										</div>
 										<p class="wc-gpd-add-menu__status" id="wc-gpd-customer-icon-status" hidden></p>
-										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-customer-icon-results" role="group" aria-label="<?php esc_attr_e( 'Icon search results', 'wc-generic-product-designer' ); ?>"></div>
+										<div class="wc-gpd-shape-library-grid wc-gpd-bootstrap-icon-results" id="wc-gpd-customer-icon-results" role="group" aria-label="<?php esc_attr_e( 'Available icons', 'wc-generic-product-designer' ); ?>"></div>
 										<p class="wc-gpd-bootstrap-icon-load-more" id="wc-gpd-customer-icon-load-more-wrap" hidden>
 											<button type="button" class="button button-small" id="wc-gpd-customer-icon-load-more"><?php esc_html_e( 'Load more', 'wc-generic-product-designer' ); ?></button>
 										</p>

@@ -183,7 +183,6 @@
 		addImageFile: document.getElementById( 'wc-gpd-add-image-file' ),
 		addGraphicLibrary: document.getElementById( 'wc-gpd-add-graphic-library' ),
 		addPhotoLibrary: document.getElementById( 'wc-gpd-add-photo-library' ),
-		iconFeatured: document.getElementById( 'wc-gpd-customer-icon-featured' ),
 		iconSearch: document.getElementById( 'wc-gpd-customer-icon-search' ),
 		iconSearchBtn: document.getElementById( 'wc-gpd-customer-icon-search-btn' ),
 		iconResults: document.getElementById( 'wc-gpd-customer-icon-results' ),
@@ -369,7 +368,7 @@
 				allowImage: productAllowsAdd( 'image' ),
 				allowIcon: productAllowsAdd( 'icon' ),
 				graphicItems: resolveAddGraphicItems().length,
-				iconSlugs: getBootstrapIconSlugs().length,
+				iconSlugs: Array.isArray( config.iconSlugs ) ? config.iconSlugs.length : 0,
 				iconBaseUrl: bootstrapIcons.iconBaseUrl || null,
 				graphicReady: isAddGroupReady( 'graphic' ),
 				iconReady: isAddGroupReady( 'icon' ),
@@ -432,13 +431,6 @@
 		graphicLibrary.forEach( pushItem );
 		demoGraphics.forEach( pushItem );
 		return items;
-	}
-
-	function getBootstrapIconSlugs() {
-		if ( Array.isArray( bootstrapIcons.featured ) && bootstrapIcons.featured.length ) {
-			return bootstrapIcons.featured;
-		}
-		return [];
 	}
 
 	function iconSearchLibraryParam() {
@@ -956,19 +948,6 @@
 		loading: false,
 	};
 
-	function renderCustomerIconFeatured( slugs ) {
-		if ( ! ui.iconFeatured ) {
-			return;
-		}
-		ui.iconFeatured.innerHTML = '';
-		if ( ! slugs || ! slugs.length ) {
-			return;
-		}
-		slugs.forEach( ( slug ) => {
-			ui.iconFeatured.appendChild( renderCustomerIconButton( slug ) );
-		} );
-	}
-
 	function updateCustomerIconStatus() {
 		if ( ! ui.iconStatus ) {
 			return;
@@ -1046,9 +1025,6 @@
 					throw new Error( 'search failed' );
 				}
 				iconBrowserState.total = payload.data.total || 0;
-				if ( ! append && payload.data.featured ) {
-					renderCustomerIconFeatured( payload.data.featured );
-				}
 				const page = payload.data.icons || [];
 				iconBrowserState.icons = append ? iconBrowserState.icons.concat( page ) : page;
 				renderCustomerIconResults();
@@ -1069,7 +1045,6 @@
 			return;
 		}
 		iconBrowserState.initialized = true;
-		renderCustomerIconFeatured( getBootstrapIconSlugs() );
 		if ( ui.iconSearchBtn ) {
 			ui.iconSearchBtn.addEventListener( 'click', () => fetchCustomerIcons( false ) );
 		}
