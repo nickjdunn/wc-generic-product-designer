@@ -20,6 +20,50 @@
 	log.setEnabled( !! config.debug );
 	log.info( 'Designer initializing', { width: config.canvasWidth, height: config.canvasHeight } );
 
+	const TEMPLATE_METADATA_PROPS = [
+		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
+		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot', 'wcGpdGraphicLibraryId',
+		'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey',
+		'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors', 'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors',
+		'wcGpdShapeUseFill', 'wcGpdShapeUseStroke', 'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold',
+		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
+		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
+	];
+
+	function registerFabricCustomProperties() {
+		const classes = [
+			fabric.Object, fabric.Text, fabric.Textbox, fabric.IText, fabric.Rect, fabric.Circle,
+			fabric.Ellipse, fabric.Polygon, fabric.Path, fabric.Polyline, fabric.Line, fabric.Group, fabric.Image,
+		];
+		classes.forEach( ( klass ) => {
+			if ( ! klass ) {
+				return;
+			}
+			if ( ! klass.customProperties ) {
+				klass.customProperties = [];
+			}
+			TEMPLATE_METADATA_PROPS.forEach( ( prop ) => {
+				if ( klass.customProperties.indexOf( prop ) < 0 ) {
+					klass.customProperties.push( prop );
+				}
+			} );
+		} );
+	}
+
+	function applyTemplateMetadata( obj, source ) {
+		if ( ! obj || ! source || typeof source !== 'object' ) {
+			return;
+		}
+		TEMPLATE_METADATA_PROPS.forEach( ( key ) => {
+			if ( source[ key ] !== undefined ) {
+				obj[ key ] = source[ key ];
+			}
+		} );
+	}
+
+	registerFabricCustomProperties();
+
 	const canvasEl = document.getElementById( 'wc-gpd-canvas' );
 	const designerRoot = document.getElementById( 'wc-gpd-designer' );
 	let svgInput = document.getElementById( 'wc-gpd-design-svg' );
@@ -334,7 +378,21 @@
 		if ( ui.navLayers ) {
 			ui.navLayers.hidden = productSettings.allow_layers_panel === false;
 		}
-		applyLayerToolSettings( activeText );
+		if ( activeText ) {
+			applyLayerToolSettings( activeText );
+		}
+	}
+
+	function resetToolRowStates() {
+		if ( ! ui.toolsPanel ) {
+			return;
+		}
+		ui.toolsPanel.querySelectorAll( '.wc-gpd-prop-row' ).forEach( ( row ) => {
+			row.classList.remove( 'is-disabled' );
+			row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( input ) => {
+				input.disabled = false;
+			} );
+		} );
 	}
 
 	function applyLayerToolSettings( obj ) {
@@ -758,7 +816,17 @@
 	}
 
 	function isCustomerEditableTemplateText( obj ) {
-		return !! obj && obj.wcGpdLayerType === 'text' && obj.wcGpdTemplateLayer && obj.wcGpdCustomerEditable !== false;
+		if ( ! obj || obj.wcGpdCustomerEditable === false || ! obj.wcGpdTemplateLayer ) {
+			return false;
+		}
+		if ( obj.wcGpdLayerType === 'placeholder' ) {
+			return false;
+		}
+		if ( obj.wcGpdLayerType === 'text' ) {
+			return true;
+		}
+		const textTypes = [ 'textbox', 'i-text', 'text' ];
+		return ! obj.wcGpdLayerType && textTypes.indexOf( obj.type ) >= 0;
 	}
 
 	function isFixedTemplateText( obj ) {
@@ -981,7 +1049,8 @@
 					fabric.util.enlivenObjects(
 						designObjects,
 						( objects ) => {
-							objects.forEach( ( obj ) => {
+							objects.forEach( ( obj, index ) => {
+								applyTemplateMetadata( obj, designObjects[ index ] );
 								if ( isPlaceholderLayer( obj ) ) {
 									const existing = findCanvasPlaceholder( obj.wcGpdPlaceholderKey );
 									if ( existing && obj.text ) {
@@ -999,6 +1068,11 @@
 									return;
 								}
 								obj.wcGpdTextLayer = obj.wcGpdTextLayer || isTextLayer( obj );
+								if ( isCustomerEditableTemplateText( obj ) ) {
+									applyTextCustomerInteractivity( obj );
+								} else if ( isCustomerEditableTemplateShape( obj ) ) {
+									applyShapeCustomerInteractivity( obj );
+								}
 								enforcePaletteColor( obj );
 								canvas.add( obj );
 								obj.setCoords();
@@ -1023,7 +1097,8 @@
 					templateObjects,
 					( objects ) => {
 						const savedPlaceholders = ( viewDesigns[ viewId ] || [] ).filter( ( o ) => o.wcGpdLayerType === 'placeholder' );
-						objects.forEach( ( obj ) => {
+						objects.forEach( ( obj, index ) => {
+							applyTemplateMetadata( obj, templateObjects[ index ] );
 							obj.wcGpdTemplateLayer = true;
 							if ( isMockupImage( obj ) ) {
 								if ( obj.wcGpdMockupVisible === false ) {
@@ -1542,6 +1617,7 @@
 
 		if ( ! enabled ) {
 			renderColorSwatches( null );
+			resetToolRowStates();
 			return;
 		}
 
@@ -1811,7 +1887,8 @@
 
 					clearTextLayers();
 
-					objects.forEach( ( obj ) => {
+					objects.forEach( ( obj, index ) => {
+						applyTemplateMetadata( obj, data.objects[ index ] );
 						obj.wcGpdTextLayer = true;
 						canvas.add( obj );
 						obj.setCoords();

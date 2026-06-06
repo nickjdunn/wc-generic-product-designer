@@ -76,8 +76,27 @@ defined( 'ABSPATH' ) || exit;
 </div>
 
 <div class="wc-gpd-context-accordion is-open" id="wc-gpd-context-block-colors" data-context-for="text,shape" hidden>
-	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></button>
+	<button type="button" class="wc-gpd-context-accordion__toggle" id="wc-gpd-context-colors-toggle" aria-expanded="true"><?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></button>
 	<div class="wc-gpd-context-accordion__body">
+		<div class="wc-gpd-prop-shape-appearance" id="wc-gpd-shape-appearance-panel" data-prop-for="shape" hidden>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_shape_use_fill" /> <?php esc_html_e( 'Fill', 'wc-generic-product-designer' ); ?></label>
+			</div>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_shape_use_stroke" checked="checked" /> <?php esc_html_e( 'Outline', 'wc-generic-product-designer' ); ?></label>
+			</div>
+			<div class="wc-gpd-prop-row" id="wc-gpd-shape-stroke-width-row">
+				<label class="wc-gpd-prop-label" for="wc_gpd_template_stroke_width"><?php esc_html_e( 'Line thickness', 'wc-generic-product-designer' ); ?></label>
+				<input type="number" id="wc_gpd_template_stroke_width" class="wc-gpd-prop-control" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['outline_stroke_width'] ); ?>" />
+			</div>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" /> <?php esc_html_e( 'Production outline (cut line)', 'wc-generic-product-designer' ); ?></label>
+			</div>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_bbox" /> <?php esc_html_e( 'Bounding box guide', 'wc-generic-product-designer' ); ?></label>
+			</div>
+			<hr class="wc-gpd-prop-divider" />
+		</div>
 		<div class="wc-gpd-prop-row" id="wc-gpd-fill-colors-panel">
 			<label class="wc-gpd-prop-label" for="wc_gpd_layer_palette_id" id="wc-gpd-fill-palette-label"><?php esc_html_e( 'Color palette for this layer', 'wc-generic-product-designer' ); ?></label>
 			<select id="wc_gpd_layer_palette_id" class="wc-gpd-prop-control"></select>
@@ -231,30 +250,6 @@ defined( 'ABSPATH' ) || exit;
 			</div>
 			<p class="description"><?php esc_html_e( 'Customers choose a graphic and can move or resize it within this box. Set move/resize under Size & position.', 'wc-generic-product-designer' ); ?></p>
 			<div class="wc-gpd-prop-row"><button type="button" class="button button-link-delete" id="wc-gpd-template-delete-slot"><?php esc_html_e( 'Remove pick area', 'wc-generic-product-designer' ); ?></button></div>
-		</div>
-	</div>
-</div>
-
-<div class="wc-gpd-context-accordion is-open" id="wc-gpd-context-block-shape" data-context-for="shape" hidden>
-	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Shape & icon appearance', 'wc-generic-product-designer' ); ?></button>
-	<div class="wc-gpd-context-accordion__body">
-		<div class="wc-gpd-tpl-selection" id="wc-gpd-shape-props-fields">
-			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
-				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_shape_use_fill" /> <?php esc_html_e( 'Fill', 'wc-generic-product-designer' ); ?></label>
-			</div>
-			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
-				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_shape_use_stroke" checked="checked" /> <?php esc_html_e( 'Outline', 'wc-generic-product-designer' ); ?></label>
-			</div>
-			<div class="wc-gpd-prop-row" id="wc-gpd-shape-stroke-width-row">
-				<label class="wc-gpd-prop-label" for="wc_gpd_template_stroke_width"><?php esc_html_e( 'Line thickness', 'wc-generic-product-designer' ); ?></label>
-				<input type="number" id="wc_gpd_template_stroke_width" class="wc-gpd-prop-control" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['outline_stroke_width'] ); ?>" />
-			</div>
-			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
-				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" /> <?php esc_html_e( 'Production outline (cut line)', 'wc-generic-product-designer' ); ?></label>
-			</div>
-			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
-				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_bbox" /> <?php esc_html_e( 'Bounding box guide', 'wc-generic-product-designer' ); ?></label>
-			</div>
 		</div>
 	</div>
 </div>

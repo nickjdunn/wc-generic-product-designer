@@ -18,7 +18,7 @@
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
 	const bboxToggle = document.getElementById( 'wc_gpd_template_is_bbox' );
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
-	const shapePropsFields = document.getElementById( 'wc-gpd-shape-props-fields' );
+	const shapePropsFields = document.getElementById( 'wc-gpd-shape-appearance-panel' );
 	const shapeStrokeWidthRow = document.getElementById( 'wc-gpd-shape-stroke-width-row' );
 	const shapeUseFillToggle = document.getElementById( 'wc_gpd_shape_use_fill' );
 	const shapeUseStrokeToggle = document.getElementById( 'wc_gpd_shape_use_stroke' );
@@ -76,6 +76,39 @@
 	if ( ! canvasEl || typeof fabric === 'undefined' ) {
 		return;
 	}
+
+	function registerFabricCustomProperties() {
+		const classes = [
+			fabric.Object, fabric.Text, fabric.Textbox, fabric.IText, fabric.Rect, fabric.Circle,
+			fabric.Ellipse, fabric.Polygon, fabric.Path, fabric.Polyline, fabric.Line, fabric.Group, fabric.Image,
+		];
+		classes.forEach( ( klass ) => {
+			if ( ! klass ) {
+				return;
+			}
+			if ( ! klass.customProperties ) {
+				klass.customProperties = [];
+			}
+			SERIALIZE_PROPS.forEach( ( prop ) => {
+				if ( klass.customProperties.indexOf( prop ) < 0 ) {
+					klass.customProperties.push( prop );
+				}
+			} );
+		} );
+	}
+
+	function applyTemplateMetadata( obj, source ) {
+		if ( ! obj || ! source || typeof source !== 'object' ) {
+			return;
+		}
+		SERIALIZE_PROPS.forEach( ( key ) => {
+			if ( source[ key ] !== undefined ) {
+				obj[ key ] = source[ key ];
+			}
+		} );
+	}
+
+	registerFabricCustomProperties();
 
 	function readCanvasDimensions() {
 		const wField = document.getElementById( 'wc_gpd_canvas_width' );
@@ -1230,6 +1263,15 @@
 		const useFill = ! isShapeLayer || shapeUsesFill( obj );
 		const useStroke = isShapeLayer && shapeUsesStroke( obj );
 
+		const shapeAppearancePanel = document.getElementById( 'wc-gpd-shape-appearance-panel' );
+		if ( shapeAppearancePanel ) {
+			shapeAppearancePanel.hidden = ! isShapeLayer;
+		}
+		const colorsToggle = document.getElementById( 'wc-gpd-context-colors-toggle' );
+		if ( colorsToggle ) {
+			colorsToggle.textContent = isShapeLayer ? 'Shape, icon & color' : 'Color';
+		}
+
 		const fillPaletteLabel = document.getElementById( 'wc-gpd-fill-palette-label' );
 		if ( fillPaletteLabel ) {
 			fillPaletteLabel.textContent = isShapeLayer ? 'Fill color palette' : 'Color palette for this layer';
@@ -2187,7 +2229,8 @@
 				return;
 			}
 			fabric.util.enlivenObjects( objects, ( enlivened ) => {
-				enlivened.forEach( ( obj ) => {
+				enlivened.forEach( ( obj, index ) => {
+					applyTemplateMetadata( obj, objects[ index ] );
 					prepareLoadedObject( obj );
 					canvas.add( obj );
 				} );

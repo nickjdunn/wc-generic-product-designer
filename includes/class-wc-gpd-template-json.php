@@ -401,6 +401,15 @@ class WC_GPD_Template_Json {
 		unset( $object[ $colors_key ] );
 	}
 
+	private static function sanitize_layer_customer_props( array &$object ) {
+		$object['wcGpdLockColor']            = ! empty( $object['wcGpdLockColor'] );
+		$object['wcGpdLockMove']             = ! empty( $object['wcGpdLockMove'] );
+		$object['wcGpdLockScale']            = ! empty( $object['wcGpdLockScale'] );
+		$object['wcGpdLockAspect']           = ! empty( $object['wcGpdLockAspect'] );
+		$object['wcGpdCustomerEditable']     = ! isset( $object['wcGpdCustomerEditable'] ) || ! empty( $object['wcGpdCustomerEditable'] );
+		$object['wcGpdHideFromCustomerLayers'] = ! empty( $object['wcGpdHideFromCustomerLayers'] );
+	}
+
 	/**
 	 * Sanitize shape/icon fill-stroke flags and palette props.
 	 *
@@ -413,6 +422,7 @@ class WC_GPD_Template_Json {
 			$object['wcGpdShapeUseFill'] = true;
 		}
 		$object['wcGpdCustomerPaletteOnly'] = ! array_key_exists( 'wcGpdCustomerPaletteOnly', $object ) || ! empty( $object['wcGpdCustomerPaletteOnly'] );
+		self::sanitize_layer_customer_props( $object );
 		self::sanitize_layer_color_props( $object, 'fill' );
 		self::sanitize_layer_color_props( $object, 'stroke' );
 	}
