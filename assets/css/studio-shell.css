@@ -298,7 +298,10 @@
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-accordion {
 	display: flex;
 	flex-direction: column;
+	flex: 1 1 auto;
 	min-height: 0;
+	height: 100%;
+	max-height: none;
 	overflow: hidden;
 }
 
@@ -334,7 +337,7 @@
 	align-items: stretch;
 	justify-content: stretch;
 	min-width: 0;
-	min-height: 0;
+	min-height: var(--wc-gpd-studio-work-h, 480px);
 	padding: 0;
 	background: var(--wc-gpd-studio-bg);
 	border: none;
@@ -367,7 +370,7 @@
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio.wc-gpd-tpl-layout {
-	min-height: 0;
+	min-height: var(--wc-gpd-studio-work-h, 480px);
 	flex: 1 1 auto;
 }
 
@@ -539,7 +542,7 @@
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root {
 	display: flex;
 	flex-direction: column;
-	min-height: 560px;
+	min-height: calc( var( --wc-gpd-studio-chrome-h, 52px ) + var( --wc-gpd-studio-work-h, 480px ) );
 	border: none;
 	border-radius: 0;
 	overflow: hidden;
@@ -548,10 +551,11 @@
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-studio-chrome {
 	border-radius: 0;
+	flex-shrink: 0;
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-modern-studio {
-	min-height: 480px;
+	min-height: var(--wc-gpd-studio-work-h, 480px);
 }
 
 .wc-gpd-template-editor-wrap.wc-gpd-modern-studio-root .wc-gpd-tpl-header {

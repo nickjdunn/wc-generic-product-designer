@@ -2313,6 +2313,18 @@
 		}
 	}
 
+	function syncStudioLayoutHeight( displayH ) {
+		if ( ! editorRoot ) {
+			return;
+		}
+		const showRuler = showRulerToggle && showRulerToggle.checked;
+		const rulerPad = showRuler ? 20 : 0;
+		const vertPad = 16;
+		const workH = Math.max( 320, displayH + ( vertPad * 2 ) + rulerPad );
+		editorRoot.style.setProperty( '--wc-gpd-studio-work-h', `${ workH }px` );
+		editorRoot.style.setProperty( '--wc-gpd-studio-canvas-display-h', `${ displayH }px` );
+	}
+
 	function applyResponsiveScale() {
 		const col = editorRoot ? editorRoot.querySelector( '.wc-gpd-tpl-canvas-col' ) : null;
 		if ( ! col ) {
@@ -2325,6 +2337,15 @@
 		const displayH = Math.max( 1, Math.floor( height * scale ) );
 		canvas.setDimensions( { width, height } );
 		canvas.setDimensions( { width: displayW, height: displayH }, { cssOnly: true } );
+		if ( canvasEl ) {
+			canvasEl.style.width = `${ displayW }px`;
+			canvasEl.style.height = `${ displayH }px`;
+		}
+		if ( canvas.wrapperEl ) {
+			canvas.wrapperEl.style.width = `${ displayW }px`;
+			canvas.wrapperEl.style.height = `${ displayH }px`;
+		}
+		syncStudioLayoutHeight( displayH );
 		canvas.calcOffset();
 		canvas.requestRenderAll();
 	}
@@ -2796,7 +2817,10 @@
 	} );
 
 	if ( showRulerToggle ) {
-		showRulerToggle.addEventListener( 'change', updateRulers );
+		showRulerToggle.addEventListener( 'change', () => {
+			updateRulers();
+			applyResponsiveScale();
+		} );
 	}
 	if ( showMeasurementsToggle ) {
 		showMeasurementsToggle.addEventListener( 'change', updateRulers );
