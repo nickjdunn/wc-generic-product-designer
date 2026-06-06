@@ -29,6 +29,7 @@
 		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
+		'wcGpdCustomerUpload',
 	];
 
 	function registerFabricCustomProperties() {
@@ -177,6 +178,14 @@
 
 	const ui = {
 		addText: document.getElementById( 'wc-gpd-add-text' ),
+		addShape: document.getElementById( 'wc-gpd-add-shape' ),
+		addImage: document.getElementById( 'wc-gpd-add-image' ),
+		addImageFile: document.getElementById( 'wc-gpd-add-image-file' ),
+		addGraphicLibrary: document.getElementById( 'wc-gpd-add-graphic-library' ),
+		addIconPicker: document.getElementById( 'wc-gpd-add-icon-picker' ),
+		addMenu: document.getElementById( 'wc-gpd-add-menu' ),
+		addEmpty: document.getElementById( 'wc-gpd-add-empty' ),
+		navAdd: document.getElementById( 'wc-gpd-nav-add' ),
 		toolsPanel: document.getElementById( 'wc-gpd-tools-panel' ),
 		contextEmpty: document.getElementById( 'wc-gpd-context-empty' ),
 		contextPane: document.getElementById( 'wc-gpd-context-pane' ),
@@ -287,7 +296,7 @@
 			return null;
 		}
 		const isText = isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer );
-		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		const isShapeLayer = isCustomerEditableShape( obj );
 		return {
 			uid: obj.wcGpdUid,
 			type: obj.type,
@@ -375,6 +384,7 @@
 
 	const graphicLibrary = Array.isArray( config.graphicLibrary ) ? config.graphicLibrary : [];
 	const graphicLibraries = Array.isArray( config.graphicLibraries ) ? config.graphicLibraries : [];
+	const bootstrapIcons = config.bootstrapIcons || {};
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
@@ -424,6 +434,9 @@
 	function textColorAllowed( obj ) {
 		if ( isCustomerEditableTemplateShape( obj ) ) {
 			return !! obj && ! obj.wcGpdLockColor;
+		}
+		if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return productSettingsAllow( 'allow_text_color' );
 		}
 		return layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 	}
@@ -582,13 +595,118 @@
 	}
 
 	function applyProductToolSettings() {
-		setToolVisible( ui.addText, productSettings.allow_free_text !== false );
+		const allowText = productAllowsAdd( 'text' );
+		const allowShape = productAllowsAdd( 'shape' );
+		const allowGraphic = productAllowsAdd( 'graphic' ) && graphicLibrary.length > 0;
+		const allowImage = productAllowsAdd( 'image' );
+		const allowIcon = productAllowsAdd( 'icon' );
+		const anyAdd = allowText || allowShape || allowGraphic || allowImage || allowIcon;
+
+		setToolVisible( ui.addText, allowText );
+		setToolVisible( ui.addShape, allowShape );
+		setToolVisible( ui.addImage, allowImage );
+
+		designerRoot.querySelectorAll( '[data-add-group]' ).forEach( ( group ) => {
+			const key = group.getAttribute( 'data-add-group' );
+			const visible = productAllowsAdd( key );
+			group.hidden = ! visible;
+			if ( visible ) {
+				const toggle = group.querySelector( '.wc-gpd-add-menu__toggle' );
+				const body = group.querySelector( '.wc-gpd-add-menu__body' );
+				if ( toggle && body && ! group.classList.contains( 'is-open' ) ) {
+					group.classList.add( 'is-open' );
+					toggle.setAttribute( 'aria-expanded', 'true' );
+					body.hidden = false;
+				}
+			}
+		} );
+
+		if ( ui.addEmpty ) {
+			ui.addEmpty.hidden = anyAdd;
+		}
+		if ( ui.addMenu ) {
+			ui.addMenu.hidden = ! anyAdd;
+		}
+		if ( ui.navAdd ) {
+			ui.navAdd.hidden = ! anyAdd;
+		}
+
+		if ( allowGraphic ) {
+			renderAddGraphicLibrary();
+		} else if ( ui.addGraphicLibrary ) {
+			ui.addGraphicLibrary.innerHTML = '';
+		}
+
+		if ( allowIcon ) {
+			renderAddIconPicker();
+		} else if ( ui.addIconPicker ) {
+			ui.addIconPicker.innerHTML = '';
+		}
+
 		if ( ui.navLayers ) {
 			ui.navLayers.hidden = productSettings.allow_layers_panel === false;
 		}
 		if ( activeText ) {
 			applyLayerToolSettings( activeText );
 		}
+	}
+
+	function productAllowsAdd( key ) {
+		const settingKey = 'allow_add_' + key;
+		if ( productSettings[ settingKey ] === false ) {
+			return false;
+		}
+		if ( key === 'text' && productSettings.allow_free_text === false ) {
+			return false;
+		}
+		if ( key === 'graphic' || key === 'image' ) {
+			return productSettings[ settingKey ] !== false;
+		}
+		return productSettings[ settingKey ] !== false;
+	}
+
+	function renderAddGraphicLibrary() {
+		if ( ! ui.addGraphicLibrary || ! graphicLibrary.length ) {
+			return;
+		}
+		ui.addGraphicLibrary.innerHTML = '';
+		const row = document.createElement( 'div' );
+		row.className = 'wc-gpd-graphic-thumb-row';
+		graphicLibrary.forEach( ( item ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-graphic-thumb';
+			btn.title = item.title || '';
+			btn.innerHTML = `<img src="${ item.url }" alt="" loading="lazy" />`;
+			btn.addEventListener( 'click', () => addGraphicFromLibrary( item ) );
+			row.appendChild( btn );
+		} );
+		ui.addGraphicLibrary.appendChild( row );
+	}
+
+	function renderAddIconPicker() {
+		if ( ! ui.addIconPicker ) {
+			return;
+		}
+		const featured = Array.isArray( bootstrapIcons.featured ) ? bootstrapIcons.featured : [];
+		const baseUrl = bootstrapIcons.iconBaseUrl || '';
+		if ( ! featured.length || ! baseUrl ) {
+			ui.addIconPicker.innerHTML = '';
+			return;
+		}
+		ui.addIconPicker.innerHTML = '';
+		const row = document.createElement( 'div' );
+		row.className = 'wc-gpd-add-icon-row';
+		featured.forEach( ( slug ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-add-icon-btn';
+			btn.title = slug;
+			btn.innerHTML = `<img src="${ baseUrl }${ slug }.svg" alt="" width="28" height="28" loading="lazy" />`;
+			btn.addEventListener( 'click', () => addCustomerIcon( slug ) );
+			row.appendChild( btn );
+		} );
+		ui.addIconPicker.appendChild( row );
 	}
 
 	function resetToolRowStates() {
@@ -607,7 +725,7 @@
 	}
 
 	function applyLayerToolSettings( obj ) {
-		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		const isShapeLayer = isCustomerEditableShape( obj );
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const colorAllowed = textColorAllowed( obj );
 		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
@@ -668,7 +786,7 @@
 		}
 
 		const paletteOnly = textColorUsesPalette( obj );
-		const isShapeLayer = isCustomerEditableTemplateShape( obj );
+		const isShapeLayer = isCustomerEditableShape( obj );
 		if ( ! paletteOnly && ! isShapeLayer ) {
 			return;
 		}
@@ -1057,6 +1175,45 @@
 		return ! obj.wcGpdLayerType && textTypes.indexOf( obj.type ) >= 0;
 	}
 
+	function isCustomerAddedShape( obj ) {
+		return !! obj && ! obj.wcGpdTemplateLayer && obj.wcGpdLayerType === 'shape';
+	}
+
+	function isCustomerAddedIcon( obj ) {
+		return !! obj && ! obj.wcGpdTemplateLayer && obj.wcGpdLayerType === 'icon';
+	}
+
+	function isCustomerEditableShape( obj ) {
+		return isCustomerEditableTemplateShape( obj ) || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj );
+	}
+
+	function isTemplateTextFullyLocked( obj ) {
+		if ( ! isCustomerEditableTemplateText( obj ) ) {
+			return false;
+		}
+		return !!(
+			obj.wcGpdLockFont &&
+			obj.wcGpdLockSize &&
+			obj.wcGpdLockColor &&
+			obj.wcGpdLockBold &&
+			obj.wcGpdLockItalic &&
+			obj.wcGpdLockUnderline &&
+			obj.wcGpdLockAlign &&
+			obj.wcGpdLockLineHeight &&
+			obj.wcGpdLockLetterSpacing &&
+			obj.wcGpdLockText &&
+			obj.wcGpdLockMove &&
+			obj.wcGpdLockScale
+		);
+	}
+
+	function isTemplateShapeFullyLocked( obj ) {
+		if ( ! isCustomerEditableTemplateShape( obj ) ) {
+			return false;
+		}
+		return !!( obj.wcGpdLockColor && obj.wcGpdLockMove && obj.wcGpdLockScale );
+	}
+
 	function isFixedTemplateText( obj ) {
 		return !! obj && obj.wcGpdLayerType === 'text' && obj.wcGpdTemplateLayer && obj.wcGpdCustomerEditable === false;
 	}
@@ -1146,7 +1303,8 @@
 		}
 		const lockMove = !! obj.wcGpdLockMove;
 		const lockScale = !! obj.wcGpdLockScale;
-		const visible = layerVisibleToCustomer( obj );
+		const fullyLocked = isTemplateShapeFullyLocked( obj );
+		const visible = layerVisibleToCustomer( obj ) && ! fullyLocked;
 		obj.set( {
 			selectable: visible,
 			evented: visible,
@@ -1156,6 +1314,22 @@
 			lockMovementY: lockMove,
 			lockScalingX: lockScale,
 			lockScalingY: lockScale,
+		} );
+	}
+
+	function applyCustomerAddedShapeInteractivity( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		obj.set( {
+			selectable: true,
+			evented: true,
+			hasControls: true,
+			hasBorders: true,
+			lockMovementX: false,
+			lockMovementY: false,
+			lockScalingX: false,
+			lockScalingY: false,
 		} );
 	}
 
@@ -1297,6 +1471,12 @@
 									obj.wcGpdLayerType = 'graphic';
 									obj.wcGpdGraphicLayer = true;
 									applyGraphicInteractivity( obj );
+									canvas.add( obj );
+									obj.setCoords();
+									return;
+								}
+								if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+									applyCustomerAddedShapeInteractivity( obj );
 									canvas.add( obj );
 									obj.setCoords();
 									return;
@@ -1565,6 +1745,9 @@
 		if ( isPlaceholderLayer( obj ) || isCustomerGraphic( obj ) ) {
 			return true;
 		}
+		if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return true;
+		}
 		if ( isTemplateLayer( obj ) ) {
 			return false;
 		}
@@ -1582,7 +1765,8 @@
 		const lockMove = !! obj.wcGpdLockMove;
 		const lockScale = !! obj.wcGpdLockScale;
 		const lockText = !! obj.wcGpdLockText;
-		const visible = layerVisibleToCustomer( obj );
+		const fullyLocked = isTemplateTextFullyLocked( obj );
+		const visible = layerVisibleToCustomer( obj ) && ! fullyLocked;
 		obj.set( {
 			selectable: visible,
 			evented: visible,
@@ -1692,9 +1876,12 @@
 				return false;
 			}
 			if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
-				return true;
+				return ! isTemplateTextFullyLocked( obj );
 			}
 			if ( isCustomerEditableTemplateShape( obj ) ) {
+				return ! isTemplateShapeFullyLocked( obj );
+			}
+			if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
 				return true;
 			}
 			if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
@@ -1715,12 +1902,18 @@
 			return false;
 		}
 		if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
-			return true;
+			return ! isTemplateTextFullyLocked( obj );
 		}
 		if ( isCustomerEditableTemplateShape( obj ) ) {
+			return ! isTemplateShapeFullyLocked( obj );
+		}
+		if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
 			return true;
 		}
 		if ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && isUsableTextLayer( obj ) ) {
+			return true;
+		}
+		if ( isCustomerGraphic( obj ) ) {
 			return true;
 		}
 		return false;
@@ -1759,10 +1952,13 @@
 		if ( current ) {
 			return true;
 		}
+		if ( canvas.getObjects().some( ( obj ) => isDesignLayer( obj ) && ! isPlaceholderLayer( obj ) ) ) {
+			return true;
+		}
 		return templateViews.some( ( view ) => {
 			const objects = viewDesigns[ view.id ] || [];
 			return objects.some( ( obj ) => {
-				if ( obj.wcGpdLayerType === 'graphic' ) {
+				if ( obj.wcGpdLayerType === 'graphic' || obj.wcGpdLayerType === 'shape' || obj.wcGpdLayerType === 'icon' ) {
 					return true;
 				}
 				const text = typeof obj.text === 'string' ? obj.text.trim() : '';
@@ -1798,8 +1994,10 @@
 			if ( ! label && obj.wcGpdLayerLabel ) {
 				label = obj.wcGpdLayerLabel;
 			}
-			if ( ! label && isCustomerEditableTemplateShape( obj ) ) {
-				label = obj.type === 'group' ? ( config.i18n.layerIcon || 'Icon' ) : ( config.i18n.layerShape || 'Shape' );
+			if ( ! label && isCustomerEditableShape( obj ) ) {
+				label = isCustomerAddedIcon( obj ) || obj.type === 'group'
+					? ( config.i18n.layerIcon || 'Icon' )
+					: ( config.i18n.layerShape || 'Shape' );
 			}
 			if ( ! label ) {
 				label = ( config.i18n.layerText || 'Text layer' ) + ' ' + ( index + 1 );
@@ -1852,7 +2050,7 @@
 	function syncToolbar( obj ) {
 		activeText = obj;
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
-		const isShapeLayer = !! obj && isCustomerEditableTemplateShape( obj );
+		const isShapeLayer = !! obj && isCustomerEditableShape( obj );
 		const enabled = isText || isShapeLayer;
 
 		if ( ui.toolsPanel ) {
@@ -1964,6 +2162,158 @@
 		syncToolbar( text );
 		syncLayersList();
 		log.debug( 'Text layer added' );
+	}
+
+	function addShapeLayer() {
+		const region = getConstraintRect();
+		const rect = new fabric.Rect( {
+			left: region.left + region.width / 2,
+			top: region.top + region.height / 2,
+			originX: 'center',
+			originY: 'center',
+			width: 140,
+			height: 90,
+			fill: '#2563eb',
+			stroke: '#1e3a8a',
+			strokeWidth: 2,
+			wcGpdLayerType: 'shape',
+			wcGpdShapeUseFill: true,
+			wcGpdShapeUseStroke: true,
+		} );
+		canvas.add( rect );
+		applyCustomerAddedShapeInteractivity( rect );
+		canvas.setActiveObject( rect );
+		canvas.requestRenderAll();
+		syncToolbar( rect );
+		syncLayersList();
+	}
+
+	function addGraphicFromLibrary( item ) {
+		if ( ! item || ! item.url ) {
+			return;
+		}
+		const region = getConstraintRect();
+		fabric.Image.fromURL(
+			item.url,
+			( img ) => {
+				if ( ! img ) {
+					return;
+				}
+				const maxW = Math.min( region.width * 0.45, 240 );
+				const scale = maxW / Math.max( img.width || 1, 1 );
+				img.set( {
+					left: region.left + region.width / 2,
+					top: region.top + region.height / 2,
+					originX: 'center',
+					originY: 'center',
+					scaleX: scale,
+					scaleY: scale,
+					wcGpdGraphicLayer: true,
+					wcGpdLayerType: 'graphic',
+				} );
+				applyGraphicInteractivity( img );
+				canvas.add( img );
+				canvas.setActiveObject( img );
+				canvas.requestRenderAll();
+				syncLayersList();
+			},
+			{ crossOrigin: 'anonymous' }
+		);
+	}
+
+	function addUploadedImage( file ) {
+		if ( ! file ) {
+			return;
+		}
+		const region = getConstraintRect();
+		const objectUrl = URL.createObjectURL( file );
+		fabric.Image.fromURL(
+			objectUrl,
+			( img ) => {
+				URL.revokeObjectURL( objectUrl );
+				if ( ! img ) {
+					return;
+				}
+				const maxW = Math.min( region.width * 0.55, 320 );
+				const scale = maxW / Math.max( img.width || 1, 1 );
+				img.set( {
+					left: region.left + region.width / 2,
+					top: region.top + region.height / 2,
+					originX: 'center',
+					originY: 'center',
+					scaleX: scale,
+					scaleY: scale,
+					wcGpdGraphicLayer: true,
+					wcGpdLayerType: 'graphic',
+					wcGpdCustomerUpload: true,
+				} );
+				applyGraphicInteractivity( img );
+				canvas.add( img );
+				canvas.setActiveObject( img );
+				canvas.requestRenderAll();
+				syncLayersList();
+			},
+			{ crossOrigin: 'anonymous' }
+		);
+	}
+
+	function styleCustomerIconPaths( obj, color ) {
+		function walk( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( walk );
+				return;
+			}
+			target.set( { fill: color, stroke: null, strokeWidth: 0 } );
+		}
+		walk( obj );
+	}
+
+	function addCustomerIcon( slug ) {
+		const baseUrl = bootstrapIcons.iconBaseUrl || '';
+		if ( ! baseUrl || ! slug ) {
+			return;
+		}
+		const region = getConstraintRect();
+		fetch( baseUrl + slug + '.svg' )
+			.then( ( response ) => response.text() )
+			.then( ( svg ) => {
+				if ( ! svg ) {
+					return;
+				}
+				fabric.loadSVGFromString( svg, ( objects, options ) => {
+					if ( ! objects || ! objects.length ) {
+						return;
+					}
+					let obj = objects.length === 1 ? objects[ 0 ] : fabric.util.groupSVGElements( objects, options );
+					const color = defaultTextColor( null );
+					styleCustomerIconPaths( obj, color );
+					const targetSize = Math.min( region.width * 0.25, 96 );
+					const bounds = obj.getBoundingRect( true, true );
+					const base = Math.max( bounds.width || 16, bounds.height || 16, 1 );
+					const scale = targetSize / base;
+					obj.set( {
+						left: region.left + region.width / 2,
+						top: region.top + region.height / 2,
+						originX: 'center',
+						originY: 'center',
+						scaleX: scale,
+						scaleY: scale,
+						wcGpdLayerType: 'icon',
+						wcGpdShapeUseFill: true,
+						wcGpdLayerLabel: slug.replace( /-/g, ' ' ),
+					} );
+					applyCustomerAddedShapeInteractivity( obj );
+					canvas.add( obj );
+					canvas.setActiveObject( obj );
+					canvas.requestRenderAll();
+					syncToolbar( obj );
+					syncLayersList();
+				} );
+			} )
+			.catch( () => {} );
 	}
 
 	/**
@@ -2391,6 +2741,21 @@
 
 	if ( ui.addText ) {
 		ui.addText.addEventListener( 'click', addTextLayer );
+	}
+
+	if ( ui.addShape ) {
+		ui.addShape.addEventListener( 'click', addShapeLayer );
+	}
+
+	if ( ui.addImage && ui.addImageFile ) {
+		ui.addImage.addEventListener( 'click', () => ui.addImageFile.click() );
+		ui.addImageFile.addEventListener( 'change', () => {
+			const file = ui.addImageFile.files && ui.addImageFile.files[ 0 ];
+			if ( file ) {
+				addUploadedImage( file );
+			}
+			ui.addImageFile.value = '';
+		} );
 	}
 
 	if ( ui.fontFamily ) {

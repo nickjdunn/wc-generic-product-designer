@@ -885,3 +885,40 @@
 .wc-gpd-context-block[hidden] {
 	display: none !important;
 }
+
+.wc-gpd-add-empty {
+	margin: 0;
+	padding: 0.75rem 1rem;
+	font-size: 0.8125rem;
+	color: var(--wc-gpd-studio-muted, #6b7280);
+}
+
+.wc-gpd-add-graphic-library .wc-gpd-graphic-thumb-row,
+.wc-gpd-add-icon-picker .wc-gpd-add-icon-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.wc-gpd-add-graphic-library .wc-gpd-graphic-thumb,
+.wc-gpd-add-icon-picker .wc-gpd-add-icon-btn {
+	width: 44px;
+	height: 44px;
+	padding: 2px;
+	border: 2px solid transparent;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+}
+
+.wc-gpd-add-graphic-library .wc-gpd-graphic-thumb:hover,
+.wc-gpd-add-icon-picker .wc-gpd-add-icon-btn:hover {
+	border-color: var(--wc-gpd-accent, #2563eb);
+}
+
+.wc-gpd-add-graphic-library .wc-gpd-graphic-thumb img,
+.wc-gpd-add-icon-picker .wc-gpd-add-icon-btn img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}

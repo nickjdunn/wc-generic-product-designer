@@ -1453,10 +1453,35 @@
 			el.hidden = ! anyEdit;
 		} );
 
-		const freeTextCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_free_text"]' );
+		const freeTextCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_add_text"]' );
 		const freeTextOn = ! freeTextCheckbox || freeTextCheckbox.checked;
-		document.querySelectorAll( `${ mockupRoot } [data-mockup="free_text"]` ).forEach( ( el ) => {
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="add_text"]` ).forEach( ( el ) => {
 			el.hidden = ! freeTextOn;
+		} );
+
+		const addShapeOn = document.querySelector( 'input[name="wc_gpd_ps_allow_add_shape"]' )?.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="add_shape"]` ).forEach( ( el ) => {
+			el.hidden = ! addShapeOn;
+		} );
+
+		const addGraphicOn = document.querySelector( 'input[name="wc_gpd_ps_allow_add_graphic"]' )?.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="add_graphic"]` ).forEach( ( el ) => {
+			el.hidden = ! addGraphicOn;
+		} );
+
+		const addImageOn = document.querySelector( 'input[name="wc_gpd_ps_allow_add_image"]' )?.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="add_image"]` ).forEach( ( el ) => {
+			el.hidden = ! addImageOn;
+		} );
+
+		const addIconOn = document.querySelector( 'input[name="wc_gpd_ps_allow_add_icon"]' )?.checked;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup="add_icon"]` ).forEach( ( el ) => {
+			el.hidden = ! addIconOn;
+		} );
+
+		const anyAdd = freeTextOn || addShapeOn || addGraphicOn || addImageOn || addIconOn;
+		document.querySelectorAll( `${ mockupRoot } [data-mockup-nav="add"]` ).forEach( ( el ) => {
+			el.hidden = ! anyAdd;
 		} );
 
 		const layersCheckbox = document.querySelector( 'input[name="wc_gpd_ps_allow_layers_panel"]' );
@@ -3428,7 +3453,11 @@
 		} );
 	}
 	[
-		'wc_gpd_ps_allow_free_text',
+		'wc_gpd_ps_allow_add_text',
+		'wc_gpd_ps_allow_add_shape',
+		'wc_gpd_ps_allow_add_graphic',
+		'wc_gpd_ps_allow_add_image',
+		'wc_gpd_ps_allow_add_icon',
 		'wc_gpd_ps_allow_layers_panel',
 		'wc_gpd_ps_allow_details_panel',
 		'wc_gpd_ps_allow_customer_graphics',

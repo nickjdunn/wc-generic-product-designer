@@ -730,7 +730,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 		<div class="wc-gpd-customer-tools-layout">
 			<div class="wc-gpd-customer-mockup-wrap">
 				<h4><?php esc_html_e( 'Customer preview', 'wc-generic-product-designer' ); ?></h4>
-				<p class="description"><?php esc_html_e( 'Live preview of the customer designer. Customer permissions now live in each property section when you select a layer (color, size, text, etc.).', 'wc-generic-product-designer' ); ?></p>
+				<p class="description"><?php esc_html_e( 'Preview of panels and add options. Per-layer edit permissions are set on the Template tab when you select a layer.', 'wc-generic-product-designer' ); ?></p>
 				<div class="wc-gpd-customer-mockup wc-gpd-mockup-studio wc-gpd-modern-studio-root" id="wc-gpd-customer-mockup">
 					<div class="wc-gpd-mockup-studio__shell">
 						<nav class="wc-gpd-studio-nav wc-gpd-mockup-nav" id="wc-gpd-mockup-nav" aria-label="<?php esc_attr_e( 'Preview designer tools', 'wc-generic-product-designer' ); ?>">
@@ -746,7 +746,11 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<div class="wc-gpd-studio-drawer__body">
 								<div class="wc-gpd-mockup-panel is-active" data-mockup-panel="add">
 									<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add elements to your design.', 'wc-generic-product-designer' ); ?></p>
-									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="free_text" disabled><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="add_text" disabled><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="add_shape" disabled hidden><?php esc_html_e( 'Add shape', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="add_graphic" disabled hidden><?php esc_html_e( 'Add graphic', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="add_image" disabled hidden><?php esc_html_e( 'Upload image', 'wc-generic-product-designer' ); ?></button>
+									<button type="button" class="button button-small wc-gpd-mockup-control" data-mockup="add_icon" disabled hidden><?php esc_html_e( 'Add icon', 'wc-generic-product-designer' ); ?></button>
 								</div>
 								<div class="wc-gpd-mockup-panel" data-mockup-panel="layers" hidden>
 									<ul class="wc-gpd-mockup-layers">
@@ -797,12 +801,34 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			</div>
 		<div class="wc-gpd-settings-grid wc-gpd-settings-grid--customer-global">
 			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
-				<h4><?php esc_html_e( 'Global customer options', 'wc-generic-product-designer' ); ?></h4>
-				<p class="description"><?php esc_html_e( 'Per-layer permissions are configured in each property section when editing a layer (Layer, Size & position, Color, Text, etc.). These options apply to the whole product.', 'wc-generic-product-designer' ); ?></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_free_text" value="1" <?php checked( $ps['allow_free_text'] ); ?> /> <?php esc_html_e( 'Allow customers to add their own text', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_layers_panel" value="1" <?php checked( $ps['allow_layers_panel'] ); ?> /> <?php esc_html_e( 'Show layers panel in designer', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_details_panel" value="1" <?php checked( $ps['allow_details_panel'] ); ?> /> <?php esc_html_e( 'Show details panel (variable fields)', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_customer_graphics" value="1" <?php checked( $ps['allow_customer_graphics'] ); ?> /> <?php esc_html_e( 'Show graphic picker in details', 'wc-generic-product-designer' ); ?></label></p>
+				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
+				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_shape" value="1" <?php checked( ! empty( $ps['allow_add_shape'] ) ); ?> /> <?php esc_html_e( 'Shapes (rectangle)', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_graphic" value="1" <?php checked( ! empty( $ps['allow_add_graphic'] ) ); ?> /> <?php esc_html_e( 'Graphics from your library', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_image" value="1" <?php checked( ! empty( $ps['allow_add_image'] ) ); ?> /> <?php esc_html_e( 'Upload their own image', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_icon" value="1" <?php checked( ! empty( $ps['allow_add_icon'] ) ); ?> /> <?php esc_html_e( 'Icons (Bootstrap Icons)', 'wc-generic-product-designer' ); ?></label></p>
+			</div>
+			<div class="wc-gpd-settings-card">
+				<h4><?php esc_html_e( 'Panels', 'wc-generic-product-designer' ); ?></h4>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_layers_panel" value="1" <?php checked( $ps['allow_layers_panel'] ); ?> /> <?php esc_html_e( 'Layers panel', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_details_panel" value="1" <?php checked( $ps['allow_details_panel'] ); ?> /> <?php esc_html_e( 'Details panel (variable fields)', 'wc-generic-product-designer' ); ?></label></p>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_customer_graphics" value="1" <?php checked( $ps['allow_customer_graphics'] ); ?> /> <?php esc_html_e( 'Graphic picker in Details (for template slots)', 'wc-generic-product-designer' ); ?></label></p>
+			</div>
+			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
+				<h4><?php esc_html_e( 'Customer-added text formatting', 'wc-generic-product-designer' ); ?></h4>
+				<p class="description"><?php esc_html_e( 'Applies only to text the customer adds — not template layers (those use per-layer locks on the Template tab).', 'wc-generic-product-designer' ); ?></p>
+				<div class="wc-gpd-settings-check-grid">
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_font_family" value="1" <?php checked( $ps['allow_font_family'] ); ?> /> <?php esc_html_e( 'Font family', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_font_size" value="1" <?php checked( $ps['allow_font_size'] ); ?> /> <?php esc_html_e( 'Font size', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_bold" value="1" <?php checked( $ps['allow_bold'] ); ?> /> <?php esc_html_e( 'Bold', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_italic" value="1" <?php checked( $ps['allow_italic'] ); ?> /> <?php esc_html_e( 'Italic', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_underline" value="1" <?php checked( $ps['allow_underline'] ); ?> /> <?php esc_html_e( 'Underline', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_text_align" value="1" <?php checked( $ps['allow_text_align'] ); ?> /> <?php esc_html_e( 'Alignment', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_line_height" value="1" <?php checked( $ps['allow_line_height'] ); ?> /> <?php esc_html_e( 'Line height', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_letter_spacing" value="1" <?php checked( $ps['allow_letter_spacing'] ); ?> /> <?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></label>
+					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_text_color" value="1" <?php checked( $ps['allow_text_color'] ); ?> /> <?php esc_html_e( 'Text color', 'wc-generic-product-designer' ); ?></label>
+				</div>
 			</div>
 		</div>
 		</div>
@@ -814,6 +840,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 */
 	private function render_template_settings( $ps ) {
 		?>
+		<p class="description"><?php esc_html_e( 'Template-wide visual defaults and export options. Customer permissions and add options are on the Customer tools tab; per-layer locks are on the Template tab.', 'wc-generic-product-designer' ); ?></p>
 		<div class="wc-gpd-settings-grid">
 			<div class="wc-gpd-settings-card wc-gpd-settings-card--colors">
 				<h4><?php esc_html_e( 'Template colors', 'wc-generic-product-designer' ); ?></h4>
@@ -825,9 +852,8 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				</div>
 			</div>
 			<div class="wc-gpd-settings-card">
-				<h4><?php esc_html_e( 'Designer', 'wc-generic-product-designer' ); ?></h4>
-				<p class="description"><?php esc_html_e( 'Customers open a full-screen designer from the Start designing button on the product page.', 'wc-generic-product-designer' ); ?></p>
-				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Canvas background', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_canvas_bg_color" value="<?php echo esc_attr( $ps['canvas_bg_color'] ); ?>" /></label></p>
+				<h4><?php esc_html_e( 'Storefront canvas', 'wc-generic-product-designer' ); ?></h4>
+				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Background color', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_canvas_bg_color" value="<?php echo esc_attr( $ps['canvas_bg_color'] ); ?>" /></label></p>
 			</div>
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Editor defaults', 'wc-generic-product-designer' ); ?></h4>

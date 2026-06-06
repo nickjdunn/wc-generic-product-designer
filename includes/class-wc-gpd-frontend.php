@@ -324,6 +324,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'galleryImages'      => self::get_listing_gallery_images( wc_get_product( $product_id ) ),
 				'graphicLibrary'     => ! empty( $settings['graphic_library'] ) ? $settings['graphic_library'] : array(),
 				'graphicLibraries'   => ! empty( $settings['graphic_libraries'] ) ? $settings['graphic_libraries'] : array(),
+				'bootstrapIcons'     => array(
+					'featured'    => WC_GPD_Bootstrap_Icons::featured_slugs(),
+					'iconBaseUrl' => WC_GPD_PLUGIN_URL . WC_GPD_Bootstrap_Icons::ICONS_DIR . '/',
+				),
 				'debug'              => WC_GPD_Settings::is_js_debug_enabled(),
 				'nonce'              => wp_create_nonce( self::NONCE_ACTION ),
 				'nonceName'          => self::NONCE_NAME,
@@ -354,6 +358,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'loadDesignError' => __( 'Could not load your saved design. Please create a new one.', 'wc-generic-product-designer' ),
 					'layersTitle'   => __( 'Layers', 'wc-generic-product-designer' ),
 					'layerText'     => __( 'Text layer', 'wc-generic-product-designer' ),
+					'layerShape'    => __( 'Shape', 'wc-generic-product-designer' ),
+					'layerIcon'     => __( 'Icon', 'wc-generic-product-designer' ),
 					'bringForward'  => __( 'Bring forward', 'wc-generic-product-designer' ),
 					'sendBackward'  => __( 'Send backward', 'wc-generic-product-designer' ),
 					'deleteLayer'   => __( 'Delete layer', 'wc-generic-product-designer' ),
@@ -519,11 +525,37 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					<div class="wc-gpd-studio-drawer__body">
 						<div class="wc-gpd-studio-panel-section is-active" data-section="add" id="wc-gpd-section-add">
 							<p class="wc-gpd-tpl-panel-desc"><?php esc_html_e( 'Add elements to your design.', 'wc-generic-product-designer' ); ?></p>
-							<div class="wc-gpd-add-menu wc-gpd-add-menu--collapsible">
-								<div class="wc-gpd-add-menu__group is-open">
-									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="true"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
-									<div class="wc-gpd-add-menu__body">
+							<p class="wc-gpd-add-empty" id="wc-gpd-add-empty" hidden><?php esc_html_e( 'Adding custom elements is disabled for this product.', 'wc-generic-product-designer' ); ?></p>
+							<div class="wc-gpd-add-menu wc-gpd-add-menu--collapsible" id="wc-gpd-add-menu">
+								<div class="wc-gpd-add-menu__group" data-add-group="text" hidden>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
 										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-text"><?php esc_html_e( 'Add text', 'wc-generic-product-designer' ); ?></button>
+									</div>
+								</div>
+								<div class="wc-gpd-add-menu__group" data-add-group="shape" hidden>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Shapes', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-shape"><?php esc_html_e( 'Add rectangle', 'wc-generic-product-designer' ); ?></button>
+									</div>
+								</div>
+								<div class="wc-gpd-add-menu__group" data-add-group="graphic" hidden>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Graphics', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<div class="wc-gpd-add-graphic-library" id="wc-gpd-add-graphic-library" role="group" aria-label="<?php esc_attr_e( 'Choose a graphic', 'wc-generic-product-designer' ); ?>"></div>
+									</div>
+								</div>
+								<div class="wc-gpd-add-menu__group" data-add-group="image" hidden>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Images', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn wc-gpd-tool-btn wc-gpd-tool-btn--add" id="wc-gpd-add-image"><?php esc_html_e( 'Upload image', 'wc-generic-product-designer' ); ?></button>
+										<input type="file" id="wc-gpd-add-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+									</div>
+								</div>
+								<div class="wc-gpd-add-menu__group" data-add-group="icon" hidden>
+									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Icons', 'wc-generic-product-designer' ); ?></button>
+									<div class="wc-gpd-add-menu__body" hidden>
+										<div class="wc-gpd-add-icon-picker" id="wc-gpd-add-icon-picker" role="group" aria-label="<?php esc_attr_e( 'Choose an icon', 'wc-generic-product-designer' ); ?>"></div>
 									</div>
 								</div>
 							</div>

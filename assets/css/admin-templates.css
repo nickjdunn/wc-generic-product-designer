@@ -27,6 +27,12 @@
 	color: #b32d2e;
 }
 
+.wc-gpd-settings-check-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+	gap: 0.35rem 1rem;
+}
+
 .wc-gpd-template-edit-wrap {
 	max-width: none;
 }

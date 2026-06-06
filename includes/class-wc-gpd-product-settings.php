@@ -30,6 +30,11 @@ class WC_GPD_Product_Settings {
 		'allow_font_size'         => true,
 		'allow_text_align'        => true,
 		'allow_free_text'         => true,
+		'allow_add_text'          => true,
+		'allow_add_shape'         => false,
+		'allow_add_graphic'       => false,
+		'allow_add_image'         => false,
+		'allow_add_icon'          => false,
 		'allow_layers_panel'      => true,
 		'allow_details_panel'     => true,
 		'allow_customer_graphics' => true,
@@ -65,6 +70,11 @@ class WC_GPD_Product_Settings {
 		$merged['export_outline_width'] = max( 0.1, min( 20, (float) $merged['export_outline_width'] ) );
 		$merged['customer_panel_position'] = self::sanitize_panel_position( $merged['customer_panel_position'] ?? 'auto' );
 
+		if ( ! array_key_exists( 'allow_add_text', $stored ) ) {
+			$merged['allow_add_text'] = ! empty( $merged['allow_free_text'] );
+		}
+		$merged['allow_free_text'] = ! empty( $merged['allow_add_text'] );
+
 		return $merged;
 	}
 
@@ -93,7 +103,12 @@ class WC_GPD_Product_Settings {
 			'allow_font_family'       => ! empty( $settings['allow_font_family'] ),
 			'allow_font_size'         => ! empty( $settings['allow_font_size'] ),
 			'allow_text_align'        => ! empty( $settings['allow_text_align'] ),
-			'allow_free_text'         => ! empty( $settings['allow_free_text'] ),
+			'allow_free_text'         => ! empty( $settings['allow_add_text'] ) || ! empty( $settings['allow_free_text'] ),
+			'allow_add_text'          => ! empty( $settings['allow_add_text'] ) || ! empty( $settings['allow_free_text'] ),
+			'allow_add_shape'         => ! empty( $settings['allow_add_shape'] ),
+			'allow_add_graphic'       => ! empty( $settings['allow_add_graphic'] ),
+			'allow_add_image'         => ! empty( $settings['allow_add_image'] ),
+			'allow_add_icon'          => ! empty( $settings['allow_add_icon'] ),
 			'allow_layers_panel'      => ! empty( $settings['allow_layers_panel'] ),
 			'allow_details_panel'     => ! empty( $settings['allow_details_panel'] ),
 			'allow_customer_graphics' => ! empty( $settings['allow_customer_graphics'] ),
@@ -133,7 +148,12 @@ class WC_GPD_Product_Settings {
 			'allow_font_family'       => ! empty( $post['wc_gpd_ps_allow_font_family'] ),
 			'allow_font_size'         => ! empty( $post['wc_gpd_ps_allow_font_size'] ),
 			'allow_text_align'        => ! empty( $post['wc_gpd_ps_allow_text_align'] ),
-			'allow_free_text'         => ! empty( $post['wc_gpd_ps_allow_free_text'] ),
+			'allow_add_text'          => ! empty( $post['wc_gpd_ps_allow_add_text'] ) || ! empty( $post['wc_gpd_ps_allow_free_text'] ),
+			'allow_free_text'         => ! empty( $post['wc_gpd_ps_allow_add_text'] ) || ! empty( $post['wc_gpd_ps_allow_free_text'] ),
+			'allow_add_shape'         => ! empty( $post['wc_gpd_ps_allow_add_shape'] ),
+			'allow_add_graphic'       => ! empty( $post['wc_gpd_ps_allow_add_graphic'] ),
+			'allow_add_image'         => ! empty( $post['wc_gpd_ps_allow_add_image'] ),
+			'allow_add_icon'          => ! empty( $post['wc_gpd_ps_allow_add_icon'] ),
 			'allow_layers_panel'      => ! empty( $post['wc_gpd_ps_allow_layers_panel'] ),
 			'allow_details_panel'     => ! empty( $post['wc_gpd_ps_allow_details_panel'] ),
 			'allow_customer_graphics' => ! empty( $post['wc_gpd_ps_allow_customer_graphics'] ),

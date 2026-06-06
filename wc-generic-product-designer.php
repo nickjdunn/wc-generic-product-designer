@@ -21,7 +21,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WC_GPD_VERSION', '1.35.1' );
+define( 'WC_GPD_VERSION', '1.36.0' );
 define( 'WC_GPD_PLUGIN_FILE', __FILE__ );
 define( 'WC_GPD_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WC_GPD_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
