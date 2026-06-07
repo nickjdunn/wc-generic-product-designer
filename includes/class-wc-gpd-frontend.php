@@ -372,6 +372,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'layerGraphic'  => __( 'Graphic', 'wc-generic-product-designer' ),
 					'layerImage'    => __( 'Uploaded image', 'wc-generic-product-designer' ),
 					'fillColor'     => __( 'Fill', 'wc-generic-product-designer' ),
+					'iconColor'     => __( 'Icon color', 'wc-generic-product-designer' ),
 					'outlineColor'  => __( 'Outline', 'wc-generic-product-designer' ),
 					'noColor'       => __( 'No color', 'wc-generic-product-designer' ),
 					'customColor'   => __( 'Custom color', 'wc-generic-product-designer' ),

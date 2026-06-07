@@ -3522,6 +3522,22 @@
 			syncColorsPanel( canvas.getActiveObject() );
 		} );
 	}
+	function syncAddTypeOptionsVisibility() {
+		document.querySelectorAll( '[data-wc-gpd-toggle-add-options]' ).forEach( ( input ) => {
+			const key = input.getAttribute( 'data-wc-gpd-toggle-add-options' );
+			const panel = document.querySelector( `[data-add-options="${ key }"]` );
+			if ( panel ) {
+				panel.hidden = ! input.checked;
+			}
+		} );
+	}
+	document.querySelectorAll( '[data-wc-gpd-toggle-add-options]' ).forEach( ( input ) => {
+		input.addEventListener( 'change', () => {
+			syncAddTypeOptionsVisibility();
+			syncCustomerMockup();
+		} );
+	} );
+	syncAddTypeOptionsVisibility();
 	[
 		'wc_gpd_ps_allow_add_text',
 		'wc_gpd_ps_allow_add_shape',

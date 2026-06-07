@@ -507,10 +507,34 @@
 		if ( isCustomerEditableTemplateShape( obj ) ) {
 			return !! obj && ! obj.wcGpdLockColor;
 		}
-		if ( isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
-			return productSettingsAllow( 'allow_text_color' );
+		if ( isCustomerAddedShape( obj ) ) {
+			return productSettingsAllow( 'allow_shape_color' );
+		}
+		if ( isCustomerAddedIcon( obj ) ) {
+			return productSettingsAllow( 'allow_icon_color' );
 		}
 		return layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
+	}
+
+	function shapeColorAllowed( obj ) {
+		if ( isCustomerEditableTemplateShape( obj ) ) {
+			return !! obj && ! obj.wcGpdLockColor;
+		}
+		if ( isCustomerAddedShape( obj ) ) {
+			return productSettingsAllow( 'allow_shape_color' );
+		}
+		return false;
+	}
+
+	function iconColorAllowed( obj ) {
+		if ( isCustomerAddedIcon( obj ) ) {
+			return productSettingsAllow( 'allow_icon_color' );
+		}
+		return false;
+	}
+
+	function customerAddedColorAllowed( obj ) {
+		return shapeColorAllowed( obj ) || iconColorAllowed( obj ) || ( textColorAllowed( obj ) && ! isCustomerAddedShape( obj ) && ! isCustomerAddedIcon( obj ) );
 	}
 
 	function textColorUsesPalette( obj ) {
@@ -1081,11 +1105,15 @@
 
 	function applyLayerToolSettings( obj ) {
 		const isShapeLayer = isCustomerEditableShape( obj );
+		const isAddedShape = isCustomerAddedShape( obj );
+		const isAddedIcon = isCustomerAddedIcon( obj );
 		const isGraphicLayer = isCustomerGraphic( obj );
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
-		const colorAllowed = textColorAllowed( obj );
-		const paletteOnly = colorAllowed && textColorUsesPalette( obj );
-		const pickerAllowed = colorAllowed && ! paletteOnly;
+		const textColorOk = isText && layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
+		const shapeColorOk = shapeColorAllowed( obj );
+		const iconColorOk = iconColorAllowed( obj );
+		const paletteOnly = textColorOk && textColorUsesPalette( obj );
+		const pickerAllowed = textColorOk && ! paletteOnly;
 		const colorRow = designerRoot.querySelector( '.wc-gpd-control-text-color' );
 
 		const fontAllowed = isText && layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' );
@@ -1110,15 +1138,28 @@
 		setPropRowVisible( ui.boldBtn, styleAllowed );
 
 		if ( colorRow ) {
-			const showColor = colorAllowed && ( isShapeLayer || isText ) && ! isGraphicLayer;
+			const showColor = textColorOk || shapeColorOk || iconColorOk;
 			colorRow.hidden = ! showColor;
 			colorRow.classList.remove( 'is-disabled' );
+			const label = colorRow.querySelector( '.wc-gpd-prop-label' );
+			if ( label ) {
+				if ( isAddedIcon || ( isShapeLayer && ! isAddedShape && ! isText ) ) {
+					label.textContent = isAddedIcon
+						? ( config.i18n.iconColor || 'Icon color' )
+						: ( config.i18n.fillColor || 'Color' );
+				} else if ( isAddedShape || ( isShapeLayer && ! isText ) ) {
+					label.textContent = config.i18n.fillColor || 'Color';
+				} else {
+					label.textContent = config.i18n.textColor || 'Text color';
+				}
+			}
 		}
 		if ( ui.colorSwatches ) {
-			ui.colorSwatches.hidden = ! colorAllowed || isGraphicLayer || ( ! paletteOnly && ! isShapeLayer );
+			const showSwatches = shapeColorOk || iconColorOk || ( textColorOk && paletteOnly );
+			ui.colorSwatches.hidden = ! showSwatches;
 		}
 		if ( ui.textColor ) {
-			ui.textColor.hidden = ! pickerAllowed || ! isText;
+			ui.textColor.hidden = ! pickerAllowed;
 			ui.textColor.disabled = false;
 		}
 		if ( ui.textColor && obj && isText ) {
@@ -1180,6 +1221,27 @@
 		return obj.fill || 'transparent';
 	}
 
+	function iconRoleColor( obj ) {
+		if ( ! obj ) {
+			return 'transparent';
+		}
+		let color = 'transparent';
+		function walk( target ) {
+			if ( ! target ) {
+				return;
+			}
+			if ( target.type === 'group' && target.getObjects ) {
+				target.getObjects().forEach( walk );
+				return;
+			}
+			if ( target.fill && ! isNoColor( target.fill ) ) {
+				color = target.fill;
+			}
+		}
+		walk( obj );
+		return color;
+	}
+
 	function isNoColor( color ) {
 		const value = String( color || '' ).toLowerCase();
 		return ! value || value === 'transparent' || value === 'none';
@@ -1193,6 +1255,28 @@
 			return color;
 		}
 		return '#000000';
+	}
+
+	function applyCustomerIconColor( obj, color ) {
+		if ( ! obj ) {
+			return;
+		}
+		const value = isNoColor( color ) ? 'transparent' : color;
+		styleCustomerIconPaths( obj, value );
+	}
+
+	function applyLayerColor( obj, role, color ) {
+		if ( isCustomerAddedIcon( obj ) ) {
+			applyCustomerIconColor( obj, color );
+			return;
+		}
+		if ( isCustomerEditableShape( obj ) ) {
+			applyShapeRoleColor( obj, role, color );
+			return;
+		}
+		if ( obj ) {
+			obj.set( 'fill', color );
+		}
 	}
 
 	function applyShapeRoleColor( obj, role, color ) {
@@ -1218,19 +1302,22 @@
 		}
 		ui.colorSwatches.innerHTML = '';
 		closeColorMenus();
-		if ( ! textColorAllowed( obj ) ) {
+		if ( ! customerAddedColorAllowed( obj ) && ! ( textColorAllowed( obj ) && isTextLayer( obj ) ) ) {
 			return;
 		}
 
-		const paletteOnly = textColorUsesPalette( obj );
+		const paletteOnly = textColorUsesPalette( obj ) && ! isCustomerAddedShape( obj ) && ! isCustomerAddedIcon( obj );
 		const isShapeLayer = isCustomerEditableShape( obj );
-		if ( ! paletteOnly && ! isShapeLayer ) {
+		const isIconLayer = isCustomerAddedIcon( obj );
+		if ( ! paletteOnly && ! isShapeLayer && ! isIconLayer ) {
 			return;
 		}
 
-		const roles = isShapeLayer
-			? [ shapeUsesFill( obj ) ? 'fill' : null, shapeUsesStroke( obj ) ? 'stroke' : null ].filter( Boolean )
-			: [ 'fill' ];
+		const roles = isIconLayer
+			? [ 'fill' ]
+			: isShapeLayer
+				? [ shapeUsesFill( obj ) ? 'fill' : null, shapeUsesStroke( obj ) ? 'stroke' : null ].filter( Boolean )
+				: [ 'fill' ];
 		const extras = allTemplatePaletteColors();
 
 		roles.forEach( ( role ) => {
@@ -1239,17 +1326,19 @@
 
 			const roleLabel = document.createElement( 'span' );
 			roleLabel.className = 'wc-gpd-color-role-label';
-			roleLabel.textContent = isShapeLayer
-				? ( role === 'stroke'
-					? ( config.i18n.outlineColor || 'Outline' )
-					: ( config.i18n.fillColor || 'Fill' ) )
-				: ( config.i18n.textColor || 'Color' );
+			roleLabel.textContent = isIconLayer
+				? ( config.i18n.iconColor || 'Icon color' )
+				: isShapeLayer
+					? ( role === 'stroke'
+						? ( config.i18n.outlineColor || 'Outline' )
+						: ( config.i18n.fillColor || 'Fill' ) )
+					: ( config.i18n.textColor || 'Color' );
 			group.appendChild( roleLabel );
 
 			const pickerRow = document.createElement( 'div' );
 			pickerRow.className = 'wc-gpd-color-picker-row';
 
-			const currentColor = shapeRoleColor( obj, role );
+			const currentColor = isIconLayer ? iconRoleColor( obj ) : shapeRoleColor( obj, role );
 			const paletteColors = uniqueColors( paletteColorsForObject( obj, role ) );
 			const menuColors = uniqueColors( paletteColors.concat( extras ) );
 
@@ -1291,7 +1380,7 @@
 						return;
 					}
 					if ( isShapeLayer ) {
-						applyShapeRoleColor( activeText, role, color );
+						applyLayerColor( activeText, role, color );
 					} else {
 						activeText.set( 'fill', color );
 						if ( ui.textColor ) {
@@ -1323,7 +1412,7 @@
 					return;
 				}
 				if ( isShapeLayer ) {
-					applyShapeRoleColor( activeText, role, 'transparent' );
+					applyLayerColor( activeText, role, 'transparent' );
 				} else {
 					activeText.set( 'fill', 'transparent' );
 				}
@@ -1347,7 +1436,7 @@
 				}
 				const color = customInput.value;
 				if ( isShapeLayer ) {
-					applyShapeRoleColor( activeText, role, color );
+					applyLayerColor( activeText, role, color );
 				} else {
 					activeText.set( 'fill', color );
 					if ( ui.textColor ) {
@@ -1877,15 +1966,18 @@
 		if ( ! obj ) {
 			return;
 		}
+		const isIcon = isCustomerAddedIcon( obj );
+		const moveAllowed = productSettingsAllow( isIcon ? 'allow_icon_move' : 'allow_shape_move' );
+		const resizeAllowed = productSettingsAllow( isIcon ? 'allow_icon_resize' : 'allow_shape_resize' );
 		obj.set( {
 			selectable: true,
 			evented: true,
-			hasControls: true,
-			hasBorders: true,
-			lockMovementX: false,
-			lockMovementY: false,
-			lockScalingX: false,
-			lockScalingY: false,
+			hasControls: resizeAllowed,
+			hasBorders: resizeAllowed,
+			lockMovementX: ! moveAllowed,
+			lockMovementY: ! moveAllowed,
+			lockScalingX: ! resizeAllowed,
+			lockScalingY: ! resizeAllowed,
 		} );
 	}
 
@@ -2338,15 +2430,17 @@
 
 	function applyGraphicInteractivity( obj ) {
 		if ( isCustomerGraphic( obj ) && ! obj.wcGpdGraphicSlotUid ) {
+			const moveAllowed = productSettingsAllow( 'allow_graphic_move' );
+			const resizeAllowed = productSettingsAllow( 'allow_graphic_resize' );
 			obj.set( {
 				selectable: true,
 				evented: true,
-				hasControls: true,
-				hasBorders: true,
-				lockMovementX: false,
-				lockMovementY: false,
-				lockScalingX: false,
-				lockScalingY: false,
+				hasControls: resizeAllowed,
+				hasBorders: resizeAllowed,
+				lockMovementX: ! moveAllowed,
+				lockMovementY: ! moveAllowed,
+				lockScalingX: ! resizeAllowed,
+				lockScalingY: ! resizeAllowed,
 				lockUniScaling: false,
 			} );
 			return;
@@ -2641,6 +2735,7 @@
 		activeText = obj;
 		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const isShapeLayer = !! obj && isCustomerEditableShape( obj );
+		const isAddedShape = isCustomerAddedShape( obj );
 		const isGraphicLayer = !! obj && isCustomerGraphic( obj );
 		const enabled = isText || isShapeLayer || isGraphicLayer;
 
@@ -2655,6 +2750,12 @@
 		}
 		setTextContextVisible( isText );
 		setGraphicContextVisible( isGraphicLayer );
+
+		if ( isAddedShape || isCustomerAddedIcon( obj ) ) {
+			applyCustomerAddedShapeInteractivity( obj );
+		} else if ( isGraphicLayer ) {
+			applyGraphicInteractivity( obj );
+		}
 
 		if ( ! enabled ) {
 			renderColorSwatches( null );

@@ -815,11 +815,52 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
 				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
 				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_shape" value="1" <?php checked( ! empty( $ps['allow_add_shape'] ) ); ?> /> <?php esc_html_e( 'Shapes (rectangle, circle, polygon, heart)', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_graphic" value="1" <?php checked( ! empty( $ps['allow_add_graphic'] ) ); ?> /> <?php esc_html_e( 'Graphics from assigned libraries', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_image" value="1" <?php checked( ! empty( $ps['allow_add_image'] ) ); ?> /> <?php esc_html_e( 'Photos from libraries and/or upload their own image', 'wc-generic-product-designer' ); ?></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_icon" value="1" <?php checked( ! empty( $ps['allow_add_icon'] ) ); ?> /> <?php esc_html_e( 'Icons (Bootstrap Icons)', 'wc-generic-product-designer' ); ?></label></p>
+
+				<div class="wc-gpd-add-type-block">
+					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
+				</div>
+
+				<div class="wc-gpd-add-type-block">
+					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_shape" value="1" data-wc-gpd-toggle-add-options="shape" <?php checked( ! empty( $ps['allow_add_shape'] ) ); ?> /> <?php esc_html_e( 'Shapes (rectangle, circle, polygon, heart)', 'wc-generic-product-designer' ); ?></label></p>
+					<div class="wc-gpd-add-type-options" data-add-options="shape" <?php echo empty( $ps['allow_add_shape'] ) ? 'hidden' : ''; ?>>
+						<p class="description"><?php esc_html_e( 'When a customer selects a shape they added:', 'wc-generic-product-designer' ); ?></p>
+						<div class="wc-gpd-settings-check-grid">
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_shape_color" value="1" <?php checked( ! empty( $ps['allow_shape_color'] ) ); ?> /> <?php esc_html_e( 'Fill & outline color', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_shape_move" value="1" <?php checked( ! empty( $ps['allow_shape_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_shape_resize" value="1" <?php checked( ! empty( $ps['allow_shape_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
+						</div>
+					</div>
+				</div>
+
+				<div class="wc-gpd-add-type-block">
+					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_graphic" value="1" data-wc-gpd-toggle-add-options="graphic" <?php checked( ! empty( $ps['allow_add_graphic'] ) ); ?> /> <?php esc_html_e( 'Graphics from assigned libraries', 'wc-generic-product-designer' ); ?></label></p>
+					<div class="wc-gpd-add-type-options" data-add-options="graphic" <?php echo empty( $ps['allow_add_graphic'] ) ? 'hidden' : ''; ?>>
+						<p class="description"><?php esc_html_e( 'When a customer selects a graphic they added:', 'wc-generic-product-designer' ); ?></p>
+						<div class="wc-gpd-settings-check-grid">
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_move" value="1" <?php checked( ! empty( $ps['allow_graphic_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_resize" value="1" <?php checked( ! empty( $ps['allow_graphic_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
+						</div>
+					</div>
+				</div>
+
+				<div class="wc-gpd-add-type-block">
+					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_image" value="1" data-wc-gpd-toggle-add-options="image" <?php checked( ! empty( $ps['allow_add_image'] ) ); ?> /> <?php esc_html_e( 'Photos from libraries and/or upload their own image', 'wc-generic-product-designer' ); ?></label></p>
+					<div class="wc-gpd-add-type-options" data-add-options="image" <?php echo empty( $ps['allow_add_image'] ) ? 'hidden' : ''; ?>>
+						<p class="description"><?php esc_html_e( 'Uploaded photos use the same move and resize options as graphics (above).', 'wc-generic-product-designer' ); ?></p>
+					</div>
+				</div>
+
+				<div class="wc-gpd-add-type-block">
+					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_icon" value="1" data-wc-gpd-toggle-add-options="icon" <?php checked( ! empty( $ps['allow_add_icon'] ) ); ?> /> <?php esc_html_e( 'Icons (Bootstrap Icons)', 'wc-generic-product-designer' ); ?></label></p>
+					<div class="wc-gpd-add-type-options" data-add-options="icon" <?php echo empty( $ps['allow_add_icon'] ) ? 'hidden' : ''; ?>>
+						<p class="description"><?php esc_html_e( 'When a customer selects an icon they added:', 'wc-generic-product-designer' ); ?></p>
+						<div class="wc-gpd-settings-check-grid">
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_color" value="1" <?php checked( ! empty( $ps['allow_icon_color'] ) ); ?> /> <?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_move" value="1" <?php checked( ! empty( $ps['allow_icon_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_resize" value="1" <?php checked( ! empty( $ps['allow_icon_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
+						</div>
+					</div>
+				</div>
 			</div>
 			<div class="wc-gpd-settings-card">
 				<h4><?php esc_html_e( 'Panels', 'wc-generic-product-designer' ); ?></h4>
