@@ -16,7 +16,7 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '8';
+	const SAMPLE_VERSION     = '9';
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
@@ -561,7 +561,7 @@ class WC_GPD_Sample_Content {
 					'wcGpdLockMove'            => true,
 					'wcGpdLockScale'           => true,
 					'wcGpdLockColor'           => false,
-					'wcGpdCustomerPaletteOnly' => false,
+					'wcGpdCustomerPaletteOnly' => true,
 					'wcGpdPaletteId'           => 'pal_demo',
 				)
 			),

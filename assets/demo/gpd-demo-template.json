@@ -79,7 +79,7 @@
           "wcGpdLayerLabel": "Demo: color only",
           "wcGpdCustomerEditable": true,
           "wcGpdPaletteId": "pal_demo",
-          "wcGpdCustomerPaletteOnly": false,
+          "wcGpdCustomerPaletteOnly": true,
           "wcGpdLockFont": true,
           "wcGpdLockSize": true,
           "wcGpdLockColor": false,

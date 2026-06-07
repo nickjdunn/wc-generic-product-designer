@@ -541,6 +541,49 @@
 		return !! obj && !! obj.wcGpdCustomerPaletteOnly;
 	}
 
+	function layerColorPaletteRestricted( obj ) {
+		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return false;
+		}
+		return !! obj.wcGpdCustomerPaletteOnly;
+	}
+
+	function templateLayerHasPalette( obj ) {
+		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return false;
+		}
+		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
+			return true;
+		}
+		return !!( obj.wcGpdPaletteId || obj.wcGpdStrokePaletteId );
+	}
+
+	function shouldShowInlinePaletteSwatches( obj ) {
+		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+			return false;
+		}
+		if ( layerColorPaletteRestricted( obj ) ) {
+			return textColorAllowed( obj ) || shapeColorAllowed( obj );
+		}
+		return isTextLayer( obj ) && textColorAllowed( obj ) && templateLayerHasPalette( obj );
+	}
+
+	function shouldShowDropdownColorPicker( obj ) {
+		if ( ! obj ) {
+			return false;
+		}
+		if ( isCustomerAddedShape( obj ) ) {
+			return shapeColorAllowed( obj );
+		}
+		if ( isCustomerAddedIcon( obj ) ) {
+			return iconColorAllowed( obj );
+		}
+		if ( isCustomerEditableTemplateShape( obj ) && shapeColorAllowed( obj ) ) {
+			return ! layerColorPaletteRestricted( obj );
+		}
+		return false;
+	}
+
 	/**
 	 * Show/hide customer tools based on per-product settings.
 	 */
@@ -1112,8 +1155,10 @@
 		const textColorOk = isText && layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 		const shapeColorOk = shapeColorAllowed( obj );
 		const iconColorOk = iconColorAllowed( obj );
-		const paletteOnly = textColorOk && textColorUsesPalette( obj );
-		const pickerAllowed = textColorOk && ! paletteOnly;
+		const paletteRestricted = layerColorPaletteRestricted( obj );
+		const showInlineSwatches = shouldShowInlinePaletteSwatches( obj );
+		const showDropdownSwatches = shouldShowDropdownColorPicker( obj );
+		const pickerAllowed = textColorOk && ! paletteRestricted;
 		const colorRow = designerRoot.querySelector( '.wc-gpd-control-text-color' );
 
 		const fontAllowed = isText && layerAllowsTool( obj, 'wcGpdLockFont', 'allow_font_family' );
@@ -1155,8 +1200,7 @@
 			}
 		}
 		if ( ui.colorSwatches ) {
-			const showSwatches = shapeColorOk || iconColorOk || ( textColorOk && paletteOnly );
-			ui.colorSwatches.hidden = ! showSwatches;
+			ui.colorSwatches.hidden = ! ( showInlineSwatches || showDropdownSwatches );
 		}
 		if ( ui.textColor ) {
 			ui.textColor.hidden = ! pickerAllowed;
@@ -1276,6 +1320,9 @@
 		}
 		if ( obj ) {
 			obj.set( 'fill', color );
+			if ( ui.textColor && isTextLayer( obj ) ) {
+				ui.textColor.value = isNoColor( color ) ? normalizePickerColor( color ) : color;
+			}
 		}
 	}
 
@@ -1296,29 +1343,36 @@
 		}
 	}
 
+	function roleColorForObject( obj, role ) {
+		if ( isCustomerAddedIcon( obj ) ) {
+			return iconRoleColor( obj );
+		}
+		if ( isCustomerEditableShape( obj ) ) {
+			return shapeRoleColor( obj, role );
+		}
+		return ( obj && obj.fill ) || 'transparent';
+	}
+
 	function renderColorSwatches( obj ) {
 		if ( ! ui.colorSwatches ) {
 			return;
 		}
 		ui.colorSwatches.innerHTML = '';
 		closeColorMenus();
-		if ( ! customerAddedColorAllowed( obj ) && ! ( textColorAllowed( obj ) && isTextLayer( obj ) ) ) {
+
+		const showInline = shouldShowInlinePaletteSwatches( obj );
+		const showDropdown = shouldShowDropdownColorPicker( obj );
+		if ( ! showInline && ! showDropdown ) {
 			return;
 		}
 
-		const paletteOnly = textColorUsesPalette( obj ) && ! isCustomerAddedShape( obj ) && ! isCustomerAddedIcon( obj );
 		const isShapeLayer = isCustomerEditableShape( obj );
 		const isIconLayer = isCustomerAddedIcon( obj );
-		if ( ! paletteOnly && ! isShapeLayer && ! isIconLayer ) {
-			return;
-		}
-
 		const roles = isIconLayer
 			? [ 'fill' ]
 			: isShapeLayer
 				? [ shapeUsesFill( obj ) ? 'fill' : null, shapeUsesStroke( obj ) ? 'stroke' : null ].filter( Boolean )
 				: [ 'fill' ];
-		const extras = allTemplatePaletteColors();
 
 		roles.forEach( ( role ) => {
 			const group = document.createElement( 'div' );
@@ -1335,12 +1389,39 @@
 					: ( config.i18n.textColor || 'Color' );
 			group.appendChild( roleLabel );
 
+			const currentColor = roleColorForObject( obj, role );
+			const paletteColors = uniqueColors( paletteColorsForObject( obj, role ) );
+
+			if ( showInline ) {
+				const swatchRow = document.createElement( 'div' );
+				swatchRow.className = 'wc-gpd-color-role-swatches';
+				paletteColors.forEach( ( color ) => {
+					const btn = document.createElement( 'button' );
+					btn.type = 'button';
+					btn.className = 'wc-gpd-color-swatch';
+					btn.style.backgroundColor = color;
+					btn.title = color;
+					btn.setAttribute( 'aria-label', color );
+					const activeColor = String( currentColor || '' ).toLowerCase();
+					btn.classList.toggle( 'is-active', ! isNoColor( activeColor ) && color.toLowerCase() === activeColor );
+					btn.addEventListener( 'click', () => {
+						if ( ! activeText ) {
+							return;
+						}
+						applyLayerColor( activeText, role, color );
+						canvas.requestRenderAll();
+						renderColorSwatches( activeText );
+					} );
+					swatchRow.appendChild( btn );
+				} );
+				group.appendChild( swatchRow );
+				ui.colorSwatches.appendChild( group );
+				return;
+			}
+
 			const pickerRow = document.createElement( 'div' );
 			pickerRow.className = 'wc-gpd-color-picker-row';
-
-			const currentColor = isIconLayer ? iconRoleColor( obj ) : shapeRoleColor( obj, role );
-			const paletteColors = uniqueColors( paletteColorsForObject( obj, role ) );
-			const menuColors = uniqueColors( paletteColors.concat( extras ) );
+			const menuColors = uniqueColors( paletteColors.concat( allTemplatePaletteColors() ) );
 
 			const trigger = document.createElement( 'button' );
 			trigger.type = 'button';
@@ -1379,14 +1460,7 @@
 					if ( ! activeText ) {
 						return;
 					}
-					if ( isShapeLayer ) {
-						applyLayerColor( activeText, role, color );
-					} else {
-						activeText.set( 'fill', color );
-						if ( ui.textColor ) {
-							ui.textColor.value = color;
-						}
-					}
+					applyLayerColor( activeText, role, color );
 					if ( isNoColor( color ) ) {
 						triggerSwatch.classList.add( 'is-none' );
 						triggerSwatch.style.backgroundColor = '';
@@ -1411,11 +1485,7 @@
 				if ( ! activeText ) {
 					return;
 				}
-				if ( isShapeLayer ) {
-					applyLayerColor( activeText, role, 'transparent' );
-				} else {
-					activeText.set( 'fill', 'transparent' );
-				}
+				applyLayerColor( activeText, role, 'transparent' );
 				triggerSwatch.classList.add( 'is-none' );
 				triggerSwatch.style.backgroundColor = '';
 				closeColorMenus();
@@ -1435,14 +1505,7 @@
 					return;
 				}
 				const color = customInput.value;
-				if ( isShapeLayer ) {
-					applyLayerColor( activeText, role, color );
-				} else {
-					activeText.set( 'fill', color );
-					if ( ui.textColor ) {
-						ui.textColor.value = color;
-					}
-				}
+				applyLayerColor( activeText, role, color );
 				triggerSwatch.classList.remove( 'is-none' );
 				triggerSwatch.style.backgroundColor = color;
 				canvas.requestRenderAll();
