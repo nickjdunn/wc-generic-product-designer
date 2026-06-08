@@ -30,6 +30,7 @@ class WC_GPD_Settings {
 		'batch_bed_unit'                => 'in',
 		'batch_export_dpi'              => 96,
 		'proof_header_template'         => '',
+		'proof_header_design'           => '',
 		'proof_header_logo_id'          => 0,
 		'etsy_api_key'                  => '',
 		'etsy_shared_secret'            => '',

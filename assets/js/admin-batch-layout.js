@@ -26,7 +26,7 @@
 		selection: true,
 		preserveObjectStacking: true,
 	} );
-	canvas.setWidth( Math.min( bedW, window.innerWidth - 80 ) );
+	canvas.setWidth( Math.min( bedW, window.innerWidth - 320 ) );
 	canvas.setHeight( Math.min( bedH, 700 ) );
 
 	const scale = Math.min( canvas.getWidth() / bedW, canvas.getHeight() / bedH );
@@ -122,6 +122,16 @@
 		return rows;
 	}
 
+	function removeJobFromCanvas( orderId, itemId ) {
+		const key = orderId + '-' + itemId;
+		const group = jobGroups[ key ];
+		if ( group ) {
+			canvas.remove( group );
+			delete jobGroups[ key ];
+			canvas.requestRenderAll();
+		}
+	}
+
 	document.getElementById( 'wc-gpd-batch-save' )?.addEventListener( 'click', function () {
 		$.post( config.ajaxUrl, {
 			action: 'wc_gpd_batch_save_layout',
@@ -133,6 +143,55 @@
 				window.alert( config.i18n?.saved || 'Saved' );
 			} else {
 				window.alert( config.i18n?.error || 'Error' );
+			}
+		} );
+	} );
+
+	function submitAdminPost( fields ) {
+		const form = $( '<form>', { method: 'post', action: config.adminPostUrl || '/wp-admin/admin-post.php' } );
+		Object.keys( fields ).forEach( function ( key ) {
+			form.append( $( '<input>', { type: 'hidden', name: key, value: fields[ key ] } ) );
+		} );
+		$( 'body' ).append( form );
+		form.trigger( 'submit' );
+	}
+
+	$( '.wc-gpd-download-batch' ).on( 'click', function () {
+		const btn = $( this );
+		submitAdminPost( {
+			action: config.downloadBatch,
+			batch_id: btn.data( 'batchId' ),
+			_wpnonce: btn.data( 'nonce' ),
+		} );
+	} );
+
+	$( '#wc-gpd-batch-job-list' ).on( 'click', '.wc-gpd-batch-remove-job', function () {
+		const li = $( this ).closest( 'li' );
+		const orderId = parseInt( li.data( 'order' ), 10 );
+		const itemId = parseInt( li.data( 'item' ), 10 );
+		if ( ! orderId || ! itemId ) {
+			return;
+		}
+		if ( ! window.confirm( config.i18n?.confirmRemove || 'Remove this job?' ) ) {
+			return;
+		}
+		$.post( config.ajaxUrl, {
+			action: 'wc_gpd_batch_remove_item',
+			nonce: config.nonce,
+			batch_id: batchId,
+			order_id: orderId,
+			item_id: itemId,
+		} ).done( function ( resp ) {
+			if ( resp && resp.success ) {
+				removeJobFromCanvas( orderId, itemId );
+				li.remove();
+				if ( ! $( '#wc-gpd-batch-job-list li' ).length ) {
+					window.location.href = config.batchEditorUrl
+						? config.batchEditorUrl.replace( 'tab=batch', 'tab=batches' )
+						: window.location.href.replace( 'tab=batch', 'tab=batches' );
+				}
+			} else {
+				window.alert( ( resp && resp.data && resp.data.message ) || config.i18n?.error || 'Error' );
 			}
 		} );
 	} );

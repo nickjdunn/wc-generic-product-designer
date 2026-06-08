@@ -350,4 +350,30 @@ class WC_GPD_Production_Jobs {
 		}
 		return $count;
 	}
+
+	/**
+	 * Get all ready job refs for batch generation.
+	 *
+	 * @return array<int,array{order_id:int,item_id:int,label:string}>
+	 */
+	public static function get_ready_jobs() {
+		$result = self::query(
+			array(
+				'status'   => self::STATUS_READY,
+				'per_page' => 500,
+				'page'     => 1,
+			)
+		);
+
+		$refs = array();
+		foreach ( $result['items'] as $job ) {
+			$refs[] = array(
+				'order_id' => absint( $job['order_id'] ),
+				'item_id'  => absint( $job['item_id'] ),
+				'label'    => sprintf( '#%s — %s', $job['order_number'], $job['product_name'] ),
+				'preview'  => $job['preview_url'] ?? '',
+			);
+		}
+		return $refs;
+	}
 }

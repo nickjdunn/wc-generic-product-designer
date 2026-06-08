@@ -252,4 +252,53 @@ class WC_GPD_Batch_Layout {
 		}
 		return $list;
 	}
+
+	/**
+	 * Remove a job from a batch and mark it ready again.
+	 *
+	 * @param int $batch_id  Batch ID.
+	 * @param int $order_id  Order ID.
+	 * @param int $item_id   Item ID.
+	 * @return bool|WP_Error
+	 */
+	public static function remove_item( $batch_id, $order_id, $item_id ) {
+		$batch = self::get( $batch_id );
+		if ( ! $batch ) {
+			return new WP_Error( 'wc_gpd_batch_missing', __( 'Batch not found.', 'wc-generic-product-designer' ) );
+		}
+
+		$order_id = absint( $order_id );
+		$item_id  = absint( $item_id );
+
+		$layout = array_values(
+			array_filter(
+				$batch['layout'],
+				function ( $row ) use ( $order_id, $item_id ) {
+					return absint( $row['order_id'] ?? 0 ) !== $order_id || absint( $row['item_id'] ?? 0 ) !== $item_id;
+				}
+			)
+		);
+
+		$item_refs = array_values(
+			array_filter(
+				$batch['item_refs'],
+				function ( $row ) use ( $order_id, $item_id ) {
+					return absint( $row['order_id'] ?? 0 ) !== $order_id || absint( $row['item_id'] ?? 0 ) !== $item_id;
+				}
+			)
+		);
+
+		update_post_meta( $batch_id, self::META_LAYOUT, wp_json_encode( $layout ) );
+		update_post_meta( $batch_id, self::META_ITEMS, wp_json_encode( $item_refs ) );
+
+		$item = WC_GPD_Production_Jobs::get_item( $order_id, $item_id );
+		if ( $item ) {
+			$order = wc_get_order( $order_id );
+			WC_GPD_Production_Jobs::set_status( $item, WC_GPD_Production_Jobs::STATUS_READY, $order );
+			$item->delete_meta_data( WC_GPD_Production_Jobs::META_BATCH_ID );
+			$item->save();
+		}
+
+		return true;
+	}
 }

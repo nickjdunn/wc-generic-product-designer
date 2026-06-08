@@ -42,8 +42,11 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		add_action( 'admin_post_' . self::DOWNLOAD_BATCH, array( $this, 'handle_download_batch' ) );
 		add_action( 'admin_post_' . self::DOWNLOAD_PROOF, array( $this, 'handle_download_proof' ) );
 		add_action( 'wp_ajax_wc_gpd_production_update_status', array( $this, 'ajax_update_status' ) );
+		add_action( 'wp_ajax_wc_gpd_production_create_batch', array( $this, 'ajax_create_batch' ) );
+		add_action( 'wp_ajax_wc_gpd_production_bulk_status', array( $this, 'ajax_bulk_status' ) );
 		add_action( 'wp_ajax_wc_gpd_batch_save_layout', array( $this, 'ajax_save_batch_layout' ) );
 		add_action( 'wp_ajax_wc_gpd_batch_job_svg', array( $this, 'ajax_batch_job_svg' ) );
+		add_action( 'wp_ajax_wc_gpd_batch_remove_item', array( $this, 'ajax_batch_remove_item' ) );
 		add_action( 'wp_ajax_wc_gpd_etsy_sync_now', array( $this, 'ajax_etsy_sync' ) );
 		add_filter( 'manage_edit-shop_order_columns', array( $this, 'order_columns' ) );
 		add_action( 'manage_shop_order_posts_custom_column', array( $this, 'order_column_content' ), 10, 2 );
@@ -102,6 +105,47 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				WC_GPD_VERSION,
 				true
 			);
+			wp_localize_script(
+				'wc-gpd-admin-batch-layout',
+				'wcGpdProduction',
+				$this->production_script_config()
+			);
+		} elseif ( 'proof' === $tab ) {
+			wp_enqueue_script(
+				'fabric-js',
+				'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
+				array(),
+				'5.3.1',
+				true
+			);
+			wp_enqueue_script(
+				'wc-gpd-admin-proof-header',
+				WC_GPD_PLUGIN_URL . 'assets/js/admin-proof-header-designer.js',
+				array( 'jquery', 'fabric-js' ),
+				WC_GPD_VERSION,
+				true
+			);
+			$logo_id = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+			wp_localize_script(
+				'wc-gpd-admin-proof-header',
+				'wcGpdProofHeader',
+				array(
+					'design'      => WC_GPD_Proof_Header::get_design(),
+					'tokens'      => WC_GPD_Proof_Header::token_labels(),
+					'sample'      => WC_GPD_Proof_Header::sample_tokens(),
+					'logoUrl'     => $logo_id ? wp_get_attachment_url( $logo_id ) : '',
+					'defaultText' => array(
+						'site_name'               => '{site_name}',
+						'site_url'                => '{site_url}',
+						'order_number'            => 'Order {order_number}',
+						'order_id'                => 'Order ID {order_id}',
+						'customer_name'           => '{customer_name}',
+						'order_date'              => '{order_date}',
+						'product_name'            => '{product_name}',
+						'personalization_summary' => '{personalization_summary}',
+					),
+				)
+			);
 		} else {
 			wp_enqueue_script(
 				'wc-gpd-admin-production-dashboard',
@@ -110,21 +154,12 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				WC_GPD_VERSION,
 				true
 			);
+			wp_localize_script(
+				'wc-gpd-admin-production-dashboard',
+				'wcGpdProduction',
+				$this->production_script_config( 'batches' === $tab )
+			);
 		}
-
-		wp_localize_script(
-			'batch' === $tab ? 'wc-gpd-admin-batch-layout' : 'wc-gpd-admin-production-dashboard',
-			'wcGpdProduction',
-			array(
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( self::NONCE_ACTION ),
-				'i18n'    => array(
-					'confirmBatch' => __( 'Create a batch from selected jobs?', 'wc-generic-product-designer' ),
-					'saved'        => __( 'Layout saved.', 'wc-generic-product-designer' ),
-					'error'        => __( 'Something went wrong.', 'wc-generic-product-designer' ),
-				),
-			)
-		);
 	}
 
 	/**
@@ -136,11 +171,6 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		}
 
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-		if ( isset( $_POST['wc_gpd_production_action'] ) ) {
-			check_admin_referer( self::NONCE_ACTION );
-			$this->handle_post_actions();
-		}
 
 		if ( isset( $_POST['wc_gpd_proof_header_save'] ) ) {
 			check_admin_referer( self::NONCE_ACTION );
@@ -231,9 +261,7 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			<button type="submit" class="button"><?php esc_html_e( 'Filter', 'wc-generic-product-designer' ); ?></button>
 		</form>
 
-		<form method="post" id="wc-gpd-production-jobs-form">
-			<?php wp_nonce_field( self::NONCE_ACTION ); ?>
-			<input type="hidden" name="wc_gpd_production_action" value="bulk" />
+		<form method="post" id="wc-gpd-production-jobs-form" action="#">
 			<div class="tablenav top">
 				<div class="alignleft actions bulkactions">
 					<select name="bulk_action">
@@ -288,13 +316,10 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 								<?php if ( $job['edit_url'] ) : ?>
 									<a class="button button-small" href="<?php echo esc_url( $job['edit_url'] ); ?>"><?php esc_html_e( 'Edit design', 'wc-generic-product-designer' ); ?></a>
 								<?php endif; ?>
-								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline">
-									<?php wp_nonce_field( self::DOWNLOAD_PROOF . '_' . $job['order_id'] . '_' . $job['item_id'] ); ?>
-									<input type="hidden" name="action" value="<?php echo esc_attr( self::DOWNLOAD_PROOF ); ?>" />
-									<input type="hidden" name="order_id" value="<?php echo esc_attr( (string) $job['order_id'] ); ?>" />
-									<input type="hidden" name="item_id" value="<?php echo esc_attr( (string) $job['item_id'] ); ?>" />
-									<button type="submit" class="button button-small"><?php esc_html_e( 'Proof', 'wc-generic-product-designer' ); ?></button>
-								</form>
+								<button type="button" class="button button-small wc-gpd-download-proof"
+									data-order="<?php echo esc_attr( (string) $job['order_id'] ); ?>"
+									data-item="<?php echo esc_attr( (string) $job['item_id'] ); ?>"
+									data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_PROOF . '_' . $job['order_id'] . '_' . $job['item_id'] ) ); ?>"><?php esc_html_e( 'Proof', 'wc-generic-product-designer' ); ?></button>
 								<button type="button" class="button button-small wc-gpd-mark-ready" data-order="<?php echo esc_attr( (string) $job['order_id'] ); ?>" data-item="<?php echo esc_attr( (string) $job['item_id'] ); ?>"><?php esc_html_e( 'Ready', 'wc-generic-product-designer' ); ?></button>
 							</td>
 						</tr>
@@ -310,8 +335,48 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 	 * Saved batches list.
 	 */
 	private function render_batches_list() {
-		$batches = WC_GPD_Batch_Layout::list_batches();
+		$batches    = WC_GPD_Batch_Layout::list_batches();
+		$ready_jobs = WC_GPD_Production_Jobs::get_ready_jobs();
 		?>
+		<div class="wc-gpd-batch-generate">
+			<h2><?php esc_html_e( 'Generate batch', 'wc-generic-product-designer' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'Ready jobs can be added to a new batch. Select specific jobs or generate from all ready designs.', 'wc-generic-product-designer' ); ?></p>
+			<?php if ( empty( $ready_jobs ) ) : ?>
+				<p><?php esc_html_e( 'No jobs are marked ready yet. Approve proofs on the Jobs tab first.', 'wc-generic-product-designer' ); ?></p>
+			<?php else : ?>
+				<div class="wc-gpd-batch-generate__toolbar">
+					<button type="button" class="button" id="wc-gpd-select-all-ready"><?php esc_html_e( 'Select all', 'wc-generic-product-designer' ); ?></button>
+					<button type="button" class="button button-primary" id="wc-gpd-generate-batch-all"><?php esc_html_e( 'Generate batch (all ready)', 'wc-generic-product-designer' ); ?></button>
+					<button type="button" class="button button-primary" id="wc-gpd-generate-batch-selected"><?php esc_html_e( 'Generate batch (selected)', 'wc-generic-product-designer' ); ?></button>
+				</div>
+				<table class="wp-list-table widefat fixed striped wc-gpd-ready-jobs-table">
+					<thead>
+						<tr>
+							<td class="check-column"><input type="checkbox" id="wc-gpd-select-all-ready-cb" /></td>
+							<th><?php esc_html_e( 'Preview', 'wc-generic-product-designer' ); ?></th>
+							<th><?php esc_html_e( 'Job', 'wc-generic-product-designer' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php foreach ( $ready_jobs as $job ) : ?>
+						<tr>
+							<th scope="row" class="check-column">
+								<input type="checkbox" class="wc-gpd-ready-job-cb" name="ready_job_refs[]" value="<?php echo esc_attr( $job['order_id'] . ':' . $job['item_id'] ); ?>" />
+							</th>
+							<td>
+								<?php if ( ! empty( $job['preview'] ) ) : ?>
+									<img src="<?php echo esc_url( $job['preview'] ); ?>" alt="" class="wc-gpd-production-thumb" width="64" height="48" />
+								<?php endif; ?>
+							</td>
+							<td><?php echo esc_html( $job['label'] ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+
+		<h2><?php esc_html_e( 'Saved batches', 'wc-generic-product-designer' ); ?></h2>
 		<table class="wp-list-table widefat fixed striped">
 			<thead>
 				<tr>
@@ -372,16 +437,36 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			data-layout="<?php echo esc_attr( wp_json_encode( $batch['layout'] ) ); ?>">
 			<div class="wc-gpd-batch-editor__toolbar">
 				<button type="button" class="button button-primary" id="wc-gpd-batch-save"><?php esc_html_e( 'Save layout', 'wc-generic-product-designer' ); ?></button>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline">
-					<?php wp_nonce_field( self::DOWNLOAD_BATCH . '_' . $batch_id ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( self::DOWNLOAD_BATCH ); ?>" />
-					<input type="hidden" name="batch_id" value="<?php echo esc_attr( (string) $batch_id ); ?>" />
-					<button type="submit" class="button"><?php esc_html_e( 'Download combined SVG', 'wc-generic-product-designer' ); ?></button>
-				</form>
+				<button type="button" class="button wc-gpd-download-batch"
+					data-batch-id="<?php echo esc_attr( (string) $batch_id ); ?>"
+					data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_BATCH . '_' . $batch_id ) ); ?>"><?php esc_html_e( 'Download combined SVG', 'wc-generic-product-designer' ); ?></button>
 				<span class="description"><?php echo esc_html( sprintf( __( 'Bed: %1$s × %2$s %3$s', 'wc-generic-product-designer' ), $bed['width'], $bed['height'], $bed['unit'] ) ); ?></span>
 			</div>
-			<div class="wc-gpd-batch-editor__canvas-wrap">
-				<canvas id="wc-gpd-batch-canvas"></canvas>
+			<div class="wc-gpd-batch-editor__body">
+				<aside class="wc-gpd-batch-editor__sidebar">
+					<h3><?php esc_html_e( 'Jobs in batch', 'wc-generic-product-designer' ); ?></h3>
+					<ul class="wc-gpd-batch-job-list" id="wc-gpd-batch-job-list">
+					<?php foreach ( $batch['layout'] as $row ) : ?>
+						<?php
+						$order_id = absint( $row['order_id'] ?? 0 );
+						$item_id  = absint( $row['item_id'] ?? 0 );
+						$label    = sprintf( 'Order %d / Item %d', $order_id, $item_id );
+						$order    = wc_get_order( $order_id );
+						$item     = $order ? $order->get_item( $item_id ) : null;
+						if ( $order && $item ) {
+							$label = sprintf( '#%s — %s', $order->get_order_number(), $item->get_name() );
+						}
+						?>
+						<li data-order="<?php echo esc_attr( (string) $order_id ); ?>" data-item="<?php echo esc_attr( (string) $item_id ); ?>">
+							<span><?php echo esc_html( $label ); ?></span>
+							<button type="button" class="button-link-delete wc-gpd-batch-remove-job"><?php esc_html_e( 'Remove', 'wc-generic-product-designer' ); ?></button>
+						</li>
+					<?php endforeach; ?>
+					</ul>
+				</aside>
+				<div class="wc-gpd-batch-editor__canvas-wrap">
+					<canvas id="wc-gpd-batch-canvas"></canvas>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -391,28 +476,45 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 	 * Proof header settings tab.
 	 */
 	private function render_proof_header_settings() {
-		$template = WC_GPD_Proof_Header::get_template();
-		$logo_id  = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+		$logo_id = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+		$tokens  = WC_GPD_Proof_Header::token_labels();
 		?>
-		<form method="post">
+		<form method="post" id="wc-gpd-proof-header-form">
 			<?php wp_nonce_field( self::NONCE_ACTION ); ?>
 			<input type="hidden" name="wc_gpd_proof_header_save" value="1" />
-			<p class="description"><?php esc_html_e( 'Design the proof header shown above customer designs. Use tokens: {site_name}, {site_url}, {order_number}, {customer_name}, {order_date}, {product_name}, {personalization_summary}, {logo}, {width}', 'wc-generic-product-designer' ); ?></p>
+			<input type="hidden" id="wc-gpd-proof-design-json" name="proof_header_design" value="" />
+			<p class="description"><?php esc_html_e( 'Design the branded header shown above proofs. Drag elements on the canvas and insert autofill tokens from the palette.', 'wc-generic-product-designer' ); ?></p>
 			<table class="form-table">
 				<tr>
 					<th><label for="wc_gpd_proof_logo"><?php esc_html_e( 'Logo', 'wc-generic-product-designer' ); ?></label></th>
 					<td>
 						<input type="hidden" id="wc_gpd_proof_logo_id" name="proof_header_logo_id" value="<?php echo esc_attr( (string) $logo_id ); ?>" />
 						<button type="button" class="button" id="wc-gpd-proof-logo-pick"><?php esc_html_e( 'Select logo', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button" id="wc-gpd-proof-add-logo"><?php esc_html_e( 'Add logo to header', 'wc-generic-product-designer' ); ?></button>
 						<span id="wc-gpd-proof-logo-preview"><?php echo $logo_id ? wp_get_attachment_image( $logo_id, 'thumbnail' ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
 					</td>
 				</tr>
-				<tr>
-					<th><label for="wc_gpd_proof_template"><?php esc_html_e( 'Header SVG template', 'wc-generic-product-designer' ); ?></label></th>
-					<td><textarea class="large-text code" rows="10" id="wc_gpd_proof_template" name="proof_header_template"><?php echo esc_textarea( $template ); ?></textarea></td>
-				</tr>
 			</table>
-			<p><button type="submit" class="button button-primary"><?php esc_html_e( 'Save proof header', 'wc-generic-product-designer' ); ?></button></p>
+			<div class="wc-gpd-proof-designer">
+				<aside class="wc-gpd-proof-designer__palette">
+					<h3><?php esc_html_e( 'Autofill tokens', 'wc-generic-product-designer' ); ?></h3>
+					<p class="description"><?php esc_html_e( 'Click to add a text block. Tokens are replaced with real order data on each proof.', 'wc-generic-product-designer' ); ?></p>
+					<div class="wc-gpd-proof-token-list">
+						<?php foreach ( $tokens as $key => $label ) : ?>
+							<?php if ( 'logo' === $key ) : ?>
+								<?php continue; ?>
+							<?php endif; ?>
+							<button type="button" class="button wc-gpd-proof-add-token" data-token="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></button>
+						<?php endforeach; ?>
+					</div>
+					<h3><?php esc_html_e( 'Preview data', 'wc-generic-product-designer' ); ?></h3>
+					<label><input type="checkbox" id="wc-gpd-proof-preview-sample" checked="checked" /> <?php esc_html_e( 'Show sample values', 'wc-generic-product-designer' ); ?></label>
+				</aside>
+				<div class="wc-gpd-proof-designer__canvas-wrap">
+					<canvas id="wc-gpd-proof-header-canvas" width="800" height="120"></canvas>
+				</div>
+			</div>
+			<p><button type="submit" class="button button-primary" id="wc-gpd-proof-save"><?php esc_html_e( 'Save proof header', 'wc-generic-product-designer' ); ?></button></p>
 		</form>
 		<script>
 		jQuery(function($){
@@ -421,8 +523,11 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				var frame = wp.media({ title: 'Logo', button: { text: 'Use logo' }, multiple: false });
 				frame.on('select', function(){
 					var att = frame.state().get('selection').first().toJSON();
-					$('#wc_gpd_proof_logo_id').val(att.id);
+					$('#wc-gpd-proof-logo_id').val(att.id);
 					$('#wc-gpd-proof-logo-preview').html('<img src="'+att.url+'" style="max-height:60px" />');
+					if ( window.wcGpdProofHeader ) {
+						window.wcGpdProofHeader.logoUrl = att.url;
+					}
 				});
 				frame.open();
 			});
@@ -501,54 +606,70 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 	}
 
 	/**
-	 * Handle dashboard bulk POST.
+	 * Script config for production dashboard / batch editor.
+	 *
+	 * @param bool $include_ready_jobs Include ready jobs list.
+	 * @return array<string,mixed>
 	 */
-	private function handle_post_actions() {
-		$action = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
-		$refs   = isset( $_POST['job_refs'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['job_refs'] ) ) : array();
+	private function production_script_config( $include_ready_jobs = false ) {
+		$config = array(
+			'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+			'adminPostUrl'   => admin_url( 'admin-post.php' ),
+			'nonce'          => wp_create_nonce( self::NONCE_ACTION ),
+			'downloadProof'  => self::DOWNLOAD_PROOF,
+			'downloadBatch'  => self::DOWNLOAD_BATCH,
+			'batchEditorUrl' => add_query_arg(
+				array(
+					'page' => self::PAGE_SLUG,
+					'tab'  => 'batch',
+				),
+				admin_url( 'admin.php' )
+			),
+			'i18n'           => array(
+				'confirmBatch'     => __( 'Create a batch from selected jobs?', 'wc-generic-product-designer' ),
+				'confirmRemove'    => __( 'Remove this job from the batch? It will return to Ready status.', 'wc-generic-product-designer' ),
+				'selectJobs'       => __( 'Select at least one job.', 'wc-generic-product-designer' ),
+				'noReadyJobs'      => __( 'No ready jobs available.', 'wc-generic-product-designer' ),
+				'saved'            => __( 'Layout saved.', 'wc-generic-product-designer' ),
+				'error'            => __( 'Something went wrong.', 'wc-generic-product-designer' ),
+				'batchCreated'     => __( 'Batch created.', 'wc-generic-product-designer' ),
+			),
+		);
+		if ( $include_ready_jobs ) {
+			$config['readyJobs'] = WC_GPD_Production_Jobs::get_ready_jobs();
+		}
+		return $config;
+	}
+
+	/**
+	 * Parse job ref strings into arrays.
+	 *
+	 * @param array $refs Ref strings order_id:item_id.
+	 * @return array<int,array{order_id:int,item_id:int}>
+	 */
+	private function parse_job_refs( array $refs ) {
 		$parsed = array();
 		foreach ( $refs as $ref ) {
-			$parts = explode( ':', $ref );
+			$parts = explode( ':', (string) $ref );
 			if ( count( $parts ) === 2 ) {
-				$parsed[] = array( 'order_id' => absint( $parts[0] ), 'item_id' => absint( $parts[1] ) );
+				$parsed[] = array(
+					'order_id' => absint( $parts[0] ),
+					'item_id'  => absint( $parts[1] ),
+				);
 			}
 		}
-		if ( empty( $parsed ) ) {
-			return;
-		}
-
-		if ( 'create_batch' === $action ) {
-			$result = WC_GPD_Batch_Layout::create( $parsed );
-			if ( is_wp_error( $result ) ) {
-				echo '<div class="notice notice-error"><p>' . esc_html( $result->get_error_message() ) . '</p></div>';
-				return;
-			}
-			wp_safe_redirect(
-				add_query_arg(
-					array(
-						'page'      => self::PAGE_SLUG,
-						'tab'       => 'batch',
-						'batch_id'  => $result,
-					),
-					admin_url( 'admin.php' )
-				)
-			);
-			exit;
-		}
-
-		if ( in_array( $action, WC_GPD_Production_Jobs::statuses(), true ) ) {
-			$count = WC_GPD_Production_Jobs::bulk_set_status( $parsed, $action );
-			echo '<div class="notice notice-success"><p>' . esc_html( sprintf( __( 'Updated %d jobs.', 'wc-generic-product-designer' ), $count ) ) . '</p></div>';
-		}
+		return $parsed;
 	}
 
 	/**
 	 * Save proof header settings.
 	 */
 	private function save_proof_header_settings() {
+		$design_raw = isset( $_POST['proof_header_design'] ) ? wp_unslash( $_POST['proof_header_design'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$design     = is_string( $design_raw ) ? json_decode( $design_raw, true ) : array();
 		WC_GPD_Settings::update(
 			array(
-				'proof_header_template' => isset( $_POST['proof_header_template'] ) ? wp_kses_post( wp_unslash( $_POST['proof_header_template'] ) ) : '',
+				'proof_header_design'   => is_array( $design ) ? wp_json_encode( $design ) : '',
 				'proof_header_logo_id'  => isset( $_POST['proof_header_logo_id'] ) ? absint( $_POST['proof_header_logo_id'] ) : 0,
 			)
 		);
@@ -586,6 +707,82 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			)
 		);
 		delete_transient( 'wc_gpd_etsy_access_token' );
+	}
+
+	/**
+	 * AJAX create batch from job refs.
+	 */
+	public function ajax_create_batch() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'wc-generic-product-designer' ) ) );
+		}
+
+		$refs = isset( $_POST['job_refs'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['job_refs'] ) ) : array();
+		$parsed = $this->parse_job_refs( $refs );
+		if ( empty( $parsed ) ) {
+			wp_send_json_error( array( 'message' => __( 'Select at least one job.', 'wc-generic-product-designer' ) ) );
+		}
+
+		$result = WC_GPD_Batch_Layout::create( $parsed );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'batch_id' => $result,
+				'redirect' => add_query_arg(
+					array(
+						'page'     => self::PAGE_SLUG,
+						'tab'      => 'batch',
+						'batch_id' => $result,
+					),
+					admin_url( 'admin.php' )
+				),
+			)
+		);
+	}
+
+	/**
+	 * AJAX bulk status update.
+	 */
+	public function ajax_bulk_status() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+
+		$action = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
+		$refs   = isset( $_POST['job_refs'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['job_refs'] ) ) : array();
+		$parsed = $this->parse_job_refs( $refs );
+
+		if ( empty( $parsed ) || ! in_array( $action, WC_GPD_Production_Jobs::statuses(), true ) ) {
+			wp_send_json_error();
+		}
+
+		$count = WC_GPD_Production_Jobs::bulk_set_status( $parsed, $action );
+		wp_send_json_success( array( 'count' => $count ) );
+	}
+
+	/**
+	 * AJAX remove job from batch.
+	 */
+	public function ajax_batch_remove_item() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+
+		$batch_id = isset( $_POST['batch_id'] ) ? absint( $_POST['batch_id'] ) : 0;
+		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		$item_id  = isset( $_POST['item_id'] ) ? absint( $_POST['item_id'] ) : 0;
+
+		$result = WC_GPD_Batch_Layout::remove_item( $batch_id, $order_id, $item_id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success();
 	}
 
 	/**

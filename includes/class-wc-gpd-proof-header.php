@@ -13,6 +13,105 @@ defined( 'ABSPATH' ) || exit;
 class WC_GPD_Proof_Header {
 
 	/**
+	 * Token labels for the visual designer palette.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function token_labels() {
+		return array(
+			'site_name'               => __( 'Site name', 'wc-generic-product-designer' ),
+			'site_url'                => __( 'Site URL', 'wc-generic-product-designer' ),
+			'order_number'            => __( 'Order number', 'wc-generic-product-designer' ),
+			'order_id'                => __( 'Order ID', 'wc-generic-product-designer' ),
+			'customer_name'           => __( 'Customer name', 'wc-generic-product-designer' ),
+			'order_date'              => __( 'Order date', 'wc-generic-product-designer' ),
+			'product_name'            => __( 'Product name', 'wc-generic-product-designer' ),
+			'personalization_summary' => __( 'Personalization summary', 'wc-generic-product-designer' ),
+			'logo'                    => __( 'Logo image', 'wc-generic-product-designer' ),
+		);
+	}
+
+	/**
+	 * Default header design JSON for the visual designer.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function default_design() {
+		return array(
+			'width'      => 800,
+			'height'     => 120,
+			'background' => '#1e293b',
+			'elements'   => array(
+				array(
+					'type'       => 'text',
+					'token'      => 'site_name',
+					'text'       => '{site_name}',
+					'left'       => 20,
+					'top'        => 28,
+					'fontSize'   => 22,
+					'fill'       => '#ffffff',
+					'fontFamily' => 'Arial, sans-serif',
+					'fontWeight' => '700',
+				),
+				array(
+					'type'       => 'text',
+					'token'      => 'site_url',
+					'text'       => '{site_url}',
+					'left'       => 20,
+					'top'        => 54,
+					'fontSize'   => 14,
+					'fill'       => '#cbd5e1',
+					'fontFamily' => 'Arial, sans-serif',
+					'fontWeight' => '400',
+				),
+				array(
+					'type'       => 'text',
+					'token'      => 'order_number',
+					'text'       => 'Order {order_number} · {customer_name} · {order_date}',
+					'left'       => 20,
+					'top'        => 80,
+					'fontSize'   => 13,
+					'fill'       => '#e2e8f0',
+					'fontFamily' => 'Arial, sans-serif',
+					'fontWeight' => '400',
+				),
+				array(
+					'type'       => 'text',
+					'token'      => 'product_name',
+					'text'       => '{product_name}',
+					'left'       => 20,
+					'top'        => 100,
+					'fontSize'   => 12,
+					'fill'       => '#94a3b8',
+					'fontFamily' => 'Arial, sans-serif',
+					'fontWeight' => '400',
+				),
+				array(
+					'type'   => 'logo',
+					'left'   => 680,
+					'top'    => 20,
+					'width'  => 100,
+					'height' => 80,
+				),
+			),
+		);
+	}
+
+	/**
+	 * @return array<string,mixed>
+	 */
+	public static function get_design() {
+		$raw = WC_GPD_Settings::get( 'proof_header_design', '' );
+		if ( is_string( $raw ) && '' !== $raw ) {
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) && ! empty( $decoded['elements'] ) ) {
+				return $decoded;
+			}
+		}
+		return self::default_design();
+	}
+
+	/**
 	 * Default header template (SVG fragment with tokens).
 	 *
 	 * @return string
@@ -40,6 +139,11 @@ class WC_GPD_Proof_Header {
 	 * @return string SVG fragment.
 	 */
 	public static function render_svg( $order, $item, $width = 800 ) {
+		$design = self::get_design();
+		if ( ! empty( $design['elements'] ) ) {
+			return self::design_to_svg( $design, $order, $item, $width );
+		}
+
 		$tokens = self::tokens( $order, $item, $width );
 		$svg    = self::get_template();
 		foreach ( $tokens as $key => $value ) {
@@ -64,6 +168,77 @@ class WC_GPD_Proof_Header {
 		}
 
 		return $svg;
+	}
+
+	/**
+	 * Build SVG from visual designer JSON.
+	 *
+	 * @param array                 $design Design.
+	 * @param WC_Order              $order  Order.
+	 * @param WC_Order_Item_Product $item   Item.
+	 * @param int                   $width  Width.
+	 * @return string
+	 */
+	public static function design_to_svg( array $design, $order, $item, $width = 800 ) {
+		$tokens   = self::tokens( $order, $item, $width );
+		$height   = absint( $design['height'] ?? 120 );
+		$bg       = sanitize_hex_color( $design['background'] ?? '#1e293b' ) ?: '#1e293b';
+		$logo_id  = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+		$logo_url = $logo_id ? wp_get_attachment_url( $logo_id ) : '';
+
+		$svg = '<rect x="0" y="0" width="' . absint( $width ) . '" height="' . $height . '" fill="' . esc_attr( $bg ) . '"/>';
+
+		foreach ( $design['elements'] as $element ) {
+			if ( ! is_array( $element ) ) {
+				continue;
+			}
+			$type = $element['type'] ?? '';
+			if ( 'logo' === $type ) {
+				if ( ! $logo_url ) {
+					continue;
+				}
+				$svg .= '<image x="' . (float) ( $element['left'] ?? 0 ) . '" y="' . (float) ( $element['top'] ?? 0 ) . '"'
+					. ' width="' . (float) ( $element['width'] ?? 100 ) . '" height="' . (float) ( $element['height'] ?? 80 ) . '"'
+					. ' preserveAspectRatio="xMidYMid meet" href="' . esc_url( $logo_url ) . '" />';
+				continue;
+			}
+			if ( 'text' !== $type ) {
+				continue;
+			}
+			$text = (string) ( $element['text'] ?? '' );
+			foreach ( $tokens as $key => $value ) {
+				$text = str_replace( '{' . $key . '}', $value, $text );
+			}
+			$font_size   = (float) ( $element['fontSize'] ?? 14 );
+			$fill        = sanitize_hex_color( $element['fill'] ?? '#ffffff' ) ?: '#ffffff';
+			$font_family = esc_attr( $element['fontFamily'] ?? 'Arial, sans-serif' );
+			$font_weight = esc_attr( $element['fontWeight'] ?? '400' );
+			$x           = (float) ( $element['left'] ?? 0 );
+			$y           = (float) ( $element['top'] ?? 0 ) + $font_size;
+			$svg        .= '<text x="' . $x . '" y="' . $y . '" fill="' . esc_attr( $fill ) . '"'
+				. ' font-family="' . $font_family . '" font-size="' . $font_size . '" font-weight="' . $font_weight . '">'
+				. esc_html( $text ) . '</text>';
+		}
+
+		return $svg;
+	}
+
+	/**
+	 * Sample token values for designer preview.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function sample_tokens() {
+		return array(
+			'site_name'               => get_bloginfo( 'name' ),
+			'site_url'                => home_url(),
+			'order_number'            => '1042',
+			'order_id'                => '1042',
+			'customer_name'           => __( 'Jane Smith', 'wc-generic-product-designer' ),
+			'order_date'              => wp_date( get_option( 'date_format' ) ),
+			'product_name'            => __( 'Custom Engraved Plaque', 'wc-generic-product-designer' ),
+			'personalization_summary' => __( 'Name: Jane · Font: Script', 'wc-generic-product-designer' ),
+		);
 	}
 
 	/**
