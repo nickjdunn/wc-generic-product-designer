@@ -22,7 +22,7 @@
 	log.info( 'Designer initializing', { width: config.canvasWidth, height: config.canvasHeight } );
 
 	const TEMPLATE_METADATA_PROPS = [
-		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
+		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox', 'wcGpdBboxRole',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot', 'wcGpdGraphicLibraryId',
 		'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey',
 		'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors', 'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors',
@@ -30,6 +30,7 @@
 		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
+		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
 		'wcGpdCustomerUpload', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
 	];
@@ -232,6 +233,12 @@
 		copyDiagnostics: document.getElementById( 'wc-gpd-copy-diagnostics' ),
 		placeholderFields: document.getElementById( 'wc-gpd-placeholder-fields' ),
 		graphicPickers: document.getElementById( 'wc-gpd-graphic-pickers' ),
+		placeholderEditRow: document.getElementById( 'wc-gpd-placeholder-edit-row' ),
+		placeholderEditLabel: document.getElementById( 'wc-gpd-placeholder-edit-label' ),
+		placeholderEditInput: document.getElementById( 'wc-gpd-placeholder-edit-input' ),
+		replaceableModal: document.getElementById( 'wc-gpd-replaceable-modal' ),
+		replaceableModalClose: document.getElementById( 'wc-gpd-replaceable-modal-close' ),
+		replaceableModalGrid: document.getElementById( 'wc-gpd-replaceable-modal-grid' ),
 	};
 
 	const sectionTitles = {
@@ -463,7 +470,8 @@
 	const DESIGN_SERIALIZE_PROPS = [
 		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
-		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId', 'wcGpdCustomerUpload', 'wcGpdLayerLabel',
+		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId', 'wcGpdCustomerUpload', 'wcGpdLayerLabel', 'wcGpdBboxRole',
+		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
@@ -1539,7 +1547,7 @@
 		const isAddedShape = isCustomerAddedShape( obj );
 		const isAddedIcon = isCustomerAddedIcon( obj );
 		const isGraphicLayer = isCustomerGraphic( obj );
-		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
+		const isText = !! obj && ( isPlaceholderLayer( obj ) || isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
 		const textColorOk = isText && layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 		const shapeColorOk = shapeColorAllowed( obj );
 		const iconColorOk = iconColorAllowed( obj );
@@ -2050,6 +2058,7 @@
 	const viewSwitcherEl = document.getElementById( 'wc-gpd-view-switcher' );
 	let activeViewId = templateViews[ 0 ].id;
 	let activeText = null;
+	let replaceablePickerSlotUid = '';
 	let displayScale = 1;
 	let submitApproved = false;
 
@@ -2086,6 +2095,149 @@
 		const allowed = new Set( library.ids.map( ( id ) => Number( id ) ) );
 		const filtered = graphicLibrary.filter( ( item ) => allowed.has( Number( item.id ) ) );
 		return filtered.length ? filtered : graphicLibrary;
+	}
+
+	function isReplaceableFrame( obj ) {
+		return !! obj && (
+			!! obj.wcGpdReplaceable
+			|| obj.wcGpdLayerType === 'graphic_slot'
+			|| obj.wcGpdLayerType === 'replaceable'
+			|| !! obj.wcGpdGraphicSlot
+		);
+	}
+
+	function isReplaceableContent( obj ) {
+		if ( ! isCustomerGraphic( obj ) ) {
+			return false;
+		}
+		return !! obj.wcGpdReplaceableUid || !! obj.wcGpdGraphicSlotUid;
+	}
+
+	function applyPlaceholderInteractivity( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		obj.set( {
+			selectable: true,
+			evented: true,
+			hasControls: false,
+			hasBorders: false,
+			editable: false,
+			lockMovementX: true,
+			lockMovementY: true,
+			lockScalingX: true,
+			lockScalingY: true,
+			hoverCursor: 'text',
+		} );
+	}
+
+	function applyReplaceableFrameInteractivity( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		obj.set( {
+			selectable: true,
+			evented: true,
+			hasControls: false,
+			hasBorders: false,
+			lockMovementX: true,
+			lockMovementY: true,
+			lockScalingX: true,
+			lockScalingY: true,
+			hoverCursor: 'pointer',
+		} );
+	}
+
+	function applyReplaceableContentInteractivity( obj ) {
+		if ( ! obj ) {
+			return;
+		}
+		obj.set( {
+			selectable: true,
+			evented: true,
+			hasControls: false,
+			hasBorders: false,
+			lockMovementX: true,
+			lockMovementY: true,
+			lockScalingX: true,
+			lockScalingY: true,
+			lockUniScaling: true,
+			hoverCursor: 'pointer',
+		} );
+	}
+
+	function fitObjectToReplaceableFrame( obj, frameObj ) {
+		if ( ! obj || ! frameObj ) {
+			return;
+		}
+		const frameWidth = ( frameObj.width || 0 ) * ( frameObj.scaleX || 1 );
+		const frameHeight = ( frameObj.height || 0 ) * ( frameObj.scaleY || 1 );
+		if ( frameWidth <= 0 || frameHeight <= 0 || ! obj.width || ! obj.height ) {
+			return;
+		}
+		obj.set( {
+			left: frameObj.left,
+			top: frameObj.top,
+			originX: 'center',
+			originY: 'center',
+			angle: frameObj.angle || 0,
+			scaleX: frameWidth / obj.width,
+			scaleY: frameHeight / obj.height,
+		} );
+		obj.setCoords();
+	}
+
+	function getReplaceableFrameForObject( obj ) {
+		if ( ! obj ) {
+			return null;
+		}
+		if ( isReplaceableFrame( obj ) ) {
+			return obj;
+		}
+		const slotUid = obj.wcGpdReplaceableUid || obj.wcGpdGraphicSlotUid;
+		if ( ! slotUid ) {
+			return null;
+		}
+		return canvas.getObjects().find( ( candidate ) => isReplaceableFrame( candidate ) && candidate.wcGpdUid === slotUid ) || null;
+	}
+
+	function closeReplaceablePicker() {
+		replaceablePickerSlotUid = '';
+		if ( ui.replaceableModal ) {
+			ui.replaceableModal.hidden = true;
+		}
+		if ( ui.replaceableModalGrid ) {
+			ui.replaceableModalGrid.innerHTML = '';
+		}
+	}
+
+	function openReplaceablePicker( frameObj ) {
+		if ( productSettings.allow_customer_graphics === false || ! frameObj || ! ui.replaceableModal || ! ui.replaceableModalGrid ) {
+			return;
+		}
+		const slotUid = frameObj.wcGpdUid || '';
+		if ( ! slotUid ) {
+			return;
+		}
+		replaceablePickerSlotUid = slotUid;
+		const items = graphicItemsForSlot( frameObj );
+		ui.replaceableModalGrid.innerHTML = '';
+		items.forEach( ( item ) => {
+			const btn = document.createElement( 'button' );
+			btn.type = 'button';
+			btn.className = 'wc-gpd-replaceable-item';
+			btn.dataset.attachmentId = String( item.id );
+			const img = document.createElement( 'img' );
+			img.src = item.url;
+			img.alt = item.title || '';
+			btn.appendChild( img );
+			btn.addEventListener( 'click', () => {
+				replaceReplaceableContent( frameObj, item );
+				closeReplaceablePicker();
+			} );
+			ui.replaceableModalGrid.appendChild( btn );
+		} );
+		ui.replaceableModal.hidden = false;
 	}
 
 	/**
@@ -2159,8 +2311,20 @@
 	/**
 	 * @returns {{left:number,top:number,width:number,height:number}|null}
 	 */
-	function getBoundingBoxRect() {
-		const bboxObj = canvas.getObjects().find( ( obj ) => obj.wcGpdBoundingBox );
+	function getBboxRect( role ) {
+		const normalizedRole = role || 'product_outline';
+		const bboxObj = canvas.getObjects().find( ( obj ) => {
+			if ( ! obj ) {
+				return false;
+			}
+			if ( obj.wcGpdBboxRole === normalizedRole ) {
+				return true;
+			}
+			if ( normalizedRole === 'product_outline' && obj.wcGpdBoundingBox ) {
+				return true;
+			}
+			return false;
+		} );
 		if ( ! bboxObj ) {
 			return null;
 		}
@@ -2172,9 +2336,13 @@
 	 * @returns {{left:number,top:number,width:number,height:number}}
 	 */
 	function getConstraintRect() {
-		const bbox = getBoundingBoxRect();
-		if ( bbox ) {
-			return bbox;
+		const imprintRect = getBboxRect( 'imprint_area' );
+		if ( imprintRect ) {
+			return imprintRect;
+		}
+		const outlineRect = getBboxRect( 'product_outline' );
+		if ( outlineRect ) {
+			return outlineRect;
 		}
 		return {
 			left: 2,
@@ -2182,6 +2350,10 @@
 			width: PROD_WIDTH - 4,
 			height: PROD_HEIGHT - 4,
 		};
+	}
+
+	function getProductOutlineRect() {
+		return getBboxRect( 'product_outline' ) || getConstraintRect();
 	}
 
 	function clearTemplateLayers() {
@@ -2199,107 +2371,45 @@
 	}
 
 	function buildCustomerFields() {
-		const view = getActiveViewConfig();
-		const placeholders = view ? getPlaceholderObjectsFromView( view ) : [];
-		const slots = view ? getGraphicSlotsFromView( view ) : [];
-		const showFields = placeholders.length > 0 || ( slots.length > 0 && graphicLibrary.length && productSettings.allow_customer_graphics !== false );
-		const detailsEnabled = showFields && productSettings.allow_details_panel !== false;
-
 		if ( ui.navDetails ) {
-			ui.navDetails.hidden = ! detailsEnabled;
+			ui.navDetails.hidden = true;
 		}
-
 		if ( ui.placeholderFields ) {
 			ui.placeholderFields.innerHTML = '';
-			placeholders.forEach( ( def ) => {
-				const key = def.wcGpdPlaceholderKey || def.wcGpdUid;
-				const label = document.createElement( 'label' );
-				label.textContent = def.wcGpdPlaceholderLabel || key;
-				label.setAttribute( 'for', `wc-gpd-ph-${ key }` );
-				const input = document.createElement( 'input' );
-				input.type = 'text';
-				input.id = `wc-gpd-ph-${ key }`;
-				input.className = 'wc-gpd-placeholder-input';
-				input.dataset.placeholderKey = key;
-				const canvasObj = findCanvasPlaceholder( key );
-				input.value = canvasObj ? ( canvasObj.text || '' ) : ( def.text || '' );
-				input.addEventListener( 'input', () => {
-					const target = findCanvasPlaceholder( key );
-					if ( ! target ) {
-						return;
-					}
-					target.set( 'text', input.value );
-					shrinkTextToFit( target );
-					canvas.requestRenderAll();
-				} );
-				ui.placeholderFields.appendChild( label );
-				ui.placeholderFields.appendChild( input );
-			} );
 		}
-
 		if ( ui.graphicPickers ) {
 			ui.graphicPickers.innerHTML = '';
-			if ( ! slots.length || ! graphicLibrary.length || productSettings.allow_customer_graphics === false ) {
-				return;
-			}
-			slots.forEach( ( slot ) => {
-				const uid = slot.wcGpdUid;
-				const wrap = document.createElement( 'div' );
-				wrap.className = 'wc-gpd-graphic-picker';
-				wrap.dataset.slotUid = uid;
-				const label = document.createElement( 'label' );
-				label.textContent = config.i18n.chooseGraphic || 'Choose graphic';
-				wrap.appendChild( label );
-				const row = document.createElement( 'div' );
-				row.className = 'wc-gpd-graphic-thumb-row';
-				graphicItemsForSlot( slot ).forEach( ( item ) => {
-					const btn = document.createElement( 'button' );
-					btn.type = 'button';
-					btn.className = 'wc-gpd-graphic-thumb';
-					btn.dataset.attachmentId = String( item.id );
-					btn.dataset.slotUid = uid;
-					const img = document.createElement( 'img' );
-					img.src = item.url;
-					img.alt = item.title || '';
-					btn.appendChild( img );
-					btn.addEventListener( 'click', () => {
-						setCustomerGraphic( slot, item );
-						row.querySelectorAll( '.wc-gpd-graphic-thumb' ).forEach( ( el ) => {
-							el.classList.toggle( 'is-selected', el === btn );
-						} );
-					} );
-					row.appendChild( btn );
-				} );
-				wrap.appendChild( row );
-				ui.graphicPickers.appendChild( wrap );
-			} );
 		}
 	}
 
 	function setCustomerGraphic( slotDef, libraryItem ) {
-		if ( ! slotDef || ! libraryItem || ! libraryItem.url ) {
+		replaceReplaceableContent( slotDef, libraryItem );
+	}
+
+	function replaceReplaceableContent( frameObj, libraryItem ) {
+		if ( ! frameObj || ! libraryItem || ! libraryItem.url ) {
 			return;
 		}
-		const slotUid = slotDef.wcGpdUid;
+		const slotUid = frameObj.wcGpdUid;
 		canvas.getObjects().slice().forEach( ( obj ) => {
-			if ( isCustomerGraphic( obj ) && obj.wcGpdGraphicSlotUid === slotUid ) {
+			if ( isCustomerGraphic( obj ) && ( obj.wcGpdReplaceableUid === slotUid || obj.wcGpdGraphicSlotUid === slotUid ) ) {
 				canvas.remove( obj );
 			}
 		} );
-
-		const slotObj = canvas.getObjects().find( ( o ) => o.wcGpdUid === slotUid );
-		const left = slotObj ? slotObj.left : PROD_WIDTH / 2;
-		const top = slotObj ? slotObj.top : PROD_HEIGHT / 2;
-		const targetW = slotObj ? ( slotObj.width * ( slotObj.scaleX || 1 ) ) : 120;
 		loadCustomerGraphic( libraryItem, {
-			left,
-			top,
-			maxW: targetW,
+			left: frameObj.left,
+			top: frameObj.top,
+			maxW: ( frameObj.width || 0 ) * ( frameObj.scaleX || 1 ),
 			extra: {
+				wcGpdReplaceableUid: slotUid,
 				wcGpdGraphicSlotUid: slotUid,
 			},
-		}, () => {
+		}, ( obj ) => {
+			fitObjectToReplaceableFrame( obj, frameObj );
+			applyReplaceableContentInteractivity( obj );
+			canvas.bringToFront( obj );
 			canvas.requestRenderAll();
+			syncLayersList();
 		} );
 	}
 
@@ -2412,7 +2522,7 @@
 	}
 
 	function isGraphicSlotMarker( obj ) {
-		return !! obj && obj.wcGpdLayerType === 'graphic_slot';
+		return isReplaceableFrame( obj );
 	}
 
 	function isCustomerGraphic( obj ) {
@@ -2578,7 +2688,12 @@
 	}
 
 	function getGraphicSlotsFromView( view ) {
-		return ( view.objects || [] ).filter( ( obj ) => obj.wcGpdLayerType === 'graphic_slot' );
+		return ( view.objects || [] ).filter( ( obj ) => (
+			obj.wcGpdLayerType === 'graphic_slot'
+			|| obj.wcGpdLayerType === 'replaceable'
+			|| obj.wcGpdReplaceable
+			|| obj.wcGpdGraphicSlot
+		) );
 	}
 
 	function templateHasPlaceholders() {
@@ -2623,6 +2738,7 @@
 		clearTextLayers();
 		clearTemplateLayers();
 		discardSelection();
+		closeReplaceablePicker();
 
 		if ( ! view ) {
 			renderViewSwitcher();
@@ -2700,9 +2816,22 @@
 					templateObjects,
 					( objects ) => {
 						const savedPlaceholders = ( viewDesigns[ viewId ] || [] ).filter( ( o ) => o.wcGpdLayerType === 'placeholder' );
+						const productOutlineUid = view.productOutlineUid || view.boundingBoxUid || '';
+						const imprintAreaUid = view.imprintAreaUid || '';
 						objects.forEach( ( obj, index ) => {
 							applyTemplateMetadata( obj, templateObjects[ index ] );
 							obj.wcGpdTemplateLayer = true;
+							if ( ! obj.wcGpdBboxRole && obj.wcGpdUid ) {
+								if ( productOutlineUid && obj.wcGpdUid === productOutlineUid ) {
+									obj.wcGpdBboxRole = 'product_outline';
+								} else if ( imprintAreaUid && obj.wcGpdUid === imprintAreaUid ) {
+									obj.wcGpdBboxRole = 'imprint_area';
+								}
+							}
+							if ( obj.wcGpdBoundingBox && ! obj.wcGpdBboxRole ) {
+								obj.wcGpdBboxRole = 'product_outline';
+							}
+							obj.wcGpdBoundingBox = obj.wcGpdBboxRole === 'product_outline';
 							const source = templateObjects[ index ] || {};
 							logDiagnostic( 'template_object_loaded', {
 								index,
@@ -2735,13 +2864,8 @@
 								return;
 							}
 							if ( isGraphicSlotMarker( obj ) ) {
-								obj.set( {
-									selectable: false,
-									evented: false,
-									hasControls: false,
-									hasBorders: false,
-									opacity: 0.35,
-								} );
+								applyReplaceableFrameInteractivity( obj );
+								obj.set( { opacity: 0.35 } );
 								canvas.add( obj );
 								return;
 							}
@@ -2754,13 +2878,7 @@
 									obj.wcGpdBaseFontSize = obj.fontSize || 32;
 								}
 								shrinkTextToFit( obj );
-								obj.set( {
-									selectable: false,
-									evented: false,
-									hasControls: false,
-									hasBorders: false,
-									editable: false,
-								} );
+								applyPlaceholderInteractivity( obj );
 								canvas.add( obj );
 								return;
 							}
@@ -2795,9 +2913,11 @@
 								return;
 							}
 							obj.wcGpdOutlineLayer = !! obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline';
-							obj.wcGpdBoundingBox = view.boundingBoxUid && obj.wcGpdUid === view.boundingBoxUid;
-							if ( obj.wcGpdBoundingBox ) {
-								obj.stroke = obj.stroke || '#2b6cb0';
+							if ( obj.wcGpdBboxRole === 'imprint_area' ) {
+								obj.stroke = '#dd6b20';
+								obj.strokeDashArray = [ 8, 6 ];
+							} else if ( obj.wcGpdBboxRole === 'product_outline' ) {
+								obj.stroke = '#2b6cb0';
 								obj.strokeDashArray = [ 8, 6 ];
 							}
 							obj.set( {
@@ -2910,7 +3030,7 @@
 		if ( isPlaceholderLayer( obj ) || isFixedTemplateText( obj ) || isTemplateGraphic( obj ) || isGraphicSlotMarker( obj ) ) {
 			return true;
 		}
-		return obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer || obj.wcGpdBoundingBox || isMockupImage( obj );
+		return obj.wcGpdTemplateLayer || obj.wcGpdOutlineLayer || obj.wcGpdBoundingBox || !! obj.wcGpdBboxRole || isMockupImage( obj );
 	}
 
 	function isTextLayer( obj ) {
@@ -2970,7 +3090,7 @@
 	}
 
 	function applyGraphicInteractivity( obj ) {
-		if ( isCustomerGraphic( obj ) && ! obj.wcGpdGraphicSlotUid ) {
+		if ( isCustomerGraphic( obj ) && ! obj.wcGpdGraphicSlotUid && ! obj.wcGpdReplaceableUid ) {
 			const moveAllowed = productSettingsAllow( 'allow_graphic_move' );
 			const resizeAllowed = productSettingsAllow( 'allow_graphic_resize' );
 			obj.set( {
@@ -2986,18 +3106,8 @@
 			} );
 			return;
 		}
-		if ( obj.wcGpdGraphicSlotUid ) {
-			obj.set( {
-				selectable: true,
-				evented: true,
-				hasControls: true,
-				hasBorders: true,
-				lockMovementX: false,
-				lockMovementY: false,
-				lockScalingX: false,
-				lockScalingY: false,
-				lockUniScaling: !! obj.wcGpdLockAspect,
-			} );
+		if ( isReplaceableContent( obj ) ) {
+			applyReplaceableContentInteractivity( obj );
 			return;
 		}
 		const lockMove = !! obj.wcGpdLockMove;
@@ -3054,6 +3164,9 @@
 		canvas.discardActiveObject();
 		activeText = null;
 		syncToolbar( null );
+		if ( ui.placeholderEditRow ) {
+			ui.placeholderEditRow.hidden = true;
+		}
 		syncContextNav( null );
 		if ( ui.contextEmpty ) {
 			ui.contextEmpty.hidden = false;
@@ -3077,8 +3190,8 @@
 			if ( ! layerVisibleToCustomer( obj ) ) {
 				return false;
 			}
-			if ( isPlaceholderLayer( obj ) ) {
-				return false;
+			if ( isPlaceholderLayer( obj ) || isReplaceableFrame( obj ) ) {
+				return true;
 			}
 			if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
 				return ! isTemplateTextFullyLocked( obj );
@@ -3104,7 +3217,10 @@
 			return false;
 		}
 		if ( isPlaceholderLayer( obj ) ) {
-			return false;
+			return true;
+		}
+		if ( isReplaceableFrame( obj ) || isReplaceableContent( obj ) ) {
+			return true;
 		}
 		if ( isCustomerEditableTemplateText( obj ) && isUsableTextLayer( obj ) ) {
 			return ! isTemplateTextFullyLocked( obj );
@@ -3274,11 +3390,19 @@
 	 */
 	function syncToolbar( obj ) {
 		activeText = obj;
-		const isText = !! obj && ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
+		const isPlaceholder = !! obj && isPlaceholderLayer( obj );
+		const isText = !! obj && (
+			isPlaceholder
+			|| (
+				( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) )
+				&& isUsableTextLayer( obj )
+			)
+		);
 		const isShapeLayer = !! obj && isCustomerEditableShape( obj );
 		const isAddedShape = isCustomerAddedShape( obj );
 		const isGraphicLayer = !! obj && isCustomerGraphic( obj );
-		const enabled = isText || isShapeLayer || isGraphicLayer;
+		const isReplaceableLayer = !! obj && ( isReplaceableFrame( obj ) || isReplaceableContent( obj ) );
+		const enabled = isText || isShapeLayer || isGraphicLayer || isReplaceableLayer;
 
 		if ( ui.toolsPanel ) {
 			ui.toolsPanel.classList.remove( 'is-disabled' );
@@ -3292,15 +3416,27 @@
 		setTextContextVisible( isText );
 		setGraphicContextVisible( isGraphicLayer );
 
-		if ( isAddedShape || isCustomerAddedIcon( obj ) ) {
+		if ( isPlaceholder ) {
+			applyPlaceholderInteractivity( obj );
+		} else if ( isAddedShape || isCustomerAddedIcon( obj ) ) {
 			applyCustomerAddedShapeInteractivity( obj );
 		} else if ( isGraphicLayer ) {
 			applyGraphicInteractivity( obj );
+		}
+		if ( isReplaceableLayer ) {
+			const frameObj = getReplaceableFrameForObject( obj );
+			if ( frameObj ) {
+				applyReplaceableFrameInteractivity( frameObj );
+				openReplaceablePicker( frameObj );
+			}
 		}
 
 		if ( ! enabled ) {
 			renderColorSwatches( null );
 			resetToolRowStates();
+			if ( ui.placeholderEditRow ) {
+				ui.placeholderEditRow.hidden = true;
+			}
 			return;
 		}
 
@@ -3310,6 +3446,24 @@
 
 		syncContextNav( obj );
 		openCustomerSection( 'context' );
+		if ( ui.placeholderEditRow ) {
+			ui.placeholderEditRow.hidden = ! isPlaceholder;
+		}
+		if ( isPlaceholder ) {
+			if ( ui.placeholderEditLabel ) {
+				ui.placeholderEditLabel.textContent = obj.wcGpdPlaceholderLabel || config.i18n.placeholderLabel || 'Field';
+			}
+			if ( ui.placeholderEditInput ) {
+				ui.placeholderEditInput.value = obj.text || '';
+				ui.placeholderEditInput.disabled = !! obj.wcGpdLockText;
+				setTimeout( () => {
+					if ( canvas.getActiveObject() === obj ) {
+						ui.placeholderEditInput.focus();
+						ui.placeholderEditInput.select();
+					}
+				}, 0 );
+			}
+		}
 
 		if ( isText ) {
 			if ( ui.fontFamily ) {
@@ -4058,6 +4212,34 @@
 			ui.addImageFile.value = '';
 		} );
 	}
+
+	if ( ui.placeholderEditInput ) {
+		ui.placeholderEditInput.addEventListener( 'input', () => {
+			const active = canvas.getActiveObject();
+			if ( ! isPlaceholderLayer( active ) ) {
+				return;
+			}
+			active.set( 'text', ui.placeholderEditInput.value || '' );
+			shrinkTextToFit( active );
+			canvas.requestRenderAll();
+		} );
+	}
+
+	if ( ui.replaceableModalClose ) {
+		ui.replaceableModalClose.addEventListener( 'click', closeReplaceablePicker );
+	}
+	if ( ui.replaceableModal ) {
+		ui.replaceableModal.addEventListener( 'click', ( event ) => {
+			if ( event.target === ui.replaceableModal ) {
+				closeReplaceablePicker();
+			}
+		} );
+	}
+	document.addEventListener( 'keydown', ( event ) => {
+		if ( event.key === 'Escape' && ui.replaceableModal && ! ui.replaceableModal.hidden ) {
+			closeReplaceablePicker();
+		}
+	} );
 
 	if ( ui.fontFamily ) {
 		ui.fontFamily.addEventListener( 'change', () => {

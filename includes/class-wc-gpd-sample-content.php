@@ -16,7 +16,7 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '10';
+	const SAMPLE_VERSION     = '11';
 	const DEMO_MIN_OBJECTS   = 8;
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
@@ -511,10 +511,10 @@ class WC_GPD_Sample_Content {
 		$product->set_regular_price( '1.00' );
 		$product->set_slug( self::PRODUCT_SLUG );
 		$product->set_description(
-			__( 'Demo product for WC Generic Product Designer. Test front/back views, text permissions, palettes, shapes, placeholders, and graphic slots. Use Add for graphics, icons, photos, and shapes.', 'wc-generic-product-designer' )
+			__( 'Demo product for WC Generic Product Designer. Test front/back views, text permissions, palettes, shapes, placeholders, and replaceable slots. Click a replaceable slot on the canvas to swap its graphic. Use Add for graphics, icons, photos, and shapes.', 'wc-generic-product-designer' )
 		);
 		$product->set_short_description(
-			__( 'Multi-view demo with labeled layers for every customer designer feature.', 'wc-generic-product-designer' )
+			__( 'Multi-view demo with labeled layers for every customer designer feature, including replaceable graphic slots.', 'wc-generic-product-designer' )
 		);
 
 		$saved_id = $product->save();
@@ -632,7 +632,7 @@ class WC_GPD_Sample_Content {
 			),
 			self::graphic_slot_layer(
 				'gpd-demo-graphic-slot',
-				'Demo: graphic slot',
+				'Demo: replaceable slot',
 				470,
 				220,
 				140,
@@ -868,6 +868,8 @@ class WC_GPD_Sample_Content {
 			'wcGpdTemplateLayer'     => true,
 			'wcGpdLayerType'         => 'graphic_slot',
 			'wcGpdGraphicSlot'       => true,
+			'wcGpdReplaceable'       => true,
+			'wcGpdReplaceableKind'   => 'graphic',
 			'wcGpdLayerLabel'        => $label,
 			'wcGpdCustomerMovable'   => false,
 			'wcGpdCustomerResizable' => false,

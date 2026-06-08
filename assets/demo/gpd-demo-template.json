@@ -6,6 +6,8 @@
       "label": "Front",
       "template_image_id": 0,
       "bounding_box_uid": "",
+      "product_outline_uid": "",
+      "imprint_area_uid": "",
       "objects": [
         {
           "type": "textbox",
@@ -283,7 +285,9 @@
           "wcGpdTemplateLayer": true,
           "wcGpdLayerType": "graphic_slot",
           "wcGpdGraphicSlot": true,
-          "wcGpdLayerLabel": "Demo: graphic slot",
+          "wcGpdReplaceable": true,
+          "wcGpdReplaceableKind": "graphic",
+          "wcGpdLayerLabel": "Demo: replaceable slot",
           "wcGpdCustomerMovable": false,
           "wcGpdCustomerResizable": false,
           "selectable": false,
@@ -296,6 +300,8 @@
       "label": "Back",
       "template_image_id": 0,
       "bounding_box_uid": "",
+      "product_outline_uid": "",
+      "imprint_area_uid": "",
       "objects": [
         {
           "type": "textbox",

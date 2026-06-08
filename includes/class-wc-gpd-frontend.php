@@ -462,6 +462,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'addTextShort'    => __( 'Add text', 'wc-generic-product-designer' ),
 					'chooseGraphic'   => __( 'Choose graphic', 'wc-generic-product-designer' ),
 					'placeholderRequired' => __( 'Fill in the required fields before adding to cart.', 'wc-generic-product-designer' ),
+					'replaceContent'  => __( 'Replace content', 'wc-generic-product-designer' ),
+					'replaceGraphic'  => __( 'Replace graphic', 'wc-generic-product-designer' ),
+					'replacePhoto'    => __( 'Replace photo', 'wc-generic-product-designer' ),
+					'placeholderLabel' => __( 'Field', 'wc-generic-product-designer' ),
 					'layers'          => __( 'Layers', 'wc-generic-product-designer' ),
 					'customizeTitle'  => __( 'Customize your design', 'wc-generic-product-designer' ),
 					'yourDetails'     => __( 'Your details', 'wc-generic-product-designer' ),
@@ -667,6 +671,10 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 							<div class="wc-gpd-context-pane" id="wc-gpd-context-pane" hidden>
 								<p class="wc-gpd-context-layer-name" id="wc-gpd-context-layer-name"></p>
 								<p class="wc-gpd-context-hint wc-gpd-control-graphic" id="wc-gpd-context-graphic-hint" data-customer-context="graphic" hidden><?php esc_html_e( 'Drag to move. Use the corner handles to resize.', 'wc-generic-product-designer' ); ?></p>
+								<div class="wc-gpd-prop-row wc-gpd-placeholder-edit-row" id="wc-gpd-placeholder-edit-row" hidden>
+									<label class="wc-gpd-prop-label" id="wc-gpd-placeholder-edit-label" for="wc-gpd-placeholder-edit-input"><?php esc_html_e( 'Field', 'wc-generic-product-designer' ); ?></label>
+									<input type="text" id="wc-gpd-placeholder-edit-input" class="wc-gpd-prop-control" />
+								</div>
 								<div class="wc-gpd-tools-panel wc-gpd-tools-panel--rows" id="wc-gpd-tools-panel">
 									<div class="wc-gpd-prop-row" data-customer-context="text">
 										<label class="wc-gpd-prop-label" for="wc-gpd-font-family"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
@@ -727,6 +735,15 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 						</div>
 					</div>
 				</main>
+			</div>
+			<div class="wc-gpd-replaceable-modal" id="wc-gpd-replaceable-modal" hidden>
+				<div class="wc-gpd-replaceable-modal__panel" role="dialog" aria-modal="true" aria-labelledby="wc-gpd-replaceable-modal-title">
+					<div class="wc-gpd-replaceable-modal__head">
+						<h3 id="wc-gpd-replaceable-modal-title"><?php esc_html_e( 'Choose graphic', 'wc-generic-product-designer' ); ?></h3>
+						<button type="button" class="wc-gpd-replaceable-modal__close" id="wc-gpd-replaceable-modal-close" aria-label="<?php esc_attr_e( 'Close', 'wc-generic-product-designer' ); ?>">&times;</button>
+					</div>
+					<div class="wc-gpd-replaceable-modal__grid" id="wc-gpd-replaceable-modal-grid"></div>
+				</div>
 			</div>
 			<footer class="wc-gpd-studio-footer" id="wc-gpd-studio-footer">
 				<div class="wc-gpd-studio-footer__left">
@@ -895,11 +912,13 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		if ( empty( $parsed['views'] ) || ! is_array( $parsed['views'] ) ) {
 			return array(
 				array(
-					'id'              => 'view_front',
-					'label'           => __( 'Front', 'wc-generic-product-designer' ),
-					'templateUrl'     => $fallback,
-					'boundingBoxUid'  => '',
-					'objects'         => array(),
+					'id'                => 'view_front',
+					'label'             => __( 'Front', 'wc-generic-product-designer' ),
+					'templateUrl'       => $fallback,
+					'boundingBoxUid'    => '',
+					'productOutlineUid' => '',
+					'imprintAreaUid'    => '',
+					'objects'           => array(),
 				),
 			);
 		}
@@ -916,12 +935,19 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 
 			$url = $image_id ? wp_get_attachment_image_url( $image_id, 'full' ) : $fallback;
 
+			$product_outline_uid = ! empty( $view['product_outline_uid'] )
+				? sanitize_text_field( (string) $view['product_outline_uid'] )
+				: ( ! empty( $view['bounding_box_uid'] ) ? sanitize_text_field( (string) $view['bounding_box_uid'] ) : '' );
+			$imprint_area_uid = ! empty( $view['imprint_area_uid'] ) ? sanitize_text_field( (string) $view['imprint_area_uid'] ) : '';
+
 			$views[] = array(
-				'id'             => sanitize_key( (string) $view['id'] ),
-				'label'          => ! empty( $view['label'] ) ? sanitize_text_field( (string) $view['label'] ) : sanitize_key( (string) $view['id'] ),
-				'templateUrl'    => $url ? $url : '',
-				'boundingBoxUid' => ! empty( $view['bounding_box_uid'] ) ? sanitize_text_field( (string) $view['bounding_box_uid'] ) : '',
-				'objects'        => ! empty( $view['objects'] ) && is_array( $view['objects'] ) ? $view['objects'] : array(),
+				'id'                => sanitize_key( (string) $view['id'] ),
+				'label'             => ! empty( $view['label'] ) ? sanitize_text_field( (string) $view['label'] ) : sanitize_key( (string) $view['id'] ),
+				'templateUrl'       => $url ? $url : '',
+				'boundingBoxUid'    => $product_outline_uid,
+				'productOutlineUid' => $product_outline_uid,
+				'imprintAreaUid'    => $imprint_area_uid,
+				'objects'           => ! empty( $view['objects'] ) && is_array( $view['objects'] ) ? $view['objects'] : array(),
 			);
 		}
 

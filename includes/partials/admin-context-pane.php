@@ -93,7 +93,10 @@ defined( 'ABSPATH' ) || exit;
 				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_outline" checked="checked" /> <?php esc_html_e( 'Production outline (cut line)', 'wc-generic-product-designer' ); ?></label>
 			</div>
 			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
-				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_is_bbox" /> <?php esc_html_e( 'Bounding box guide', 'wc-generic-product-designer' ); ?></label>
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_product_outline" /> <?php esc_html_e( 'Product outline (export)', 'wc-generic-product-designer' ); ?></label>
+			</div>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
+				<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_imprint_area" /> <?php esc_html_e( 'Max imprint / designable area', 'wc-generic-product-designer' ); ?></label>
 			</div>
 			<hr class="wc-gpd-prop-divider" />
 		</div>
@@ -242,15 +245,15 @@ defined( 'ABSPATH' ) || exit;
 </div>
 
 <div class="wc-gpd-context-accordion is-open" id="wc-gpd-context-block-slot" data-context-for="slot" hidden>
-	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Graphic pick area', 'wc-generic-product-designer' ); ?></button>
+	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Replaceable slot', 'wc-generic-product-designer' ); ?></button>
 	<div class="wc-gpd-context-accordion__body">
 		<div class="wc-gpd-tpl-selection" id="wc-gpd-graphic-slot-props">
 			<div class="wc-gpd-prop-row">
 				<label class="wc-gpd-prop-label" for="wc_gpd_slot_library_id"><?php esc_html_e( 'Graphic library', 'wc-generic-product-designer' ); ?></label>
 				<select id="wc_gpd_slot_library_id" class="wc-gpd-prop-control"></select>
 			</div>
-			<p class="description"><?php esc_html_e( 'Customers choose a graphic and can move or resize it within this box. Set move/resize under Size & position.', 'wc-generic-product-designer' ); ?></p>
-			<div class="wc-gpd-prop-row"><button type="button" class="button button-link-delete" id="wc-gpd-template-delete-slot"><?php esc_html_e( 'Remove pick area', 'wc-generic-product-designer' ); ?></button></div>
+			<p class="description"><?php esc_html_e( 'Position and size are locked. Customers click this slot on the canvas to replace its content with a graphic from the assigned library.', 'wc-generic-product-designer' ); ?></p>
+			<div class="wc-gpd-prop-row"><button type="button" class="button button-link-delete" id="wc-gpd-template-delete-slot"><?php esc_html_e( 'Remove replaceable slot', 'wc-generic-product-designer' ); ?></button></div>
 		</div>
 	</div>
 </div>

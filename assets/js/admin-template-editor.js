@@ -16,7 +16,8 @@
 	const layersListEl = document.getElementById( 'wc-gpd-template-layers-list' );
 	const layersEmptyHint = document.getElementById( 'wc-gpd-layers-empty-hint' );
 	const outlineToggle = document.getElementById( 'wc_gpd_template_is_outline' );
-	const bboxToggle = document.getElementById( 'wc_gpd_template_is_bbox' );
+	const productOutlineToggle = document.getElementById( 'wc_gpd_template_product_outline' );
+	const imprintAreaToggle = document.getElementById( 'wc_gpd_template_imprint_area' );
 	const strokeWidthInput = document.getElementById( 'wc_gpd_template_stroke_width' );
 	const shapePropsFields = document.getElementById( 'wc-gpd-shape-appearance-panel' );
 	const shapeStrokeWidthRow = document.getElementById( 'wc-gpd-shape-stroke-width-row' );
@@ -46,8 +47,9 @@
 	const measureRightEl = document.getElementById( 'wc-gpd-tpl-measure-right' );
 
 	const SERIALIZE_PROPS = [
-		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox',
+		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox', 'wcGpdBboxRole',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
+		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
 		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
@@ -286,7 +288,7 @@
 	}
 
 	function isShapeType( obj ) {
-		if ( ! obj || obj.wcGpdLayerType === 'graphic_slot' || obj.wcGpdGraphicSlot ) {
+		if ( ! obj || obj.wcGpdLayerType === 'graphic_slot' || obj.wcGpdLayerType === 'replaceable' || obj.wcGpdGraphicSlot || obj.wcGpdReplaceable ) {
 			return false;
 		}
 		const shapeTypes = [ 'rect', 'circle', 'ellipse', 'polygon', 'path', 'polyline', 'group', 'line' ];
@@ -391,7 +393,7 @@
 	}
 
 	function applyShapeStyleFromFlags( obj ) {
-		if ( ! isShape( obj ) || obj.wcGpdBoundingBox ) {
+		if ( ! isShape( obj ) || obj.wcGpdBboxRole || obj.wcGpdBoundingBox ) {
 			return;
 		}
 		inferShapeStyleFlags( obj );
@@ -433,7 +435,7 @@
 	}
 
 	function applyShapeFillColor( obj, color ) {
-		if ( ! obj || ! isShape( obj ) || obj.wcGpdBoundingBox ) {
+		if ( ! obj || ! isShape( obj ) || obj.wcGpdBboxRole || obj.wcGpdBoundingBox ) {
 			return;
 		}
 		function applyToTarget( target ) {
@@ -450,7 +452,7 @@
 	}
 
 	function applyShapeStrokeColor( obj, color ) {
-		if ( ! obj || ! isShape( obj ) || obj.wcGpdBoundingBox ) {
+		if ( ! obj || ! isShape( obj ) || obj.wcGpdBboxRole || obj.wcGpdBoundingBox ) {
 			return;
 		}
 		const strokeWidth = getShapeStrokeWidth( obj );
@@ -546,7 +548,12 @@
 	}
 
 	function isGraphicSlot( obj ) {
-		return obj && ( obj.wcGpdLayerType === 'graphic_slot' || ( obj.type === 'rect' && obj.wcGpdGraphicSlot ) );
+		return obj && (
+			obj.wcGpdLayerType === 'graphic_slot'
+			|| obj.wcGpdLayerType === 'replaceable'
+			|| ( obj.type === 'rect' && obj.wcGpdGraphicSlot )
+			|| !! obj.wcGpdReplaceable
+		);
 	}
 
 	function isTextLayer( obj ) {
@@ -604,7 +611,7 @@
 			return 'Repositionable graphic';
 		}
 		if ( isGraphicSlot( obj ) ) {
-			return 'Graphic pick area';
+			return 'Replaceable graphic slot';
 		}
 		if ( isTextLayer( obj ) ) {
 			if ( obj.wcGpdLayerLabel ) {
@@ -616,8 +623,11 @@
 			const text = ( obj.text || '' ).trim();
 			return text ? text.slice( 0, 32 ) : 'Text field';
 		}
-		if ( obj.wcGpdBoundingBox ) {
-			return 'Bounding box';
+		if ( obj.wcGpdBboxRole === 'imprint_area' ) {
+			return 'Imprint area';
+		}
+		if ( obj.wcGpdBboxRole === 'product_outline' || obj.wcGpdBoundingBox ) {
+			return 'Product outline';
 		}
 		if ( obj.wcGpdOutlineLayer ) {
 			return 'Outline';
@@ -629,7 +639,7 @@
 		if ( ! documentData.views.length ) {
 			documentData = {
 				version: 2,
-				views: [ { id: 'view_front', label: 'Front', template_image_id: 0, bounding_box_uid: '', objects: [] } ],
+				views: [ { id: 'view_front', label: 'Front', template_image_id: 0, bounding_box_uid: '', product_outline_uid: '', imprint_area_uid: '', objects: [] } ],
 			};
 		}
 		if ( ! activeViewId ) {
@@ -673,10 +683,25 @@
 		}
 		view.objects = canvas.getObjects().map( ( obj ) => obj.toObject( SERIALIZE_PROPS ) );
 		view.bounding_box_uid = '';
+		view.product_outline_uid = '';
+		view.imprint_area_uid = '';
 		view.template_image_id = 0;
+		const assignedRoles = new Set();
 		view.objects.forEach( ( obj ) => {
-			if ( obj.wcGpdBoundingBox && obj.wcGpdUid ) {
+			if ( obj.wcGpdBboxRole ) {
+				if ( assignedRoles.has( obj.wcGpdBboxRole ) ) {
+					obj.wcGpdBboxRole = '';
+					obj.wcGpdBoundingBox = false;
+				} else {
+					assignedRoles.add( obj.wcGpdBboxRole );
+				}
+			}
+			if ( obj.wcGpdBboxRole === 'product_outline' && obj.wcGpdUid ) {
+				view.product_outline_uid = obj.wcGpdUid;
 				view.bounding_box_uid = obj.wcGpdUid;
+			}
+			if ( obj.wcGpdBboxRole === 'imprint_area' && obj.wcGpdUid ) {
+				view.imprint_area_uid = obj.wcGpdUid;
 			}
 		} );
 	}
@@ -698,27 +723,40 @@
 			obj.wcGpdOutlineLayer = outlineToggle.checked;
 			obj.wcGpdLayerType = outlineToggle.checked ? 'outline' : 'shape';
 		}
-		if ( bboxToggle && bboxToggle.checked ) {
+		if ( productOutlineToggle && productOutlineToggle.checked ) {
 			obj.wcGpdOutlineLayer = true;
 			obj.wcGpdLayerType = 'outline';
-			if ( outlineToggle ) {
-				outlineToggle.checked = true;
+			obj.wcGpdBboxRole = 'product_outline';
+			obj.wcGpdBoundingBox = true;
+			if ( imprintAreaToggle ) {
+				imprintAreaToggle.checked = false;
 			}
 			canvas.getObjects().forEach( ( other ) => {
-				if ( other !== obj && isShape( other ) ) {
+				if ( other !== obj && isShape( other ) && other.wcGpdBboxRole === 'product_outline' ) {
+					other.wcGpdBboxRole = '';
 					other.wcGpdBoundingBox = false;
-					if ( other.wcGpdOutlineLayer ) {
-						applyStrokeToObject( other, false );
-					}
+					applyStrokeToObject( other, false );
 				}
 			} );
-			obj.wcGpdBoundingBox = true;
 			applyStrokeToObject( obj, true );
-			const view = getActiveView();
-			if ( view ) {
-				view.bounding_box_uid = obj.wcGpdUid;
+		} else if ( imprintAreaToggle && imprintAreaToggle.checked ) {
+			obj.wcGpdOutlineLayer = true;
+			obj.wcGpdLayerType = 'outline';
+			obj.wcGpdBboxRole = 'imprint_area';
+			obj.wcGpdBoundingBox = false;
+			if ( productOutlineToggle ) {
+				productOutlineToggle.checked = false;
 			}
-		} else if ( bboxToggle ) {
+			canvas.getObjects().forEach( ( other ) => {
+				if ( other !== obj && isShape( other ) && other.wcGpdBboxRole === 'imprint_area' ) {
+					other.wcGpdBboxRole = '';
+					other.wcGpdBoundingBox = false;
+					applyStrokeToObject( other, false );
+				}
+			} );
+			applyStrokeToObject( obj, true );
+		} else {
+			obj.wcGpdBboxRole = '';
 			obj.wcGpdBoundingBox = false;
 			applyStrokeToObject( obj, false );
 		}
@@ -1929,11 +1967,13 @@
 			syncGraphicSlotPropsPanel( active );
 		}
 
-		if ( bboxToggle ) {
-			bboxToggle.disabled = ! shapeSelected;
-			if ( shapeSelected ) {
-				bboxToggle.checked = !! active.wcGpdBoundingBox;
-			}
+		if ( productOutlineToggle ) {
+			productOutlineToggle.disabled = ! shapeSelected;
+			productOutlineToggle.checked = !!( shapeSelected && active.wcGpdBboxRole === 'product_outline' );
+		}
+		if ( imprintAreaToggle ) {
+			imprintAreaToggle.disabled = ! shapeSelected;
+			imprintAreaToggle.checked = !!( shapeSelected && active.wcGpdBboxRole === 'imprint_area' );
 		}
 		if ( outlineToggle && shapeSelected ) {
 			outlineToggle.checked = !! active.wcGpdOutlineLayer;
@@ -2273,12 +2313,12 @@
 			}
 		} );
 		canvas.getObjects().forEach( ( obj ) => {
-			if ( isShape( obj ) && ! obj.wcGpdBoundingBox ) {
+			if ( isShape( obj ) && ! obj.wcGpdBboxRole && ! obj.wcGpdBoundingBox ) {
 				canvas.bringToFront( obj );
 			}
 		} );
 		canvas.getObjects().forEach( ( obj ) => {
-			if ( obj.wcGpdBoundingBox ) {
+			if ( obj.wcGpdBboxRole || obj.wcGpdBoundingBox ) {
 				canvas.bringToFront( obj );
 			}
 		} );
@@ -2364,8 +2404,23 @@
 				return;
 			}
 			fabric.util.enlivenObjects( objects, ( enlivened ) => {
+				const productOutlineUid = view.product_outline_uid || view.bounding_box_uid || '';
+				const imprintAreaUid = view.imprint_area_uid || '';
 				enlivened.forEach( ( obj, index ) => {
 					applyTemplateMetadata( obj, objects[ index ] );
+					if ( ! obj.wcGpdBboxRole && obj.wcGpdUid ) {
+						if ( productOutlineUid && obj.wcGpdUid === productOutlineUid ) {
+							obj.wcGpdBboxRole = 'product_outline';
+						} else if ( imprintAreaUid && obj.wcGpdUid === imprintAreaUid ) {
+							obj.wcGpdBboxRole = 'imprint_area';
+						}
+					}
+					obj.wcGpdBoundingBox = obj.wcGpdBboxRole === 'product_outline';
+					if ( isGraphicSlot( obj ) ) {
+						obj.wcGpdLayerType = 'replaceable';
+						obj.wcGpdReplaceable = true;
+						obj.wcGpdReplaceableKind = obj.wcGpdReplaceableKind || 'graphic';
+					}
 					prepareLoadedObject( obj );
 					canvas.add( obj );
 				} );
@@ -2723,8 +2778,10 @@
 			strokeDashArray: [ 6, 4 ],
 			wcGpdUid: uid(),
 			wcGpdTemplateLayer: true,
-			wcGpdLayerType: 'graphic_slot',
+			wcGpdLayerType: 'replaceable',
 			wcGpdGraphicSlot: true,
+			wcGpdReplaceable: true,
+			wcGpdReplaceableKind: 'graphic',
 			wcGpdCustomerMovable: false,
 			wcGpdCustomerResizable: false,
 		} );
@@ -2895,7 +2952,7 @@
 		documentData.views.push( {
 			id: `view_${ index }`,
 			label: presets[ index - 1 ] || `Area ${ index }`,
-			template_image_id: 0, bounding_box_uid: '', objects: [],
+			template_image_id: 0, bounding_box_uid: '', product_outline_uid: '', imprint_area_uid: '', objects: [],
 		} );
 		loadView( `view_${ index }` );
 		syncMaxViewsField();
@@ -2974,6 +3031,14 @@
 		if ( documentData.views.length > MAX_VIEWS ) {
 			documentData.views = documentData.views.slice( 0, MAX_VIEWS );
 		}
+		documentData.views.forEach( ( view ) => {
+			if ( typeof view.product_outline_uid === 'undefined' ) {
+				view.product_outline_uid = view.bounding_box_uid || '';
+			}
+			if ( typeof view.imprint_area_uid === 'undefined' ) {
+				view.imprint_area_uid = '';
+			}
+		} );
 		syncMaxViewsField();
 		loadView( documentData.views[ 0 ].id, { skipPersist: true } );
 	}
@@ -3430,28 +3495,43 @@
 			active.wcGpdOutlineLayer = outlineToggle.checked;
 			active.wcGpdLayerType = outlineToggle.checked ? 'outline' : 'shape';
 			if ( ! outlineToggle.checked ) {
+				active.wcGpdBboxRole = '';
 				active.wcGpdBoundingBox = false;
-				if ( bboxToggle ) {
-					bboxToggle.checked = false;
+				if ( productOutlineToggle ) {
+					productOutlineToggle.checked = false;
+				}
+				if ( imprintAreaToggle ) {
+					imprintAreaToggle.checked = false;
 				}
 			}
-			applyStrokeToObject( active, active.wcGpdBoundingBox );
+			applyStrokeToObject( active, !! active.wcGpdBboxRole || active.wcGpdBoundingBox );
 			canvas.requestRenderAll();
 		} );
 	}
 
-	if ( bboxToggle ) {
-		bboxToggle.addEventListener( 'change', () => {
+	if ( productOutlineToggle ) {
+		productOutlineToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
 			if ( ! active || ! isShape( active ) ) {
 				return;
 			}
-			if ( bboxToggle.checked ) {
-				syncShapeFlags( active );
-			} else {
-				active.wcGpdBoundingBox = false;
-				applyStrokeToObject( active, false );
+			if ( productOutlineToggle.checked && imprintAreaToggle ) {
+				imprintAreaToggle.checked = false;
 			}
+			syncShapeFlags( active );
+			canvas.requestRenderAll();
+		} );
+	}
+	if ( imprintAreaToggle ) {
+		imprintAreaToggle.addEventListener( 'change', () => {
+			const active = canvas.getActiveObject();
+			if ( ! active || ! isShape( active ) ) {
+				return;
+			}
+			if ( imprintAreaToggle.checked && productOutlineToggle ) {
+				productOutlineToggle.checked = false;
+			}
+			syncShapeFlags( active );
 			canvas.requestRenderAll();
 		} );
 	}
@@ -3459,7 +3539,7 @@
 	if ( shapeUseFillToggle ) {
 		shapeUseFillToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBboxRole || active.wcGpdBoundingBox ) {
 				return;
 			}
 			active.wcGpdShapeUseFill = shapeUseFillToggle.checked;
@@ -3479,7 +3559,7 @@
 	if ( shapeUseStrokeToggle ) {
 		shapeUseStrokeToggle.addEventListener( 'change', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBboxRole || active.wcGpdBoundingBox ) {
 				return;
 			}
 			active.wcGpdShapeUseStroke = shapeUseStrokeToggle.checked;
@@ -3499,7 +3579,7 @@
 	if ( strokeWidthInput ) {
 		strokeWidthInput.addEventListener( 'input', () => {
 			const active = canvas.getActiveObject();
-			if ( ! active || ! isShape( active ) || active.wcGpdBoundingBox ) {
+			if ( ! active || ! isShape( active ) || active.wcGpdBboxRole || active.wcGpdBoundingBox ) {
 				return;
 			}
 			applyShapeStrokeWidth( active, parseFloat( strokeWidthInput.value ) || defaultOutlineWidth() );

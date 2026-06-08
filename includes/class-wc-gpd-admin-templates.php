@@ -633,7 +633,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 									<button type="button" class="wc-gpd-add-menu__toggle" aria-expanded="false"><?php esc_html_e( 'Images & graphics', 'wc-generic-product-designer' ); ?></button>
 									<div class="wc-gpd-add-menu__body" hidden>
 										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-image"><?php esc_html_e( 'Image from library', 'wc-generic-product-designer' ); ?></button>
-										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Customer pick area', 'wc-generic-product-designer' ); ?></button>
+										<button type="button" class="button button-small wc-gpd-add-menu__btn" id="wc-gpd-template-add-graphic-slot"><?php esc_html_e( 'Replaceable slot', 'wc-generic-product-designer' ); ?></button>
 									</div>
 								</div>
 								<div class="wc-gpd-add-menu__group">
