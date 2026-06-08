@@ -28,6 +28,8 @@ class WC_GPD_Design_Json {
 		'circle',
 		'ellipse',
 		'image',
+		'group',
+		'path',
 	);
 
 	/**
@@ -146,6 +148,20 @@ class WC_GPD_Design_Json {
 				if ( $is_placeholder && ! empty( $object['wcGpdPlaceholderKey'] ) ) {
 					$object['wcGpdPlaceholderKey'] = sanitize_key( (string) $object['wcGpdPlaceholderKey'] );
 				}
+			} elseif ( 'group' === $type ) {
+				if ( empty( $object['objects'] ) || ! is_array( $object['objects'] ) ) {
+					continue;
+				}
+				$nested = self::sanitize_objects( $object['objects'] );
+				if ( empty( $nested ) ) {
+					continue;
+				}
+				$object['objects'] = $nested;
+				if ( empty( $object['wcGpdLayerType'] ) ) {
+					$object['wcGpdLayerType'] = 'shape';
+				}
+			} elseif ( 'path' === $type ) {
+				$object['wcGpdLayerType'] = ! empty( $object['wcGpdLayerType'] ) ? sanitize_key( (string) $object['wcGpdLayerType'] ) : 'shape';
 			} elseif ( 'image' === $type ) {
 				$src = ! empty( $object['src'] ) ? esc_url_raw( (string) $object['src'] ) : '';
 				if ( ! $src ) {
@@ -235,5 +251,24 @@ class WC_GPD_Design_Json {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Normalize stored JSON for edit mode (empty when nothing editable remains).
+	 *
+	 * @param string $json Stored JSON.
+	 * @return string
+	 */
+	public static function for_edit_context( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return '';
+		}
+
+		if ( ! self::has_design( $json ) ) {
+			return '';
+		}
+
+		$encoded = wp_json_encode( self::parse( $json ) );
+		return $encoded ? $encoded : '';
 	}
 }

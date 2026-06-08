@@ -4564,38 +4564,72 @@
 		applyResponsiveScale();
 	}
 
+	/**
+	 * Populate viewDesigns from saved multi-view JSON.
+	 *
+	 * @param {object} data Parsed design JSON.
+	 * @returns {boolean}
+	 */
+	function hydrateViewDesignsFromJson( data ) {
+		if ( ! data.views || typeof data.views !== 'object' ) {
+			return false;
+		}
+
+		Object.keys( data.views ).forEach( ( viewId ) => {
+			const entry = data.views[ viewId ];
+			if ( entry && Array.isArray( entry.objects ) && entry.objects.length ) {
+				viewDesigns[ viewId ] = entry.objects;
+			}
+		} );
+
+		const firstWithDesign = templateViews.find( ( view ) => viewDesigns[ view.id ] && viewDesigns[ view.id ].length );
+		if ( firstWithDesign ) {
+			activeViewId = firstWithDesign.id;
+			return true;
+		}
+
+		const orphanKey = Object.keys( data.views ).find( ( viewId ) => {
+			const entry = data.views[ viewId ];
+			return entry && Array.isArray( entry.objects ) && entry.objects.length;
+		} );
+
+		if ( orphanKey && templateViews.length ) {
+			viewDesigns[ templateViews[ 0 ].id ] = data.views[ orphanKey ].objects;
+			activeViewId = templateViews[ 0 ].id;
+			return true;
+		}
+
+		return false;
+	}
+
+	function tryLoadDesignFromSvg() {
+		if ( ! config.existingDesignSvg ) {
+			return Promise.reject( new Error( 'no-design' ) );
+		}
+		return loadDesignFromSvg( config.existingDesignSvg );
+	}
+
 	function loadExistingDesign() {
 		if ( config.existingDesignJson ) {
 			try {
 				const data = JSON.parse( config.existingDesignJson );
 				if ( data.views && typeof data.views === 'object' ) {
-					Object.keys( data.views ).forEach( ( viewId ) => {
-						const entry = data.views[ viewId ];
-						if ( entry && Array.isArray( entry.objects ) ) {
-							viewDesigns[ viewId ] = entry.objects;
-						}
-					} );
-					const firstWithDesign = templateViews.find( ( view ) => viewDesigns[ view.id ] && viewDesigns[ view.id ].length );
-					if ( firstWithDesign ) {
-						activeViewId = firstWithDesign.id;
+					if ( hydrateViewDesignsFromJson( data ) ) {
+						return loadDesignView( activeViewId );
 					}
-					return loadDesignView( activeViewId );
+					return tryLoadDesignFromSvg();
+				}
+				if ( data.objects && data.objects.length ) {
+					return loadDesignFromJson( config.existingDesignJson );
 				}
 			} catch ( error ) {
-				log.warn( 'Failed to parse multi-view design JSON', error );
+				log.warn( 'Failed to parse saved design JSON', error );
 			}
-			return loadDesignFromJson( config.existingDesignJson );
+
+			return loadDesignFromJson( config.existingDesignJson ).catch( () => tryLoadDesignFromSvg() );
 		}
 
-		if ( config.isEditing ) {
-			return Promise.reject( new Error( 'no-json' ) );
-		}
-
-		if ( config.existingDesignSvg ) {
-			return loadDesignFromSvg( config.existingDesignSvg );
-		}
-
-		return Promise.reject( new Error( 'no-design' ) );
+		return tryLoadDesignFromSvg();
 	}
 
 	initFontSelect();
@@ -4636,6 +4670,48 @@
 
 	applyCtaLabel();
 	initFallbackCta();
+
+	function submitOrderDownload( preset ) {
+		if ( ! config.orderEdit || ! config.adminPostUrl ) {
+			return;
+		}
+
+		const saveForm = document.createElement( 'form' );
+		saveForm.method = 'POST';
+		saveForm.action = config.adminPostUrl;
+		saveForm.style.display = 'none';
+
+		const fields = {
+			action: config.orderDownloadAction,
+			order_id: String( config.orderId ),
+			item_id: String( config.orderItemId ),
+			_wpnonce: config.orderDownloadNonce,
+			wc_gpd_preset: preset || 'production',
+		};
+
+		Object.keys( fields ).forEach( ( name ) => {
+			const input = document.createElement( 'input' );
+			input.type = 'hidden';
+			input.name = name;
+			input.value = fields[ name ];
+			saveForm.appendChild( input );
+		} );
+
+		document.body.appendChild( saveForm );
+		saveForm.submit();
+	}
+
+	function bindOrderDownloads() {
+		if ( ! config.orderEdit ) {
+			return;
+		}
+
+		document.querySelectorAll( '.wc-gpd-order-download' ).forEach( ( btn ) => {
+			btn.addEventListener( 'click', () => {
+				submitOrderDownload( btn.getAttribute( 'data-preset' ) || 'production' );
+			} );
+		} );
+	}
 
 	function bindOrderSave() {
 		const btn = document.getElementById( 'wc-gpd-save-order-design' );
@@ -4695,6 +4771,7 @@
 				}
 
 				bindOrderSave();
+				bindOrderDownloads();
 				log.info( 'Designer ready' );
 			} );
 		} );

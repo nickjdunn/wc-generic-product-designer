@@ -99,9 +99,6 @@ class WC_GPD_Admin_Order implements WC_GPD_Module {
 			return;
 		}
 
-		$defaults = WC_GPD_Settings::export_defaults();
-		$proof    = WC_GPD_Settings::proof_export_defaults();
-
 		echo '<div class="wc-gpd-order-designs">';
 		foreach ( $design_items as $item_id => $data ) {
 			/** @var WC_Order_Item_Product $item */
@@ -121,61 +118,12 @@ class WC_GPD_Admin_Order implements WC_GPD_Module {
 
 				<?php if ( $edit_url ) : ?>
 					<p>
-						<a href="<?php echo esc_url( $edit_url ); ?>" class="button" target="_blank" rel="noopener noreferrer">
-							<?php esc_html_e( 'Edit design before download', 'wc-generic-product-designer' ); ?>
+						<a href="<?php echo esc_url( $edit_url ); ?>" class="button button-primary" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Edit design', 'wc-generic-product-designer' ); ?>
 						</a>
 					</p>
+					<p class="description"><?php esc_html_e( 'Open the designer to edit, save changes, and download production or proof files.', 'wc-generic-product-designer' ); ?></p>
 				<?php endif; ?>
-
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wc-gpd-order-download-form">
-					<?php wp_nonce_field( self::NONCE_DOWNLOAD . '_' . $order->get_id() . '_' . $item_id ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( self::DOWNLOAD_ACTION ); ?>" />
-					<input type="hidden" name="order_id" value="<?php echo esc_attr( (string) $order->get_id() ); ?>" />
-					<input type="hidden" name="item_id" value="<?php echo esc_attr( (string) $item_id ); ?>" />
-					<input type="hidden" name="wc_gpd_preset" value="production" />
-
-					<p><strong><?php esc_html_e( 'Download production file', 'wc-generic-product-designer' ); ?></strong></p>
-					<p class="description"><?php esc_html_e( 'Uses your default production preset from Template Designer → Production.', 'wc-generic-product-designer' ); ?></p>
-					<input type="hidden" name="wc_gpd_inc_background" value="<?php echo ! empty( $defaults['include_background'] ) ? '1' : '0'; ?>" />
-					<input type="hidden" name="wc_gpd_inc_text" value="<?php echo ! empty( $defaults['include_text'] ) ? '1' : '0'; ?>" />
-					<input type="hidden" name="wc_gpd_inc_outlines" value="<?php echo ! empty( $defaults['include_outlines'] ) ? '1' : '0'; ?>" />
-					<input type="hidden" name="wc_gpd_inc_shapes" value="<?php echo ! empty( $defaults['include_shapes'] ) ? '1' : '0'; ?>" />
-					<input type="hidden" name="wc_gpd_rasterize" value="<?php echo ! empty( $defaults['rasterize'] ) ? '1' : '0'; ?>" />
-					<button type="submit" class="button button-primary button-large"><?php esc_html_e( 'Download production file', 'wc-generic-product-designer' ); ?></button>
-				</form>
-
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wc-gpd-order-download-form wc-gpd-order-download-form--proof">
-					<?php wp_nonce_field( self::NONCE_DOWNLOAD . '_' . $order->get_id() . '_' . $item_id ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( self::DOWNLOAD_ACTION ); ?>" />
-					<input type="hidden" name="order_id" value="<?php echo esc_attr( (string) $order->get_id() ); ?>" />
-					<input type="hidden" name="item_id" value="<?php echo esc_attr( (string) $item_id ); ?>" />
-					<input type="hidden" name="wc_gpd_preset" value="proof" />
-					<input type="hidden" name="wc_gpd_inc_background" value="<?php echo ! empty( $proof['include_background'] ) ? '1' : '0'; ?>" />
-					<input type="hidden" name="wc_gpd_inc_text" value="1" />
-					<input type="hidden" name="wc_gpd_inc_outlines" value="0" />
-					<input type="hidden" name="wc_gpd_inc_shapes" value="1" />
-					<input type="hidden" name="wc_gpd_rasterize" value="0" />
-					<button type="submit" class="button"><?php esc_html_e( 'Download customer proof', 'wc-generic-product-designer' ); ?></button>
-				</form>
-
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wc-gpd-order-download-form wc-gpd-order-download-form--custom">
-					<?php wp_nonce_field( self::NONCE_DOWNLOAD . '_' . $order->get_id() . '_' . $item_id ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( self::DOWNLOAD_ACTION ); ?>" />
-					<input type="hidden" name="order_id" value="<?php echo esc_attr( (string) $order->get_id() ); ?>" />
-					<input type="hidden" name="item_id" value="<?php echo esc_attr( (string) $item_id ); ?>" />
-					<input type="hidden" name="wc_gpd_preset" value="custom" />
-
-					<p><strong><?php esc_html_e( 'Download with custom options', 'wc-generic-product-designer' ); ?></strong></p>
-					<div class="wc-gpd-download-options">
-						<label><input type="checkbox" name="wc_gpd_inc_background" value="1" /> <?php esc_html_e( 'Product background image', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_inc_text" value="1" checked="checked" /> <?php esc_html_e( 'Customer text', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_inc_outlines" value="1" checked="checked" /> <?php esc_html_e( 'Template outline lines', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_inc_shapes" value="1" checked="checked" /> <?php esc_html_e( 'Customer shapes', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_rasterize" value="1" id="wc_gpd_rasterize_<?php echo esc_attr( (string) $item_id ); ?>" /> <?php esc_html_e( 'Rasterize (PNG)', 'wc-generic-product-designer' ); ?></label>
-						<label><input type="checkbox" name="wc_gpd_transparent_raster" value="1" checked="checked" /> <?php esc_html_e( 'Transparent PNG background (when rasterizing)', 'wc-generic-product-designer' ); ?></label>
-					</div>
-					<button type="submit" class="button"><?php esc_html_e( 'Download custom file', 'wc-generic-product-designer' ); ?></button>
-				</form>
 			</div>
 			<?php
 		}

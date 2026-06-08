@@ -389,7 +389,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'nonceName'          => self::NONCE_NAME,
 				'editCartKey'        => ( $edit_context && ! empty( $edit_context['cart_item_key'] ) ) ? $edit_context['cart_item_key'] : '',
 				'existingDesignSvg'  => $edit_context ? $edit_context['svg'] : '',
-				'existingDesignJson' => $edit_context && ! empty( $edit_context['json'] ) ? $edit_context['json'] : '',
+				'existingDesignJson' => $edit_context && ! empty( $edit_context['json'] ) ? WC_GPD_Design_Json::for_edit_context( $edit_context['json'] ) : '',
+				'orderDownloadAction' => WC_GPD_Admin_Order::DOWNLOAD_ACTION,
+				'orderDownloadNonce'  => $order_edit ? wp_create_nonce( WC_GPD_Admin_Order::NONCE_DOWNLOAD . '_' . $order_edit['order_id'] . '_' . $order_edit['item_id'] ) : '',
 				'isEditing'          => (bool) $edit_context,
 				'orderEdit'          => (bool) ( $order_edit ?? false ),
 				'orderId'            => $order_edit ? (int) $order_edit['order_id'] : 0,
@@ -543,9 +545,11 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			'wc-gpd-modern-studio-root',
 		);
 
-		$atc_label = $edit_context
-			? __( 'Update cart with design', 'wc-generic-product-designer' )
-			: __( 'Add to cart', 'wc-generic-product-designer' );
+		$atc_label = $order_edit
+			? ''
+			: ( $edit_context && ! empty( $edit_context['cart_item_key'] )
+				? __( 'Update cart with design', 'wc-generic-product-designer' )
+				: __( 'Add to cart', 'wc-generic-product-designer' ) );
 
 		$show_diagnostics = WC_GPD_Settings::is_js_debug_enabled()
 			|| current_user_can( 'manage_woocommerce' )
@@ -564,7 +568,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		>
 			<?php if ( $order_edit ) : ?>
 				<p class="wc-gpd-designer__notice wc-gpd-designer__notice--inline" role="status">
-					<?php esc_html_e( 'You are editing this order design. Save when finished, then return to the order to download.', 'wc-generic-product-designer' ); ?>
+					<?php esc_html_e( 'You are editing this order design. Save changes, then download production or proof files below.', 'wc-generic-product-designer' ); ?>
 				</p>
 			<?php elseif ( $edit_context ) : ?>
 				<p class="wc-gpd-designer__notice wc-gpd-designer__notice--inline" role="status">
@@ -772,7 +776,9 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 						</button>
 					<?php endif; ?>
 				</div>
-				<button type="button" class="wc-gpd-studio-footer__atc" id="wc-gpd-designer-atc"><?php echo esc_html( $atc_label ); ?></button>
+				<?php if ( ! $order_edit ) : ?>
+					<button type="button" class="wc-gpd-studio-footer__atc" id="wc-gpd-designer-atc"><?php echo esc_html( $atc_label ); ?></button>
+				<?php endif; ?>
 			</footer>
 			<input type="hidden" name="wc_gpd_design_svg" id="wc-gpd-design-svg" value="" />
 			<input type="hidden" name="wc_gpd_design_json" id="wc-gpd-design-json" value="" />
@@ -781,11 +787,17 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				<input type="hidden" name="wc_gpd_edit_cart_key" id="wc-gpd-edit-cart-key" value="<?php echo esc_attr( $edit_context['cart_item_key'] ); ?>" />
 			<?php endif; ?>
 			<?php if ( $order_edit ) : ?>
-				<p class="wc-gpd-designer__order-save">
+				<div class="wc-gpd-designer__order-actions">
 					<button type="button" class="button button-primary" id="wc-gpd-save-order-design">
 						<?php esc_html_e( 'Save design to order', 'wc-generic-product-designer' ); ?>
 					</button>
-				</p>
+					<button type="button" class="button wc-gpd-order-download" data-preset="production" id="wc-gpd-download-production">
+						<?php esc_html_e( 'Download production file', 'wc-generic-product-designer' ); ?>
+					</button>
+					<button type="button" class="button wc-gpd-order-download" data-preset="proof" id="wc-gpd-download-proof">
+						<?php esc_html_e( 'Download customer proof', 'wc-generic-product-designer' ); ?>
+					</button>
+				</div>
 			<?php endif; ?>
 			<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
 		</div>
@@ -826,12 +838,14 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return null;
 		}
 
+		$raw_json = ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] )
+			? (string) $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ]
+			: '';
+
 		return array(
 			'cart_item_key' => $cart_item_key,
 			'svg'           => $svg,
-			'json'          => ! empty( $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ] )
-				? $cart_item[ WC_GPD_Product_Meta::CART_KEY_DESIGN_JSON ]
-				: '',
+			'json'          => WC_GPD_Design_Json::for_edit_context( $raw_json ),
 		);
 	}
 
@@ -867,11 +881,13 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return null;
 		}
 
+		$raw_json = (string) $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true );
+
 		return array(
 			'order_id' => $order_id,
 			'item_id'  => $item_id,
 			'svg'      => $svg,
-			'json'     => $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true ),
+			'json'     => WC_GPD_Design_Json::for_edit_context( $raw_json ),
 		);
 	}
 

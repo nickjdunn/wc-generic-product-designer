@@ -241,7 +241,7 @@ class WC_GPD_Cart implements WC_GPD_Module {
 			return $item_data;
 		}
 
-		$edit_url = self::get_edit_design_url( $cart_item );
+		$edit_url = self::get_edit_design_url( $cart_item, self::resolve_cart_item_key( $cart_item ) );
 		$link     = $edit_url
 			? sprintf(
 				'<a href="%1$s" class="wc-gpd-edit-design">%2$s</a>',
@@ -404,6 +404,26 @@ class WC_GPD_Cart implements WC_GPD_Module {
 			),
 			$permalink
 		);
+	}
+
+	/**
+	 * Resolve cart line key for edit links.
+	 *
+	 * @param array $cart_item Cart item.
+	 * @return string
+	 */
+	public static function resolve_cart_item_key( $cart_item ) {
+		if ( ! WC()->cart ) {
+			return '';
+		}
+
+		foreach ( WC()->cart->get_cart() as $key => $item ) {
+			if ( $item === $cart_item ) {
+				return $key;
+			}
+		}
+
+		return self::find_cart_item_key( $cart_item );
 	}
 
 	/**
