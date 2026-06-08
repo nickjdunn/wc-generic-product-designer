@@ -89,8 +89,9 @@ class WC_GPD_Product_Meta {
 					'graphic_libraries'   => $template['graphic_libraries'],
 					'library_assignments' => $template['library_assignments'],
 					'icon_slugs'          => $template['icon_slugs'],
-					'template_palettes' => $template['template_palettes'],
-					'product_settings'  => $product_settings,
+					'template_palettes'      => $template['template_palettes'],
+					'template_font_palettes' => $template['template_font_palettes'],
+					'product_settings'       => $product_settings,
 				);
 			}
 		}

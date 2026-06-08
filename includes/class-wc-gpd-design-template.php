@@ -21,7 +21,8 @@ class WC_GPD_Design_Template {
 	const META_GRAPHIC_LIBRARY    = '_wc_gpd_graphic_library';
 	const META_GRAPHIC_LIBRARIES = '_wc_gpd_graphic_libraries';
 	const META_TEMPLATE_FONTS    = '_wc_gpd_template_fonts';
-	const META_TEMPLATE_PALETTES = '_wc_gpd_template_palettes';
+	const META_TEMPLATE_PALETTES      = '_wc_gpd_template_palettes';
+	const META_TEMPLATE_FONT_PALETTES = '_wc_gpd_template_font_palettes';
 
 	/**
 	 * Register post type.
@@ -121,8 +122,9 @@ class WC_GPD_Design_Template {
 			'library_assignments'     => self::get_library_assignments( $template_id ),
 			'icon_slugs'              => self::get_icon_slugs_for_template( $template_id ),
 			'template_fonts'     => self::get_template_fonts( $template_id ),
-			'template_palettes'  => self::get_palettes( $template_id ),
-			'product_settings'   => WC_GPD_Product_Settings::get( $template_id ),
+			'template_palettes'       => self::get_palettes( $template_id ),
+			'template_font_palettes'  => self::get_font_palettes( $template_id ),
+			'product_settings'        => WC_GPD_Product_Settings::get( $template_id ),
 		);
 	}
 
@@ -251,6 +253,160 @@ class WC_GPD_Design_Template {
 	}
 
 	/**
+	 * Default font palette document.
+	 *
+	 * @return array
+	 */
+	public static function default_font_palettes_data() {
+		return array(
+			'palettes'              => array(
+				array(
+					'id'    => 'fp_default',
+					'name'  => __( 'Default', 'wc-generic-product-designer' ),
+					'fonts' => array(),
+				),
+			),
+			'use_global_fonts'      => false,
+			'global_font_palette_id' => 'fp_custom',
+			'global_fonts'          => array(),
+		);
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return array
+	 */
+	public static function get_font_palettes( $template_id ) {
+		$raw = get_post_meta( absint( $template_id ), self::META_TEMPLATE_FONT_PALETTES, true );
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$data = json_decode( $raw, true );
+			if ( is_array( $data ) ) {
+				return self::sanitize_font_palettes_data( $data, $template_id );
+			}
+		}
+		if ( is_array( $raw ) ) {
+			return self::sanitize_font_palettes_data( $raw, $template_id );
+		}
+		return self::sanitize_font_palettes_data( self::default_font_palettes_data(), $template_id );
+	}
+
+	/**
+	 * @param array $data        Font palette payload.
+	 * @param int   $template_id Template ID for font key validation.
+	 * @return array
+	 */
+	public static function sanitize_font_palettes_data( array $data, $template_id = 0 ) {
+		$defaults      = self::default_font_palettes_data();
+		$allowed_keys  = self::get_template_font_keys_for_palettes( $template_id );
+		$clean         = array(
+			'palettes'               => array(),
+			'use_global_fonts'       => ! empty( $data['use_global_fonts'] ),
+			'global_font_palette_id' => 'fp_custom',
+			'global_fonts'           => array(),
+		);
+
+		if ( ! empty( $data['palettes'] ) && is_array( $data['palettes'] ) ) {
+			foreach ( $data['palettes'] as $palette ) {
+				if ( ! is_array( $palette ) ) {
+					continue;
+				}
+				$id = ! empty( $palette['id'] ) ? sanitize_key( (string) $palette['id'] ) : '';
+				if ( ! $id ) {
+					continue;
+				}
+				$name  = ! empty( $palette['name'] ) ? sanitize_text_field( (string) $palette['name'] ) : $id;
+				$fonts = self::sanitize_font_palette_keys( $palette['fonts'] ?? array(), $allowed_keys );
+				if ( empty( $fonts ) && ! empty( $allowed_keys ) ) {
+					$fonts = $allowed_keys;
+				}
+				$clean['palettes'][] = array(
+					'id'    => $id,
+					'name'  => $name,
+					'fonts' => array_values( array_unique( $fonts ) ),
+				);
+			}
+		}
+
+		if ( empty( $clean['palettes'] ) ) {
+			$clean['palettes'] = $defaults['palettes'];
+			if ( ! empty( $allowed_keys ) ) {
+				$clean['palettes'][0]['fonts'] = $allowed_keys;
+			}
+		}
+
+		$global_palette_id = ! empty( $data['global_font_palette_id'] ) ? sanitize_key( (string) $data['global_font_palette_id'] ) : 'fp_custom';
+		if ( 'fp_custom' !== $global_palette_id ) {
+			$known = wp_list_pluck( $clean['palettes'], 'id' );
+			if ( ! in_array( $global_palette_id, $known, true ) ) {
+				$global_palette_id = 'fp_custom';
+			}
+		}
+		$clean['global_font_palette_id'] = $global_palette_id;
+
+		$clean['global_fonts'] = self::sanitize_font_palette_keys( $data['global_fonts'] ?? array(), $allowed_keys );
+		if ( empty( $clean['global_fonts'] ) && ! empty( $allowed_keys ) ) {
+			$clean['global_fonts'] = $allowed_keys;
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * @param string $json        JSON font palettes.
+	 * @param int    $template_id Template ID.
+	 * @return array
+	 */
+	public static function sanitize_font_palettes_json( $json, $template_id = 0 ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::sanitize_font_palettes_data( self::default_font_palettes_data(), $template_id );
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::sanitize_font_palettes_data( self::default_font_palettes_data(), $template_id );
+		}
+		return self::sanitize_font_palettes_data( $data, $template_id );
+	}
+
+	/**
+	 * @param int $template_id Template ID.
+	 * @return string[]
+	 */
+	private static function get_template_font_keys_for_palettes( $template_id ) {
+		$fonts = WC_GPD_Font_Registry::fonts_for_template( $template_id );
+		$keys  = array();
+		foreach ( $fonts as $font ) {
+			if ( ! empty( $font['key'] ) ) {
+				$keys[] = sanitize_text_field( (string) $font['key'] );
+			}
+		}
+		return array_values( array_unique( $keys ) );
+	}
+
+	/**
+	 * @param mixed    $fonts         Font keys.
+	 * @param string[] $allowed_keys  Allowed template font keys.
+	 * @return string[]
+	 */
+	private static function sanitize_font_palette_keys( $fonts, array $allowed_keys ) {
+		if ( ! is_array( $fonts ) ) {
+			return array();
+		}
+		$clean   = array();
+		$allowed = ! empty( $allowed_keys );
+		foreach ( $fonts as $key ) {
+			$key = sanitize_text_field( (string) $key );
+			if ( ! $key ) {
+				continue;
+			}
+			if ( $allowed && ! in_array( $key, $allowed_keys, true ) ) {
+				continue;
+			}
+			$clean[] = $key;
+		}
+		return array_values( array_unique( $clean ) );
+	}
+
+	/**
 	 * Create a new template.
 	 *
 	 * @param string $title Template name.
@@ -362,6 +518,10 @@ class WC_GPD_Design_Template {
 		$palettes_raw = isset( $_POST['wc_gpd_template_palettes'] ) ? wp_unslash( $_POST['wc_gpd_template_palettes'] ) : '';
 		$palettes     = self::sanitize_palettes_json( is_string( $palettes_raw ) ? $palettes_raw : '' );
 		update_post_meta( $template_id, self::META_TEMPLATE_PALETTES, wp_slash( wp_json_encode( $palettes ) ) );
+
+		$font_palettes_raw = isset( $_POST['wc_gpd_template_font_palettes'] ) ? wp_unslash( $_POST['wc_gpd_template_font_palettes'] ) : '';
+		$font_palettes     = self::sanitize_font_palettes_json( is_string( $font_palettes_raw ) ? $font_palettes_raw : '', $template_id );
+		update_post_meta( $template_id, self::META_TEMPLATE_FONT_PALETTES, wp_slash( wp_json_encode( $font_palettes ) ) );
 
 		WC_GPD_Product_Settings::save( $template_id, WC_GPD_Product_Settings::from_post( wp_unslash( $_POST ) ) );
 

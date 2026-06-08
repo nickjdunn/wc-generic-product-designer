@@ -350,6 +350,8 @@ class WC_GPD_Template_Json {
 
 		self::sanitize_layer_color_props( $object );
 
+		self::sanitize_layer_font_props( $object );
+
 		return $object;
 	}
 
@@ -430,6 +432,32 @@ class WC_GPD_Template_Json {
 
 		$object[ $id_key ] = $palette_id;
 		unset( $object[ $colors_key ] );
+	}
+
+	/**
+	 * Sanitize per-layer font palette ID and optional custom font list.
+	 *
+	 * @param array $object Fabric object (by reference).
+	 */
+	private static function sanitize_layer_font_props( array &$object ) {
+		$palette_id = ! empty( $object['wcGpdFontPaletteId'] ) ? sanitize_key( (string) $object['wcGpdFontPaletteId'] ) : 'fp_default';
+		if ( 'fp_custom' === $palette_id ) {
+			$object['wcGpdFontPaletteId'] = 'fp_custom';
+			$fonts                        = array();
+			if ( ! empty( $object['wcGpdLayerFonts'] ) && is_array( $object['wcGpdLayerFonts'] ) ) {
+				foreach ( $object['wcGpdLayerFonts'] as $key ) {
+					$key = sanitize_text_field( (string) $key );
+					if ( $key ) {
+						$fonts[] = $key;
+					}
+				}
+			}
+			$object['wcGpdLayerFonts'] = array_values( array_unique( $fonts ) );
+			return;
+		}
+
+		$object['wcGpdFontPaletteId'] = $palette_id;
+		unset( $object['wcGpdLayerFonts'] );
 	}
 
 	private static function sanitize_layer_customer_props( array &$object ) {

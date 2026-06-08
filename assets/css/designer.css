@@ -214,6 +214,31 @@
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
+	margin-top: 0.35rem;
+}
+
+.wc-gpd-tools-panel--rows .wc-gpd-cust-accordion .wc-gpd-prop-row {
+	margin-bottom: 0.55rem;
+}
+
+.wc-gpd-font-palette-picks,
+.wc-gpd-global-fonts-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	max-height: 220px;
+	overflow-y: auto;
+}
+
+.wc-gpd-font-palette-pick {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.8125rem;
+}
+
+.wc-gpd-font-palette-card .wc-gpd-font-palette-picks {
+	max-height: none;
 }
 
 .wc-gpd-cust-section {

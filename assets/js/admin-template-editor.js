@@ -30,6 +30,7 @@
 	const contextPane = document.getElementById( 'wc-gpd-context-pane' );
 	const contextLayerName = document.getElementById( 'wc-gpd-context-layer-name' );
 	const palettesInput = document.getElementById( 'wc_gpd_template_palettes' );
+	const fontPalettesInput = document.getElementById( 'wc_gpd_template_font_palettes' );
 	const graphicSlotPropsPanel = document.getElementById( 'wc-gpd-graphic-slot-props' );
 	const mockupVisibleToggle = document.getElementById( 'wc_gpd_template_mockup_visible' );
 	const deleteImageBtn = document.getElementById( 'wc-gpd-template-delete-image' );
@@ -56,7 +57,7 @@
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockText', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
-		'wcGpdCustomerPaletteOnly',
+		'wcGpdCustomerPaletteOnly', 'wcGpdFontPaletteId', 'wcGpdLayerFonts',
 		'strokeDashArray',
 	];
 
@@ -135,8 +136,15 @@
 		global_palette_id: 'pal_custom',
 		global_colors: [ '#000000' ],
 	};
+	let fontPalettesData = {
+		palettes: [ { id: 'fp_default', name: 'Default', fonts: [] } ],
+		use_global_fonts: false,
+		global_font_palette_id: 'fp_custom',
+		global_fonts: [],
+	};
 
 	const PAL_CUSTOM = 'pal_custom';
+	const FP_CUSTOM = 'fp_custom';
 
 	const STEPPER_CONFIG = {
 		line_height: {
@@ -592,6 +600,7 @@
 		if ( ! obj.wcGpdFitMode ) {
 			obj.wcGpdFitMode = 'none';
 		}
+		obj.wcGpdFontPaletteId = obj.wcGpdFontPaletteId || 'fp_default';
 	}
 
 	function layerLabel( obj ) {
@@ -943,6 +952,294 @@
 			palettesData.global_colors = [ '#000000' ];
 		}
 		palettesInput.value = JSON.stringify( palettesData );
+	}
+
+	function templateFontCatalog() {
+		return editorConfig.fontOptions || [];
+	}
+
+	function defaultTemplateFontKeys() {
+		return templateFontCatalog().map( ( font ) => font.key ).filter( Boolean );
+	}
+
+	function loadFontPalettesFromInput() {
+		if ( ! fontPalettesInput || ! fontPalettesInput.value ) {
+			return;
+		}
+		try {
+			const parsed = JSON.parse( fontPalettesInput.value );
+			if ( parsed && typeof parsed === 'object' ) {
+				const defaults = defaultTemplateFontKeys();
+				fontPalettesData = {
+					palettes: Array.isArray( parsed.palettes ) && parsed.palettes.length ? parsed.palettes : fontPalettesData.palettes,
+					use_global_fonts: !! parsed.use_global_fonts,
+					global_font_palette_id: parsed.global_font_palette_id || FP_CUSTOM,
+					global_fonts: Array.isArray( parsed.global_fonts ) && parsed.global_fonts.length ? parsed.global_fonts : defaults,
+				};
+			}
+		} catch ( e ) {
+			// Keep defaults.
+		}
+		if ( fontPalettesData.palettes[ 0 ] && ( ! fontPalettesData.palettes[ 0 ].fonts || ! fontPalettesData.palettes[ 0 ].fonts.length ) ) {
+			fontPalettesData.palettes[ 0 ].fonts = defaultTemplateFontKeys();
+		}
+	}
+
+	function saveFontPalettesToInput() {
+		if ( ! fontPalettesInput ) {
+			return;
+		}
+		const defaults = defaultTemplateFontKeys();
+		if ( ! fontPalettesData.global_fonts || ! fontPalettesData.global_fonts.length ) {
+			fontPalettesData.global_fonts = defaults;
+		}
+		fontPalettesInput.value = JSON.stringify( fontPalettesData );
+	}
+
+	function getFontPaletteById( paletteId ) {
+		return ( fontPalettesData.palettes || [] ).find( ( palette ) => palette.id === paletteId );
+	}
+
+	function isGlobalTemplateFontsActive() {
+		return !! fontPalettesData.use_global_fonts;
+	}
+
+	function populateNamedFontPaletteSelect( select, selectedId, options ) {
+		if ( ! select ) {
+			return;
+		}
+		const opts = options || {};
+		const keepDefault = opts.keepDefault !== false;
+		const selected = selectedId || select.dataset.selected || select.value || '';
+		while ( select.options.length > ( keepDefault ? 1 : 0 ) ) {
+			select.remove( keepDefault ? 1 : 0 );
+		}
+		( fontPalettesData.palettes || [] ).forEach( ( palette ) => {
+			const option = document.createElement( 'option' );
+			option.value = palette.id;
+			option.textContent = palette.name || palette.id;
+			select.appendChild( option );
+		} );
+		if ( opts.includeCustom !== false ) {
+			const customOpt = document.createElement( 'option' );
+			customOpt.value = FP_CUSTOM;
+			customOpt.textContent = opts.customLabel || 'Custom font list';
+			select.appendChild( customOpt );
+		}
+		if ( selected ) {
+			select.value = selected;
+		}
+	}
+
+	function populateCustomerAddFontPaletteSelects() {
+		document.querySelectorAll( '.wc-gpd-font-palette-select[data-selected]' ).forEach( ( select ) => {
+			populateNamedFontPaletteSelect( select, select.dataset.selected || '', { keepDefault: true } );
+		} );
+	}
+
+	function syncGlobalCustomFontsVisibility() {
+		const wrap = document.getElementById( 'wc-gpd-global-custom-fonts-wrap' );
+		const globalSelect = document.getElementById( 'wc_gpd_global_font_palette_id' );
+		if ( ! wrap || ! globalSelect ) {
+			return;
+		}
+		const useCustom = ! globalSelect.value || globalSelect.value === FP_CUSTOM;
+		wrap.hidden = ! useCustom;
+	}
+
+	function syncTemplateFontsLockout() {
+		const active = isGlobalTemplateFontsActive();
+		document.querySelectorAll( '[data-template-fonts-lock]' ).forEach( ( row ) => {
+			if ( row.id === 'wc-gpd-template-fonts-active-notice' || row.id === 'wc-gpd-customer-tools-template-fonts-notice' ) {
+				row.hidden = ! active;
+				return;
+			}
+			row.classList.toggle( 'is-disabled', active );
+			row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( el ) => {
+				el.disabled = active;
+			} );
+		} );
+	}
+
+	function renderGlobalFontsList() {
+		const list = document.getElementById( 'wc-gpd-global-fonts-list' );
+		if ( ! list ) {
+			return;
+		}
+		list.innerHTML = '';
+		const selected = new Set( fontPalettesData.global_fonts || [] );
+		templateFontCatalog().forEach( ( font ) => {
+			const label = document.createElement( 'label' );
+			label.className = 'wc-gpd-font-palette-pick';
+			label.style.fontFamily = font.css || font.family;
+			const input = document.createElement( 'input' );
+			input.type = 'checkbox';
+			input.value = font.key;
+			input.checked = selected.has( font.key );
+			input.addEventListener( 'change', () => {
+				const next = new Set( fontPalettesData.global_fonts || [] );
+				if ( input.checked ) {
+					next.add( font.key );
+				} else {
+					next.delete( font.key );
+				}
+				fontPalettesData.global_fonts = Array.from( next );
+				if ( ! fontPalettesData.global_fonts.length ) {
+					fontPalettesData.global_fonts = [ font.key ];
+					input.checked = true;
+				}
+				saveFontPalettesToInput();
+				syncFontsPanel( canvas.getActiveObject() );
+			} );
+			label.appendChild( input );
+			label.appendChild( document.createTextNode( ' ' + ( font.label || font.key ) ) );
+			list.appendChild( label );
+		} );
+	}
+
+	function renderFontPalettesAdmin() {
+		const list = document.getElementById( 'wc-gpd-font-palettes-list' );
+		if ( ! list ) {
+			return;
+		}
+		list.innerHTML = '';
+		const catalog = templateFontCatalog();
+		( fontPalettesData.palettes || [] ).forEach( ( palette ) => {
+			const card = document.createElement( 'div' );
+			card.className = 'wc-gpd-palette-card wc-gpd-font-palette-card';
+			card.dataset.paletteId = palette.id;
+
+			const header = document.createElement( 'div' );
+			header.className = 'wc-gpd-palette-card__header';
+			const nameInput = document.createElement( 'input' );
+			nameInput.type = 'text';
+			nameInput.className = 'wc-gpd-palette-name';
+			nameInput.value = palette.name || palette.id;
+			nameInput.addEventListener( 'input', () => {
+				palette.name = nameInput.value;
+				saveFontPalettesToInput();
+				populateLayerFontPaletteSelect();
+				populateCustomerAddFontPaletteSelects();
+				syncGlobalFontPaletteSelect();
+			} );
+			header.appendChild( nameInput );
+
+			const picks = document.createElement( 'div' );
+			picks.className = 'wc-gpd-font-palette-picks';
+			const selected = new Set( palette.fonts || [] );
+			catalog.forEach( ( font ) => {
+				const label = document.createElement( 'label' );
+				label.className = 'wc-gpd-font-palette-pick';
+				label.style.fontFamily = font.css || font.family;
+				const input = document.createElement( 'input' );
+				input.type = 'checkbox';
+				input.value = font.key;
+				input.checked = selected.has( font.key );
+				input.addEventListener( 'change', () => {
+					palette.fonts = palette.fonts || [];
+					if ( input.checked ) {
+						if ( ! palette.fonts.includes( font.key ) ) {
+							palette.fonts.push( font.key );
+						}
+					} else {
+						palette.fonts = palette.fonts.filter( ( key ) => key !== font.key );
+					}
+					if ( ! palette.fonts.length ) {
+						palette.fonts = [ font.key ];
+						input.checked = true;
+					}
+					saveFontPalettesToInput();
+					syncFontsPanel( canvas.getActiveObject() );
+				} );
+				label.appendChild( input );
+				label.appendChild( document.createTextNode( ' ' + ( font.label || font.key ) ) );
+				picks.appendChild( label );
+			} );
+
+			card.appendChild( header );
+			card.appendChild( picks );
+			list.appendChild( card );
+		} );
+		populateCustomerAddFontPaletteSelects();
+		syncGlobalFontPaletteSelect();
+	}
+
+	function syncGlobalFontPaletteSelect() {
+		const select = document.getElementById( 'wc_gpd_global_font_palette_id' );
+		populateNamedFontPaletteSelect( select, fontPalettesData.global_font_palette_id || FP_CUSTOM, {
+			keepDefault: false,
+			includeCustom: true,
+			customLabel: 'Custom font list',
+		} );
+		syncGlobalCustomFontsVisibility();
+	}
+
+	function populateLayerFontPaletteSelect( selectedId, selectEl ) {
+		const select = selectEl || document.getElementById( 'wc_gpd_layer_font_palette_id' );
+		populateNamedFontPaletteSelect( select, selectedId || ( canvas.getActiveObject()?.wcGpdFontPaletteId || 'fp_default' ), {
+			keepDefault: false,
+			includeCustom: true,
+			customLabel: 'Custom font list for this layer',
+		} );
+	}
+
+	function renderLayerFontPicks( obj ) {
+		const list = document.getElementById( 'wc-gpd-layer-font-picks' );
+		const listRow = document.getElementById( 'wc-gpd-layer-fonts-list-row' );
+		if ( ! list || ! listRow ) {
+			return;
+		}
+		list.innerHTML = '';
+		const paletteId = obj?.wcGpdFontPaletteId || 'fp_default';
+		const isCustom = paletteId === FP_CUSTOM;
+		listRow.hidden = ! isCustom || isGlobalTemplateFontsActive();
+		if ( ! isCustom || ! obj ) {
+			return;
+		}
+		const selected = new Set( obj.wcGpdLayerFonts || [] );
+		templateFontCatalog().forEach( ( font ) => {
+			const label = document.createElement( 'label' );
+			label.className = 'wc-gpd-font-palette-pick';
+			label.style.fontFamily = font.css || font.family;
+			const input = document.createElement( 'input' );
+			input.type = 'checkbox';
+			input.value = font.key;
+			input.checked = selected.has( font.key );
+			input.addEventListener( 'change', () => {
+				obj.wcGpdLayerFonts = obj.wcGpdLayerFonts || [];
+				if ( input.checked ) {
+					if ( ! obj.wcGpdLayerFonts.includes( font.key ) ) {
+						obj.wcGpdLayerFonts.push( font.key );
+					}
+				} else {
+					obj.wcGpdLayerFonts = obj.wcGpdLayerFonts.filter( ( key ) => key !== font.key );
+				}
+				if ( ! obj.wcGpdLayerFonts.length ) {
+					obj.wcGpdLayerFonts = [ font.key ];
+					input.checked = true;
+				}
+				canvas.requestRenderAll();
+			} );
+			label.appendChild( input );
+			label.appendChild( document.createTextNode( ' ' + ( font.label || font.key ) ) );
+			list.appendChild( label );
+		} );
+	}
+
+	function syncFontsPanel( obj ) {
+		if ( ! obj || ! isTextLayer( obj ) ) {
+			return;
+		}
+		const useGlobal = isGlobalTemplateFontsActive();
+		const panel = document.getElementById( 'wc-gpd-layer-fonts-panel' );
+		const listRow = document.getElementById( 'wc-gpd-layer-fonts-list-row' );
+		setPropRowDisabled( panel, useGlobal );
+		setPropRowDisabled( listRow, useGlobal );
+		if ( ! useGlobal ) {
+			populateLayerFontPaletteSelect( obj.wcGpdFontPaletteId || 'fp_default' );
+			renderLayerFontPicks( obj );
+		}
+		syncTemplateFontsLockout();
 	}
 
 	function getPaletteById( paletteId ) {
@@ -1995,6 +2292,7 @@
 			syncCustomerAccessPanel( active );
 			syncSelectionDimsPanel( active );
 			syncColorsPanel( active );
+			syncFontsPanel( active );
 			syncContextNav( active );
 			openAccordionForSelection( active );
 		} else {
@@ -2720,6 +3018,7 @@
 			wcGpdLayerLabel: '',
 			wcGpdFitMode: 'none',
 			wcGpdPaletteId: 'pal_default',
+			wcGpdFontPaletteId: 'fp_default',
 			wcGpdCustomerPaletteOnly: true,
 			wcGpdCustomerEditable: true,
 			wcGpdHideFromCustomerLayers: false,
@@ -2878,6 +3177,9 @@
 			}
 		} );
 		templateFontsInput.value = JSON.stringify( keys );
+		renderFontPalettesAdmin();
+		renderGlobalFontsList();
+		syncFontsPanel( canvas.getActiveObject() );
 	}
 
 	function setMockupBackground() {
@@ -3720,6 +4022,52 @@
 			syncTemplateColorsLockout();
 		} );
 	}
+	const useSameFontsCheckbox = document.getElementById( 'wc_gpd_ps_use_same_fonts' );
+	const globalFontsPanel = document.getElementById( 'wc-gpd-global-fonts-panel' );
+	if ( useSameFontsCheckbox ) {
+		useSameFontsCheckbox.addEventListener( 'change', () => {
+			fontPalettesData.use_global_fonts = useSameFontsCheckbox.checked;
+			saveFontPalettesToInput();
+			if ( globalFontsPanel ) {
+				globalFontsPanel.hidden = ! useSameFontsCheckbox.checked;
+			}
+			syncFontsPanel( canvas.getActiveObject() );
+			syncTemplateFontsLockout();
+		} );
+	}
+	document.getElementById( 'wc-gpd-add-font-palette' )?.addEventListener( 'click', () => {
+		const id = 'fp_' + Date.now();
+		fontPalettesData.palettes = fontPalettesData.palettes || [];
+		fontPalettesData.palettes.push( {
+			id,
+			name: 'Font palette ' + fontPalettesData.palettes.length,
+			fonts: defaultTemplateFontKeys().slice( 0, Math.min( 8, defaultTemplateFontKeys().length ) ),
+		} );
+		saveFontPalettesToInput();
+		renderFontPalettesAdmin();
+		populateLayerFontPaletteSelect();
+	} );
+	document.getElementById( 'wc_gpd_global_font_palette_id' )?.addEventListener( 'change', ( event ) => {
+		fontPalettesData.global_font_palette_id = event.target.value || FP_CUSTOM;
+		saveFontPalettesToInput();
+		syncGlobalCustomFontsVisibility();
+		renderGlobalFontsList();
+		syncFontsPanel( canvas.getActiveObject() );
+	} );
+	document.getElementById( 'wc_gpd_layer_font_palette_id' )?.addEventListener( 'change', ( event ) => {
+		const obj = canvas.getActiveObject();
+		if ( ! obj || ! isTextLayer( obj ) ) {
+			return;
+		}
+		obj.wcGpdFontPaletteId = event.target.value || 'fp_default';
+		if ( obj.wcGpdFontPaletteId !== FP_CUSTOM ) {
+			delete obj.wcGpdLayerFonts;
+		} else {
+			obj.wcGpdLayerFonts = defaultTemplateFontKeys().slice( 0, Math.min( 8, defaultTemplateFontKeys().length ) );
+		}
+		renderLayerFontPicks( obj );
+		canvas.requestRenderAll();
+	} );
 	function syncAddTypeOptionsVisibility() {
 		document.querySelectorAll( '[data-wc-gpd-toggle-add-options]' ).forEach( ( input ) => {
 			const key = input.getAttribute( 'data-wc-gpd-toggle-add-options' );
@@ -3810,7 +4158,11 @@
 		if ( useSameColorsCheckbox ) {
 			palettesData.use_global_colors = useSameColorsCheckbox.checked;
 		}
+		if ( useSameFontsCheckbox ) {
+			fontPalettesData.use_global_fonts = useSameFontsCheckbox.checked;
+		}
 		savePalettesToInput();
+		saveFontPalettesToInput();
 		saveJson();
 	}
 
@@ -3829,15 +4181,25 @@
 	initContextAccordions();
 	updateUnitSuffixes();
 	loadPalettesFromInput();
+	loadFontPalettesFromInput();
 	if ( useSameColorsCheckbox ) {
 		palettesData.use_global_colors = useSameColorsCheckbox.checked;
 	}
+	if ( useSameFontsCheckbox ) {
+		fontPalettesData.use_global_fonts = useSameFontsCheckbox.checked;
+	}
 	renderPalettesAdmin();
+	renderFontPalettesAdmin();
 	renderGlobalColorsList();
+	renderGlobalFontsList();
 	syncGlobalPaletteSelect();
+	syncGlobalFontPaletteSelect();
 	populateCustomerAddPaletteSelects();
+	populateCustomerAddFontPaletteSelects();
 	populateLayerPaletteSelect();
+	populateLayerFontPaletteSelect();
 	syncTemplateColorsLockout();
+	syncTemplateFontsLockout();
 	bindSteppers();
 	bindTextEditor();
 	bindCustomerAccessPanel();

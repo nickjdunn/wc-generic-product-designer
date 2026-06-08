@@ -169,6 +169,15 @@ defined( 'ABSPATH' ) || exit;
 			<label class="wc-gpd-prop-label" for="wc_gpd_tpl_font_family"><?php esc_html_e( 'Font', 'wc-generic-product-designer' ); ?></label>
 			<select id="wc_gpd_tpl_font_family" class="wc-gpd-prop-control wc-gpd-rich-font-select"></select>
 		</div>
+		<div class="wc-gpd-prop-row" id="wc-gpd-layer-fonts-panel" data-template-fonts-lock>
+			<label class="wc-gpd-prop-label" for="wc_gpd_layer_font_palette_id"><?php esc_html_e( 'Font palette for this layer', 'wc-generic-product-designer' ); ?></label>
+			<select id="wc_gpd_layer_font_palette_id" class="wc-gpd-prop-control"></select>
+		</div>
+		<p id="wc-gpd-template-fonts-active-notice" class="description wc-gpd-template-colors-notice" data-template-fonts-lock hidden><?php esc_html_e( 'Template font settings are active. Per-layer font palette options are disabled while “Use same fonts on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
+		<div class="wc-gpd-prop-row" id="wc-gpd-layer-fonts-list-row" data-template-fonts-lock>
+			<span class="wc-gpd-prop-label"><?php esc_html_e( 'Allowed fonts', 'wc-generic-product-designer' ); ?></span>
+			<div class="wc-gpd-font-palette-picks" id="wc-gpd-layer-font-picks"></div>
+		</div>
 		<div class="wc-gpd-prop-row wc-gpd-prop-row--check">
 			<label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_allow_font" checked="checked" /> <?php esc_html_e( 'Customer can change font', 'wc-generic-product-designer' ); ?></label>
 		</div>

@@ -568,13 +568,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 */
 	private function render_template_canvas( $settings, $template_json, $ps ) {
 		$template_fonts_json    = wp_json_encode( $settings['template_fonts'] );
-		$template_palettes_json = wp_json_encode( ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data() );
-		$font_options           = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
+		$template_palettes_json      = wp_json_encode( ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data() );
+		$template_font_palettes_json = wp_json_encode( ! empty( $settings['template_font_palettes'] ) ? $settings['template_font_palettes'] : WC_GPD_Design_Template::default_font_palettes_data() );
+		$font_options                = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
 		?>
 		<div class="wc-gpd-template-editor-wrap wc-gpd-modern-studio-root" id="wc-gpd-template-editor-root">
 			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
 			<textarea id="wc_gpd_template_fonts" name="wc_gpd_template_fonts" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_fonts_json ? $template_fonts_json : '[]' ); ?></textarea>
 			<textarea id="wc_gpd_template_palettes" name="wc_gpd_template_palettes" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_palettes_json ? $template_palettes_json : '{}' ); ?></textarea>
+			<textarea id="wc_gpd_template_font_palettes" name="wc_gpd_template_font_palettes" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_font_palettes_json ? $template_font_palettes_json : '{}' ); ?></textarea>
 			<input type="hidden" id="wc_gpd_library_assignments" name="wc_gpd_library_assignments" value="<?php echo esc_attr( $assignments_json ? $assignments_json : '{}' ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_width" value="<?php echo esc_attr( (string) $settings['width'] ); ?>" />
 			<input type="hidden" id="wc_gpd_template_canvas_height" value="<?php echo esc_attr( (string) $settings['height'] ); ?>" />
@@ -707,6 +709,12 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 								<div id="wc-gpd-palettes-list"></div>
 								<button type="button" class="button button-small" id="wc-gpd-add-palette"><?php esc_html_e( 'Add palette', 'wc-generic-product-designer' ); ?></button>
 							</div>
+							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Font palettes', 'wc-generic-product-designer' ); ?></h5>
+							<div id="wc-gpd-font-palettes-admin">
+								<p class="description"><?php esc_html_e( 'Group template fonts into palettes (e.g. 7–10 fonts per product). Enable “same fonts on entire template” in Settings for one global palette.', 'wc-generic-product-designer' ); ?></p>
+								<div id="wc-gpd-font-palettes-list"></div>
+								<button type="button" class="button button-small" id="wc-gpd-add-font-palette"><?php esc_html_e( 'Add font palette', 'wc-generic-product-designer' ); ?></button>
+							</div>
 							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Canvas guides', 'wc-generic-product-designer' ); ?></h5>
 							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_ruler" /> <?php esc_html_e( 'Show ruler', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_measurements" /> <?php esc_html_e( 'Show measurements', 'wc-generic-product-designer' ); ?></label>
@@ -816,6 +824,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
 				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
 				<p id="wc-gpd-customer-tools-template-colors-notice" class="description wc-gpd-template-colors-notice" data-template-colors-lock hidden><?php esc_html_e( 'Template color settings are active. Customer add palette options are disabled while “Use same colors on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
+				<p id="wc-gpd-customer-tools-template-fonts-notice" class="description wc-gpd-template-colors-notice" data-template-fonts-lock hidden><?php esc_html_e( 'Template font settings are active. Per-layer font palette options are disabled while “Use same fonts on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
 
 				<div class="wc-gpd-add-type-block">
 					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
@@ -911,6 +920,14 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_letter_spacing" value="1" <?php checked( $ps['allow_letter_spacing'] ); ?> /> <?php esc_html_e( 'Letter spacing', 'wc-generic-product-designer' ); ?></label>
 					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_text_color" value="1" <?php checked( $ps['allow_text_color'] ); ?> /> <?php esc_html_e( 'Text color', 'wc-generic-product-designer' ); ?></label>
 				</div>
+				<div class="wc-gpd-add-font-palette-options" data-template-fonts-lock>
+					<p class="description"><?php esc_html_e( 'Font choices for customer-added text:', 'wc-generic-product-designer' ); ?></p>
+					<p><label><?php esc_html_e( 'Font palette', 'wc-generic-product-designer' ); ?>
+						<select name="wc_gpd_ps_customer_add_text_font_palette_id" id="wc_gpd_ps_customer_add_text_font_palette_id" class="wc-gpd-font-palette-select" data-selected="<?php echo esc_attr( $ps['customer_add_text_font_palette_id'] ?? '' ); ?>">
+							<option value=""><?php esc_html_e( 'Template default', 'wc-generic-product-designer' ); ?></option>
+						</select>
+					</label></p>
+				</div>
 			</div>
 		</div>
 		</div>
@@ -936,6 +953,20 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						<p class="description"><?php esc_html_e( 'Custom template colors (at least one required).', 'wc-generic-product-designer' ); ?></p>
 						<div id="wc-gpd-global-colors-list" class="wc-gpd-global-colors-list"></div>
 						<button type="button" class="button button-small" id="wc-gpd-add-global-color"><?php esc_html_e( 'Add color', 'wc-generic-product-designer' ); ?></button>
+					</div>
+				</div>
+			</div>
+			<div class="wc-gpd-settings-card wc-gpd-settings-card--fonts">
+				<h4><?php esc_html_e( 'Template fonts', 'wc-generic-product-designer' ); ?></h4>
+				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_use_same_fonts" value="1" id="wc_gpd_ps_use_same_fonts" <?php checked( ! empty( $ps['use_same_fonts_entire_template'] ) ); ?> /> <?php esc_html_e( 'Use same fonts on entire template', 'wc-generic-product-designer' ); ?></label></p>
+				<div id="wc-gpd-global-fonts-panel" <?php echo empty( $ps['use_same_fonts_entire_template'] ) ? 'hidden' : ''; ?>>
+					<p class="description"><?php esc_html_e( 'Choose a named font palette or build a custom font list. When enabled, per-layer font palette settings on the Template tab are disabled.', 'wc-generic-product-designer' ); ?></p>
+					<p><label><?php esc_html_e( 'Font palette', 'wc-generic-product-designer' ); ?>
+						<select id="wc_gpd_global_font_palette_id" class="wc-gpd-prop-control"></select>
+					</label></p>
+					<div id="wc-gpd-global-custom-fonts-wrap">
+						<p class="description"><?php esc_html_e( 'Custom template fonts (at least one required).', 'wc-generic-product-designer' ); ?></p>
+						<div id="wc-gpd-global-fonts-list" class="wc-gpd-global-fonts-list"></div>
 					</div>
 				</div>
 			</div>

@@ -16,6 +16,19 @@
 		global_palette_id: 'pal_custom',
 		global_colors: [ '#000000' ],
 	};
+	const templateFontPalettes = config.templateFontPalettes || {
+		palettes: [ { id: 'fp_default', name: 'Default', fonts: [] } ],
+		use_global_fonts: false,
+		global_font_palette_id: 'fp_custom',
+		global_fonts: [],
+	};
+	const allFontOptions = config.fontOptions || ( config.fonts || [] ).map( ( family ) => ( {
+		key: family,
+		family,
+		label: family.split( ',' )[ 0 ].replace( /"/g, '' ).trim(),
+		css: family,
+	} ) );
+	const FP_CUSTOM = 'fp_custom';
 
 	const log = window.wcGpdDebug || { setEnabled() {}, debug() {}, info() {}, warn() {}, error() {} };
 	log.setEnabled( !! config.debug );
@@ -29,7 +42,8 @@
 		'wcGpdShapeUseFill', 'wcGpdShapeUseStroke', 'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold',
 		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
-		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
+		'wcGpdCustomerPaletteOnly', 'wcGpdFontPaletteId', 'wcGpdLayerFonts',
+		'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
 		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
 		'wcGpdCustomerUpload', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
@@ -475,7 +489,8 @@
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
-		'wcGpdCustomerPaletteOnly', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
+		'wcGpdCustomerPaletteOnly', 'wcGpdFontPaletteId', 'wcGpdLayerFonts',
+		'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
 	];
 
@@ -566,6 +581,62 @@
 				: [ '#000000' ];
 		}
 		return paletteColorsById( paletteId );
+	}
+
+	function allTemplateFontKeys() {
+		return allFontOptions.map( ( font ) => font.key ).filter( Boolean );
+	}
+
+	function fontKeysByPaletteId( paletteId ) {
+		if ( ! paletteId || paletteId === FP_CUSTOM ) {
+			return [];
+		}
+		const palette = ( templateFontPalettes.palettes || [] ).find( ( item ) => item.id === paletteId );
+		if ( palette && palette.fonts && palette.fonts.length ) {
+			return palette.fonts;
+		}
+		const keys = allTemplateFontKeys();
+		return keys.length ? keys : [];
+	}
+
+	function resolveTemplateGlobalFontKeys() {
+		if ( ! templateFontPalettes.use_global_fonts && ! productSettings.use_same_fonts_entire_template ) {
+			return null;
+		}
+		const globalPaletteId = templateFontPalettes.global_font_palette_id || FP_CUSTOM;
+		if ( globalPaletteId && globalPaletteId !== FP_CUSTOM ) {
+			return fontKeysByPaletteId( globalPaletteId );
+		}
+		return templateFontPalettes.global_fonts && templateFontPalettes.global_fonts.length
+			? templateFontPalettes.global_fonts
+			: allTemplateFontKeys();
+	}
+
+	function fontKeysForObject( obj ) {
+		const globalKeys = resolveTemplateGlobalFontKeys();
+		if ( globalKeys ) {
+			return globalKeys;
+		}
+		if ( obj && isTextLayer( obj ) && ! obj.wcGpdTemplateLayer && ! isPlaceholderLayer( obj ) ) {
+			const paletteId = productSettings.customer_add_text_font_palette_id || 'fp_default';
+			return fontKeysByPaletteId( paletteId );
+		}
+		const paletteId = obj && obj.wcGpdFontPaletteId ? obj.wcGpdFontPaletteId : 'fp_default';
+		if ( paletteId === FP_CUSTOM ) {
+			return Array.isArray( obj.wcGpdLayerFonts ) && obj.wcGpdLayerFonts.length
+				? obj.wcGpdLayerFonts
+				: allTemplateFontKeys();
+		}
+		return fontKeysByPaletteId( paletteId );
+	}
+
+	function fontOptionsForObject( obj ) {
+		const allowed = new Set( fontKeysForObject( obj ) );
+		if ( ! allowed.size ) {
+			return allFontOptions.slice();
+		}
+		const filtered = allFontOptions.filter( ( font ) => font.key && allowed.has( font.key ) );
+		return filtered.length ? filtered : allFontOptions.slice();
 	}
 
 	function defaultTextColor( obj ) {
@@ -1626,6 +1697,10 @@
 		if ( ui.textColor && obj && isText ) {
 			ui.textColor.value = obj.fill || defaultTextColor( obj );
 		}
+		if ( isText ) {
+			refreshFontSelect( obj );
+		}
+		syncContextAccordionSections();
 	}
 
 	function syncContextNav( active ) {
@@ -2082,23 +2157,65 @@
 	let submitApproved = false;
 
 	/**
-	 * Populate font dropdown.
+	 * Populate font dropdown for the active layer's palette.
+	 *
+	 * @param {fabric.Object|null} obj Active text layer.
 	 */
-	function initFontSelect() {
+	function refreshFontSelect( obj ) {
 		if ( ! ui.fontFamily ) {
 			return;
 		}
-		const options = config.fontOptions || ( config.fonts || [] ).map( ( family ) => ( {
-			family,
-			label: family.split( ',' )[ 0 ].replace( /"/g, '' ).trim(),
-			css: family,
-		} ) );
+		const options = obj ? fontOptionsForObject( obj ) : allFontOptions;
+		const current = obj && obj.fontFamily ? obj.fontFamily : DEFAULT_FONT;
+		ui.fontFamily.innerHTML = '';
 		options.forEach( ( font ) => {
 			const option = document.createElement( 'option' );
 			option.value = font.family || font.css;
 			option.textContent = font.label || option.value;
 			option.style.fontFamily = font.css || font.family;
 			ui.fontFamily.appendChild( option );
+		} );
+		const match = options.some( ( font ) => ( font.family || font.css ) === current );
+		if ( match ) {
+			ui.fontFamily.value = current;
+		} else if ( options.length ) {
+			const next = options[ 0 ].family || options[ 0 ].css;
+			ui.fontFamily.value = next;
+			if ( obj ) {
+				obj.set( 'fontFamily', next );
+			}
+		}
+	}
+
+	function initFontSelect() {
+		refreshFontSelect( null );
+	}
+
+	function initContextAccordion() {
+		document.querySelectorAll( '#wc-gpd-context-accordion .wc-gpd-cust-toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const section = toggle.closest( '.wc-gpd-cust-section' );
+				const body = section ? section.querySelector( '.wc-gpd-cust-body' ) : null;
+				if ( ! section || ! body ) {
+					return;
+				}
+				const open = ! section.classList.contains( 'is-open' );
+				section.classList.toggle( 'is-open', open );
+				body.hidden = ! open;
+				toggle.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+			} );
+		} );
+	}
+
+	function syncContextAccordionSections() {
+		const accordion = document.getElementById( 'wc-gpd-context-accordion' );
+		if ( ! accordion ) {
+			return;
+		}
+		accordion.querySelectorAll( '.wc-gpd-cust-section' ).forEach( ( section ) => {
+			const rows = section.querySelectorAll( '.wc-gpd-prop-row' );
+			const hasVisible = Array.from( rows ).some( ( row ) => ! row.hidden );
+			section.hidden = ! hasVisible;
 		} );
 	}
 
@@ -3535,6 +3652,7 @@
 		}
 
 		if ( isText ) {
+			refreshFontSelect( obj );
 			if ( ui.fontFamily ) {
 				ui.fontFamily.value = obj.fontFamily || DEFAULT_FONT;
 			}
@@ -4481,6 +4599,7 @@
 	}
 
 	initFontSelect();
+	initContextAccordion();
 	initAddMenuCollapsible();
 	initStudioNav();
 	applyProductToolSettings();
