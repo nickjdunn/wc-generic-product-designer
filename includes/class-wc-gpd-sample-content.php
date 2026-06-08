@@ -400,6 +400,7 @@ class WC_GPD_Sample_Content {
 				'allow_icon_resize'    => true,
 				'allow_graphic_move'   => true,
 				'allow_graphic_resize' => true,
+				'allow_graphic_color'  => true,
 				'allow_free_text'   => true,
 			)
 		);

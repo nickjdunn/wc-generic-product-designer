@@ -29,7 +29,7 @@
 		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
-		'wcGpdCustomerUpload',
+		'wcGpdCustomerUpload', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 	];
 
 	function registerFabricCustomProperties() {
@@ -465,7 +465,7 @@
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
-		'wcGpdCustomerPaletteOnly',
+		'wcGpdCustomerPaletteOnly', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 	];
 
 	function paletteColorsForObject( obj, role ) {
@@ -582,6 +582,231 @@
 			return ! layerColorPaletteRestricted( obj );
 		}
 		return false;
+	}
+
+	const MAX_GRAPHIC_COLOR_SLOTS = 4;
+
+	function isMeaningfulSvgColor( value ) {
+		if ( ! value || typeof value !== 'string' ) {
+			return false;
+		}
+		const normalized = value.trim().toLowerCase();
+		return normalized && normalized !== 'none' && normalized !== 'transparent'
+			&& ! normalized.startsWith( 'url(' ) && normalized !== 'currentcolor';
+	}
+
+	function normalizeHexColor( color ) {
+		if ( ! isMeaningfulSvgColor( color ) ) {
+			return '';
+		}
+		try {
+			const fabricColor = new fabric.Color( String( color ).trim() );
+			return '#' + fabricColor.toHex().slice( 0, 7 ).toLowerCase();
+		} catch ( error ) {
+			const value = String( color ).trim().toLowerCase();
+			if ( value.startsWith( '#' ) && value.length === 4 ) {
+				return '#' + value[ 1 ] + value[ 1 ] + value[ 2 ] + value[ 2 ] + value[ 3 ] + value[ 3 ];
+			}
+			return value;
+		}
+	}
+
+	function isSvgResourceUrl( url, item ) {
+		if ( item && item.mime && String( item.mime ).toLowerCase().indexOf( 'svg' ) >= 0 ) {
+			return true;
+		}
+		if ( ! url ) {
+			return false;
+		}
+		const clean = String( url ).split( '?' )[ 0 ].split( '#' )[ 0 ].toLowerCase();
+		return clean.endsWith( '.svg' );
+	}
+
+	function extractSvgColorSlots( svgText, maxSlots ) {
+		const limit = maxSlots || MAX_GRAPHIC_COLOR_SLOTS;
+		const seen = new Set();
+		const slots = [];
+		function pushColor( raw ) {
+			const normalized = normalizeHexColor( raw );
+			if ( ! normalized || seen.has( normalized ) ) {
+				return;
+			}
+			seen.add( normalized );
+			slots.push( normalized );
+		}
+		try {
+			const doc = new DOMParser().parseFromString( svgText, 'image/svg+xml' );
+			doc.querySelectorAll( '[fill],[stroke]' ).forEach( ( el ) => {
+				[ 'fill', 'stroke' ].forEach( ( attr ) => {
+					const value = el.getAttribute( attr );
+					if ( isMeaningfulSvgColor( value ) ) {
+						pushColor( value );
+					}
+				} );
+				const style = el.getAttribute( 'style' );
+				if ( style ) {
+					style.split( ';' ).forEach( ( rule ) => {
+						const match = rule.match( /^\s*(fill|stroke)\s*:\s*(.+)$/i );
+						if ( match && isMeaningfulSvgColor( match[ 2 ] ) ) {
+							pushColor( match[ 2 ].trim() );
+						}
+					} );
+				}
+			} );
+		} catch ( error ) {
+			return [];
+		}
+		return slots.slice( 0, limit );
+	}
+
+	function isRecolorableCustomerGraphic( obj ) {
+		return graphicColorAllowed( obj )
+			&& Array.isArray( obj.wcGpdGraphicColorSlots )
+			&& obj.wcGpdGraphicColorSlots.length > 0;
+	}
+
+	function graphicColorAllowed( obj ) {
+		return isCustomerGraphic( obj )
+			&& !! obj.wcGpdGraphicVector
+			&& productSettingsAllow( 'allow_graphic_color' );
+	}
+
+	function graphicColorValues( obj ) {
+		if ( ! obj || ! Array.isArray( obj.wcGpdGraphicColorSlots ) ) {
+			return [];
+		}
+		if ( Array.isArray( obj.wcGpdGraphicColors ) && obj.wcGpdGraphicColors.length === obj.wcGpdGraphicColorSlots.length ) {
+			return obj.wcGpdGraphicColors.slice();
+		}
+		return obj.wcGpdGraphicColorSlots.slice();
+	}
+
+	function replaceGraphicColorOnPaths( obj, fromColor, toColor ) {
+		const source = normalizeHexColor( fromColor );
+		const target = isNoColor( toColor ) ? 'transparent' : toColor;
+		function walk( node ) {
+			if ( ! node ) {
+				return;
+			}
+			if ( node.type === 'group' && node.getObjects ) {
+				node.getObjects().forEach( walk );
+				return;
+			}
+			[ 'fill', 'stroke' ].forEach( ( prop ) => {
+				const value = node[ prop ];
+				if ( value && normalizeHexColor( value ) === source ) {
+					node.set( prop, target );
+				}
+			} );
+		}
+		walk( obj );
+	}
+
+	function applyGraphicSlotColor( obj, slotIndex, color ) {
+		if ( ! obj || ! Array.isArray( obj.wcGpdGraphicColorSlots ) ) {
+			return;
+		}
+		const colors = graphicColorValues( obj );
+		if ( slotIndex < 0 || slotIndex >= colors.length ) {
+			return;
+		}
+		const replaceFrom = colors[ slotIndex ];
+		const replaceTo = isNoColor( color ) ? colors[ slotIndex ] : color;
+		replaceGraphicColorOnPaths( obj, replaceFrom, replaceTo );
+		colors[ slotIndex ] = replaceTo;
+		obj.wcGpdGraphicColors = colors;
+	}
+
+	function finalizeCustomerGraphic( obj, onAdded ) {
+		applyGraphicInteractivity( obj );
+		canvas.add( obj );
+		canvas.setActiveObject( obj );
+		canvas.requestRenderAll();
+		syncToolbar( obj );
+		syncLayersList();
+		openCustomerSection( 'context' );
+		if ( typeof onAdded === 'function' ) {
+			onAdded( obj );
+		}
+	}
+
+	function loadCustomerGraphic( item, placement, onAdded ) {
+		if ( ! item || ! item.url ) {
+			return;
+		}
+		const region = ( placement && placement.region ) || getConstraintRect();
+		const maxW = ( placement && placement.maxW ) || Math.min( region.width * 0.45, 240 );
+		const left = placement && placement.left !== undefined ? placement.left : region.left + region.width / 2;
+		const top = placement && placement.top !== undefined ? placement.top : region.top + region.height / 2;
+		const extra = ( placement && placement.extra ) || {};
+		const baseMeta = {
+			left,
+			top,
+			originX: 'center',
+			originY: 'center',
+			wcGpdLayerType: 'graphic',
+			wcGpdGraphicLayer: true,
+			wcGpdAttachmentId: item.id || 0,
+			wcGpdLayerLabel: item.title || ( config.i18n.layerGraphic || 'Graphic' ),
+			...extra,
+		};
+
+		function addRasterGraphic() {
+			fabric.Image.fromURL(
+				item.url,
+				( img ) => {
+					if ( ! img ) {
+						return;
+					}
+					const scale = maxW / Math.max( img.width || 1, 1 );
+					img.set( {
+						...baseMeta,
+						scaleX: scale,
+						scaleY: scale,
+						wcGpdGraphicVector: false,
+					} );
+					finalizeCustomerGraphic( img, onAdded );
+				},
+				{ crossOrigin: 'anonymous' }
+			);
+		}
+
+		if ( ! isSvgResourceUrl( item.url, item ) ) {
+			addRasterGraphic();
+			return;
+		}
+
+		fetch( item.url, { credentials: 'same-origin' } )
+			.then( ( response ) => response.text() )
+			.then( ( svg ) => {
+				if ( ! svg ) {
+					addRasterGraphic();
+					return;
+				}
+				const slots = extractSvgColorSlots( svg, MAX_GRAPHIC_COLOR_SLOTS );
+				fabric.loadSVGFromString( svg, ( objects, options ) => {
+					if ( ! objects || ! objects.length ) {
+						addRasterGraphic();
+						return;
+					}
+					let obj = objects.length === 1 ? objects[ 0 ] : fabric.util.groupSVGElements( objects, options );
+					const bounds = obj.getBoundingRect( true, true );
+					const base = Math.max( bounds.width || 1, bounds.height || 1, 1 );
+					const scale = maxW / base;
+					obj.set( {
+						...baseMeta,
+						scaleX: scale,
+						scaleY: scale,
+						wcGpdGraphicVector: true,
+						wcGpdGraphicColorSlots: slots,
+						wcGpdGraphicColors: slots.slice(),
+					} );
+					finalizeCustomerGraphic( obj, onAdded );
+				} );
+			} )
+			.catch( () => {
+				addRasterGraphic();
+			} );
 	}
 
 	/**
@@ -1155,6 +1380,7 @@
 		const textColorOk = isText && layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 		const shapeColorOk = shapeColorAllowed( obj );
 		const iconColorOk = iconColorAllowed( obj );
+		const graphicColorOk = graphicColorAllowed( obj );
 		const paletteRestricted = layerColorPaletteRestricted( obj );
 		const showInlineSwatches = shouldShowInlinePaletteSwatches( obj );
 		const showDropdownSwatches = shouldShowDropdownColorPicker( obj );
@@ -1183,12 +1409,14 @@
 		setPropRowVisible( ui.boldBtn, styleAllowed );
 
 		if ( colorRow ) {
-			const showColor = textColorOk || shapeColorOk || iconColorOk;
+			const showColor = textColorOk || shapeColorOk || iconColorOk || graphicColorOk;
 			colorRow.hidden = ! showColor;
 			colorRow.classList.remove( 'is-disabled' );
 			const label = colorRow.querySelector( '.wc-gpd-prop-label' );
 			if ( label ) {
-				if ( isAddedIcon || ( isShapeLayer && ! isAddedShape && ! isText ) ) {
+				if ( graphicColorOk ) {
+					label.textContent = config.i18n.graphicColors || 'Graphic colors';
+				} else if ( isAddedIcon || ( isShapeLayer && ! isAddedShape && ! isText ) ) {
 					label.textContent = isAddedIcon
 						? ( config.i18n.iconColor || 'Icon color' )
 						: ( config.i18n.fillColor || 'Color' );
@@ -1200,7 +1428,7 @@
 			}
 		}
 		if ( ui.colorSwatches ) {
-			ui.colorSwatches.hidden = ! ( showInlineSwatches || showDropdownSwatches );
+			ui.colorSwatches.hidden = ! ( showInlineSwatches || showDropdownSwatches || graphicColorOk );
 		}
 		if ( ui.textColor ) {
 			ui.textColor.hidden = ! pickerAllowed;
@@ -1353,12 +1581,65 @@
 		return ( obj && obj.fill ) || 'transparent';
 	}
 
+	function renderGraphicSlotSwatches( obj ) {
+		if ( ! ui.colorSwatches ) {
+			return;
+		}
+		ui.colorSwatches.innerHTML = '';
+		closeColorMenus();
+
+		const slots = obj.wcGpdGraphicColorSlots || [];
+		const colors = graphicColorValues( obj );
+		const palette = uniqueColors( allTemplatePaletteColors() );
+		const labelTemplate = config.i18n.graphicColorSlot || 'Color %d';
+
+		slots.forEach( ( slotColor, slotIndex ) => {
+			const group = document.createElement( 'div' );
+			group.className = 'wc-gpd-color-role-group wc-gpd-color-role-group--stacked';
+
+			const roleLabel = document.createElement( 'span' );
+			roleLabel.className = 'wc-gpd-color-role-label';
+			roleLabel.textContent = labelTemplate.replace( '%d', String( slotIndex + 1 ) );
+			group.appendChild( roleLabel );
+
+			const currentColor = colors[ slotIndex ] || slotColor;
+			const swatchRow = document.createElement( 'div' );
+			swatchRow.className = 'wc-gpd-color-role-swatches';
+			palette.forEach( ( color ) => {
+				const btn = document.createElement( 'button' );
+				btn.type = 'button';
+				btn.className = 'wc-gpd-color-swatch';
+				btn.style.backgroundColor = color;
+				btn.title = color;
+				btn.setAttribute( 'aria-label', color );
+				const activeColor = normalizeHexColor( currentColor );
+				btn.classList.toggle( 'is-active', activeColor && color.toLowerCase() === activeColor );
+				btn.addEventListener( 'click', () => {
+					if ( ! activeText ) {
+						return;
+					}
+					applyGraphicSlotColor( activeText, slotIndex, color );
+					canvas.requestRenderAll();
+					renderColorSwatches( activeText );
+				} );
+				swatchRow.appendChild( btn );
+			} );
+			group.appendChild( swatchRow );
+			ui.colorSwatches.appendChild( group );
+		} );
+	}
+
 	function renderColorSwatches( obj ) {
 		if ( ! ui.colorSwatches ) {
 			return;
 		}
 		ui.colorSwatches.innerHTML = '';
 		closeColorMenus();
+
+		if ( isRecolorableCustomerGraphic( obj ) ) {
+			renderGraphicSlotSwatches( obj );
+			return;
+		}
 
 		const showInline = shouldShowInlinePaletteSwatches( obj );
 		const showDropdown = shouldShowDropdownColorPicker( obj );
@@ -1799,31 +2080,20 @@
 			}
 		} );
 
-		fabric.Image.fromURL( libraryItem.url, ( img ) => {
-			if ( ! img ) {
-				return;
-			}
-			const slotObj = canvas.getObjects().find( ( o ) => o.wcGpdUid === slotUid );
-			const left = slotObj ? slotObj.left : PROD_WIDTH / 2;
-			const top = slotObj ? slotObj.top : PROD_HEIGHT / 2;
-			const targetW = slotObj ? ( slotObj.width * ( slotObj.scaleX || 1 ) ) : 120;
-			const scale = Math.min( targetW / img.width, targetW / img.height );
-			img.set( {
-				left,
-				top,
-				originX: 'center',
-				originY: 'center',
-				scaleX: scale,
-				scaleY: scale,
-				wcGpdLayerType: 'graphic',
-				wcGpdGraphicLayer: true,
+		const slotObj = canvas.getObjects().find( ( o ) => o.wcGpdUid === slotUid );
+		const left = slotObj ? slotObj.left : PROD_WIDTH / 2;
+		const top = slotObj ? slotObj.top : PROD_HEIGHT / 2;
+		const targetW = slotObj ? ( slotObj.width * ( slotObj.scaleX || 1 ) ) : 120;
+		loadCustomerGraphic( libraryItem, {
+			left,
+			top,
+			maxW: targetW,
+			extra: {
 				wcGpdGraphicSlotUid: slotUid,
-				wcGpdAttachmentId: libraryItem.id,
-			} );
-			applyGraphicInteractivity( img );
-			canvas.add( img );
+			},
+		}, () => {
 			canvas.requestRenderAll();
-		}, { crossOrigin: 'anonymous' } );
+		} );
 	}
 
 	function renderViewSwitcher() {
@@ -1939,7 +2209,7 @@
 	}
 
 	function isCustomerGraphic( obj ) {
-		return !! obj && obj.type === 'image' && obj.wcGpdLayerType === 'graphic' && ! obj.wcGpdTemplateLayer;
+		return !! obj && obj.wcGpdLayerType === 'graphic' && ! obj.wcGpdTemplateLayer;
 	}
 
 	function isTemplateShape( obj ) {
@@ -2178,7 +2448,7 @@
 									}
 									return;
 								}
-								if ( isCustomerGraphic( obj ) || ( obj.type === 'image' && obj.wcGpdGraphicLayer ) ) {
+								if ( isCustomerGraphic( obj ) ) {
 									obj.wcGpdLayerType = 'graphic';
 									obj.wcGpdGraphicLayer = true;
 									applyGraphicInteractivity( obj );
@@ -3029,33 +3299,10 @@
 			return;
 		}
 		const region = getConstraintRect();
-		fabric.Image.fromURL(
-			item.url,
-			( img ) => {
-				if ( ! img ) {
-					return;
-				}
-				const maxW = Math.min( region.width * 0.45, 240 );
-				const scale = maxW / Math.max( img.width || 1, 1 );
-				img.set( {
-					left: region.left + region.width / 2,
-					top: region.top + region.height / 2,
-					originX: 'center',
-					originY: 'center',
-					scaleX: scale,
-					scaleY: scale,
-					wcGpdGraphicLayer: true,
-					wcGpdLayerType: 'graphic',
-				} );
-				applyGraphicInteractivity( img );
-				canvas.add( img );
-				canvas.setActiveObject( img );
-				canvas.requestRenderAll();
-				syncToolbar( img );
-				syncLayersList();
-			},
-			{ crossOrigin: 'anonymous' }
-		);
+		loadCustomerGraphic( item, {
+			region,
+			maxW: Math.min( region.width * 0.45, 240 ),
+		} );
 	}
 
 	function addUploadedImage( file ) {

@@ -837,6 +837,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 					<div class="wc-gpd-add-type-options" data-add-options="graphic" <?php echo empty( $ps['allow_add_graphic'] ) ? 'hidden' : ''; ?>>
 						<p class="description"><?php esc_html_e( 'When a customer selects a graphic they added:', 'wc-generic-product-designer' ); ?></p>
 						<div class="wc-gpd-settings-check-grid">
+							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_color" value="1" <?php checked( ! empty( $ps['allow_graphic_color'] ) ); ?> /> <?php esc_html_e( 'Recolor SVG graphics (up to 4 colors)', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_move" value="1" <?php checked( ! empty( $ps['allow_graphic_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_resize" value="1" <?php checked( ! empty( $ps['allow_graphic_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
 						</div>

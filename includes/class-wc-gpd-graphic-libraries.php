@@ -352,6 +352,7 @@ class WC_GPD_Graphic_Libraries {
 				'id'    => $attachment_id,
 				'url'   => $url,
 				'title' => get_the_title( $attachment_id ),
+				'mime'  => get_post_mime_type( $attachment_id ) ? get_post_mime_type( $attachment_id ) : '',
 			);
 		}
 		return $items;
