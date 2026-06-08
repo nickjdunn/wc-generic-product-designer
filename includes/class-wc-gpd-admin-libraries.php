@@ -116,11 +116,6 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 					'loadMoreIcons'    => __( 'Load more icons', 'wc-generic-product-designer' ),
 					'searching'        => __( 'Loading icons…', 'wc-generic-product-designer' ),
 					'noResults'        => __( 'No icons found.', 'wc-generic-product-designer' ),
-					'sectionMedia'     => __( 'Graphics, photos & icons', 'wc-generic-product-designer' ),
-					'sectionFonts'     => __( 'Font libraries', 'wc-generic-product-designer' ),
-					'sectionColors'    => __( 'Color palettes', 'wc-generic-product-designer' ),
-					'fontsDesc'        => __( 'Group site fonts into reusable libraries. Templates pick from these when assigning font palettes to layers or customer-added text.', 'wc-generic-product-designer' ),
-					'colorsDesc'       => __( 'Create shared color palettes for customer swatches. Manage template-wide defaults on each template’s Settings tab.', 'wc-generic-product-designer' ),
 					'addFontLibrary'   => __( 'Add font library', 'wc-generic-product-designer' ),
 					'addColorPalette'  => __( 'Add color palette', 'wc-generic-product-designer' ),
 					'addColor'         => __( 'Add color', 'wc-generic-product-designer' ),
@@ -180,33 +175,27 @@ class WC_GPD_Admin_Libraries implements WC_GPD_Module {
 				<input type="hidden" id="wc_gpd_site_color_palettes_json" name="wc_gpd_site_color_palettes_json" value="<?php echo esc_attr( $color_json ? $color_json : '{}' ); ?>" />
 				<input type="hidden" id="wc_gpd_site_font_libraries_json" name="wc_gpd_site_font_libraries_json" value="<?php echo esc_attr( $font_json ? $font_json : '{}' ); ?>" />
 
-				<div class="wc-gpd-libraries-accordion wc-gpd-tpl-accordion" id="wc-gpd-libraries-accordion">
-					<div class="wc-gpd-accordion-section is-open" data-lib-section="media">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true"><?php esc_html_e( 'Graphics, photos & icons', 'wc-generic-product-designer' ); ?></button>
-						<div class="wc-gpd-accordion-body">
-							<p class="description"><?php esc_html_e( 'Image and icon collections customers can add from the storefront designer.', 'wc-generic-product-designer' ); ?></p>
-							<div id="wc-gpd-libraries-admin-list" class="wc-gpd-libraries-admin-list"></div>
-							<p><button type="button" class="button" id="wc-gpd-libraries-add"><?php esc_html_e( 'Add library', 'wc-generic-product-designer' ); ?></button></p>
-						</div>
-					</div>
+				<div class="wc-gpd-libraries-sections">
+					<section class="wc-gpd-libraries-section">
+						<h2 class="wc-gpd-libraries-section__title"><?php esc_html_e( 'Graphics, photos & icons', 'wc-generic-product-designer' ); ?></h2>
+						<p class="description"><?php esc_html_e( 'Image and icon collections customers can add from the storefront designer.', 'wc-generic-product-designer' ); ?></p>
+						<div id="wc-gpd-libraries-admin-list" class="wc-gpd-libraries-admin-list"></div>
+						<p><button type="button" class="button" id="wc-gpd-libraries-add"><?php esc_html_e( 'Add library', 'wc-generic-product-designer' ); ?></button></p>
+					</section>
 
-					<div class="wc-gpd-accordion-section" data-lib-section="fonts">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Font libraries', 'wc-generic-product-designer' ); ?></button>
-						<div class="wc-gpd-accordion-body" hidden>
-							<p class="description"><?php esc_html_e( 'Group site fonts into reusable libraries (e.g. 7–10 fonts per product type). Templates reference these when limiting customer font choices.', 'wc-generic-product-designer' ); ?></p>
-							<div id="wc-gpd-font-libraries-list" class="wc-gpd-libraries-admin-list"></div>
-							<p><button type="button" class="button button-small" id="wc-gpd-add-font-library"><?php esc_html_e( 'Add font library', 'wc-generic-product-designer' ); ?></button></p>
-						</div>
-					</div>
+					<section class="wc-gpd-libraries-section">
+						<h2 class="wc-gpd-libraries-section__title"><?php esc_html_e( 'Font libraries', 'wc-generic-product-designer' ); ?></h2>
+						<p class="description"><?php esc_html_e( 'Group site fonts into reusable libraries (e.g. 7–10 fonts per product type). Templates reference these when limiting customer font choices.', 'wc-generic-product-designer' ); ?></p>
+						<div id="wc-gpd-font-libraries-list" class="wc-gpd-libraries-admin-list"></div>
+						<p><button type="button" class="button" id="wc-gpd-add-font-library"><?php esc_html_e( 'Add font library', 'wc-generic-product-designer' ); ?></button></p>
+					</section>
 
-					<div class="wc-gpd-accordion-section" data-lib-section="colors">
-						<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Color palettes', 'wc-generic-product-designer' ); ?></button>
-						<div class="wc-gpd-accordion-body" hidden>
-							<p class="description"><?php esc_html_e( 'Shared swatch palettes for shapes, text, icons, and graphics across all templates.', 'wc-generic-product-designer' ); ?></p>
-							<div id="wc-gpd-site-color-palettes-list" class="wc-gpd-libraries-admin-list"></div>
-							<p><button type="button" class="button button-small" id="wc-gpd-add-site-color-palette"><?php esc_html_e( 'Add color palette', 'wc-generic-product-designer' ); ?></button></p>
-						</div>
-					</div>
+					<section class="wc-gpd-libraries-section">
+						<h2 class="wc-gpd-libraries-section__title"><?php esc_html_e( 'Color palettes', 'wc-generic-product-designer' ); ?></h2>
+						<p class="description"><?php esc_html_e( 'Shared swatch palettes for shapes, text, icons, and graphics across all templates.', 'wc-generic-product-designer' ); ?></p>
+						<div id="wc-gpd-site-color-palettes-list" class="wc-gpd-libraries-admin-list"></div>
+						<p><button type="button" class="button" id="wc-gpd-add-site-color-palette"><?php esc_html_e( 'Add color palette', 'wc-generic-product-designer' ); ?></button></p>
+					</section>
 				</div>
 
 				<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save libraries', 'wc-generic-product-designer' ); ?></button></p>

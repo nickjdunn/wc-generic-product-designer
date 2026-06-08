@@ -490,11 +490,7 @@
 			removeBtn.type = 'button';
 			removeBtn.className = 'button button-link-delete';
 			removeBtn.textContent = config.i18n?.removeLibrary || 'Remove';
-			removeBtn.disabled = colorPalettesDoc.palettes.length <= 1;
 			removeBtn.addEventListener( 'click', () => {
-				if ( colorPalettesDoc.palettes.length <= 1 ) {
-					return;
-				}
 				colorPalettesDoc.palettes.splice( paletteIndex, 1 );
 				syncColorPalettesHidden();
 				renderColorPalettes();
@@ -622,11 +618,7 @@
 			removeBtn.type = 'button';
 			removeBtn.className = 'button button-link-delete';
 			removeBtn.textContent = config.i18n?.removeLibrary || 'Remove';
-			removeBtn.disabled = fontLibrariesDoc.libraries.length <= 1;
 			removeBtn.addEventListener( 'click', () => {
-				if ( fontLibrariesDoc.libraries.length <= 1 ) {
-					return;
-				}
 				fontLibrariesDoc.libraries.splice( libraryIndex, 1 );
 				syncFontLibrariesHidden();
 				renderFontLibraries();
@@ -682,50 +674,6 @@
 		renderFontLibraries();
 	} );
 
-	function initLibrariesAccordion() {
-		const accordion = document.getElementById( 'wc-gpd-libraries-accordion' );
-		if ( ! accordion ) {
-			return;
-		}
-		accordion.querySelectorAll( '.wc-gpd-accordion-toggle' ).forEach( ( toggle ) => {
-			toggle.addEventListener( 'click', () => {
-				const section = toggle.closest( '.wc-gpd-accordion-section' );
-				if ( ! section ) {
-					return;
-				}
-				const body = section.querySelector( '.wc-gpd-accordion-body' );
-				const sectionName = section.dataset.libSection || '';
-				if ( section.classList.contains( 'is-open' ) ) {
-					section.classList.remove( 'is-open' );
-					toggle.setAttribute( 'aria-expanded', 'false' );
-					if ( body ) {
-						body.hidden = true;
-					}
-					return;
-				}
-				accordion.querySelectorAll( '.wc-gpd-accordion-section' ).forEach( ( row ) => {
-					const isTarget = row.dataset.libSection === sectionName;
-					const rowToggle = row.querySelector( '.wc-gpd-accordion-toggle' );
-					const rowBody = row.querySelector( '.wc-gpd-accordion-body' );
-					if ( ! isTarget ) {
-						row.classList.remove( 'is-open' );
-						if ( rowToggle ) {
-							rowToggle.setAttribute( 'aria-expanded', 'false' );
-						}
-						if ( rowBody ) {
-							rowBody.hidden = true;
-						}
-					}
-				} );
-				section.classList.add( 'is-open' );
-				toggle.setAttribute( 'aria-expanded', 'true' );
-				if ( body ) {
-					body.hidden = false;
-				}
-			} );
-		} );
-	}
-
 	const librariesForm = document.getElementById( 'wc-gpd-libraries-form' );
 	if ( librariesForm ) {
 		librariesForm.addEventListener( 'submit', () => {
@@ -741,5 +689,4 @@
 	renderColorPalettes();
 	loadFontLibraries();
 	renderFontLibraries();
-	initLibrariesAccordion();
 }( jQuery ) );
