@@ -133,6 +133,17 @@ class WC_GPD_Design_Json {
 				continue;
 			}
 
+			if ( ! empty( $object['wcGpdTemplateEdit'] ) && ! empty( $object['wcGpdUid'] ) ) {
+				$object['wcGpdUid'] = sanitize_text_field( (string) $object['wcGpdUid'] );
+				if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
+					$object['wcGpdLayerType'] = 'text';
+					$object['wcGpdTextLayer']  = true;
+				}
+				unset( $object['wcGpdTemplateLayer'] );
+				$clean[] = $object;
+				continue;
+			}
+
 			if ( ! empty( $object['wcGpdTemplateLayer'] ) && empty( $object['wcGpdPlaceholderKey'] ) && 'placeholder' !== ( $object['wcGpdLayerType'] ?? '' ) ) {
 				continue;
 			}

@@ -9,6 +9,23 @@
 		return;
 	}
 
+	// #region agent log
+	function agentDebug( location, message, data, hypothesisId ) {
+		fetch( 'http://127.0.0.1:7264/ingest/9953b43f-5987-48c6-a044-57eb3f754632', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '25d064' },
+			body: JSON.stringify( {
+				sessionId: '25d064',
+				location,
+				message,
+				data,
+				hypothesisId,
+				timestamp: Date.now(),
+			} ),
+		} ).catch( () => {} );
+	}
+	// #endregion
+
 	const productSettings = config.productSettings || {};
 	const templatePalettes = config.templatePalettes || {
 		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
@@ -482,7 +499,7 @@
 
 	const DEFAULT_FONT = config.defaultFont || ( config.fonts && config.fonts[ 0 ] ) || '"Times New Roman", Times, serif';
 	const DESIGN_SERIALIZE_PROPS = [
-		'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
+		'wcGpdUid', 'wcGpdTemplateEdit', 'wcGpdTextLayer', 'wcGpdLayerType', 'wcGpdPlaceholderKey', 'wcGpdPlaceholderLabel', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
 		'wcGpdGraphicLayer', 'wcGpdGraphicSlotUid', 'wcGpdAttachmentId', 'wcGpdCustomerUpload', 'wcGpdLayerLabel', 'wcGpdBboxRole',
 		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
@@ -1213,6 +1230,18 @@
 	}
 
 	function moveCustomerLayer( obj, direction ) {
+		// #region agent log
+		agentDebug( 'designer.js:moveCustomerLayer', 'layer reorder attempt', {
+			direction,
+			type: obj ? obj.type : null,
+			uid: obj && obj.wcGpdUid ? obj.wcGpdUid : null,
+			layerType: obj && obj.wcGpdLayerType ? obj.wcGpdLayerType : null,
+			templateLayer: obj ? !! obj.wcGpdTemplateLayer : null,
+			selectable: obj ? isCustomerSelectableLayer( obj ) : false,
+			canvasIndex: obj ? canvas.getObjects().indexOf( obj ) : -1,
+			totalObjects: canvas.getObjects().length,
+		}, 'D' );
+		// #endregion
 		if ( ! obj || ! isCustomerSelectableLayer( obj ) ) {
 			return;
 		}
@@ -2534,10 +2563,50 @@
 		} );
 	}
 
+	function shouldPersistDesignState( obj ) {
+		if ( isDesignLayer( obj ) || isPlaceholderLayer( obj ) ) {
+			return true;
+		}
+		if ( isCustomerEditableTemplateText( obj ) || isCustomerEditableTemplateShape( obj ) ) {
+			return true;
+		}
+		return false;
+	}
+
 	function persistCurrentViewDesign() {
 		viewDesigns[ activeViewId ] = canvas.getObjects()
-			.filter( ( obj ) => isDesignLayer( obj ) || isPlaceholderLayer( obj ) )
+			.filter( ( obj ) => shouldPersistDesignState( obj ) )
 			.map( ( obj ) => serializeDesignObject( obj ) );
+	}
+
+	function findSavedDesignForUid( viewId, uid ) {
+		if ( ! uid ) {
+			return null;
+		}
+		return ( viewDesigns[ viewId ] || [] ).find( ( o ) => o.wcGpdUid === uid ) || null;
+	}
+
+	function applySavedTextState( target, saved ) {
+		if ( ! target || ! saved ) {
+			return;
+		}
+		const props = [
+			'text', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fill', 'textAlign',
+			'lineHeight', 'charSpacing', 'left', 'top', 'scaleX', 'scaleY', 'angle', 'underline',
+		];
+		props.forEach( ( prop ) => {
+			if ( saved[ prop ] !== undefined ) {
+				target.set( prop, saved[ prop ] );
+			}
+		} );
+		if ( saved.wcGpdLayerFonts ) {
+			target.wcGpdLayerFonts = saved.wcGpdLayerFonts;
+		}
+		if ( saved.wcGpdLayerColors ) {
+			target.wcGpdLayerColors = saved.wcGpdLayerColors;
+		}
+		shrinkTextToFit( target );
+		target.setCoords();
 	}
 
 	function buildCustomerFields() {
@@ -2887,6 +2956,11 @@
 
 	function serializeDesignObject( obj ) {
 		const data = obj.toObject( DESIGN_SERIALIZE_PROPS );
+		if ( isCustomerEditableTemplateText( obj ) || isCustomerEditableTemplateShape( obj ) ) {
+			data.wcGpdTemplateEdit = true;
+			data.wcGpdUid = obj.wcGpdUid || data.wcGpdUid || '';
+			delete data.wcGpdTemplateLayer;
+		}
 		if ( isUsableTextLayer( obj ) && ! isPlaceholderLayer( obj ) ) {
 			data.wcGpdLayerType = 'text';
 			data.wcGpdTextLayer = true;
@@ -2908,8 +2982,20 @@
 	 * @param {string} viewId View ID.
 	 * @returns {Promise<void>}
 	 */
-	function loadDesignView( viewId ) {
-		persistCurrentViewDesign();
+	function productHasTemplate() {
+		return templateViews.some( ( view ) => ( view.objects || [] ).length > 0 );
+	}
+
+	/**
+	 * @param {string} viewId View ID.
+	 * @param {{skipPersist?:boolean}} options Load options.
+	 * @returns {Promise<void>}
+	 */
+	function loadDesignView( viewId, options ) {
+		const opts = options || {};
+		if ( ! opts.skipPersist ) {
+			persistCurrentViewDesign();
+		}
 		activeViewId = viewId;
 		const view = getActiveViewConfig();
 		clearTextLayers();
@@ -2940,6 +3026,16 @@
 						( objects ) => {
 							objects.forEach( ( obj, index ) => {
 								applyTemplateMetadata( obj, designObjects[ index ] );
+								const savedSource = designObjects[ index ] || {};
+								if ( savedSource.wcGpdTemplateEdit && savedSource.wcGpdUid ) {
+									const templateObj = canvas.getObjects().find( ( o ) => o.wcGpdUid === savedSource.wcGpdUid );
+									if ( templateObj ) {
+										if ( isCustomerEditableTemplateText( templateObj ) || isTextLayer( templateObj ) ) {
+											applySavedTextState( templateObj, savedSource );
+										}
+										return;
+									}
+								}
 								if ( isPlaceholderLayer( obj ) ) {
 									const existing = findCanvasPlaceholder( obj.wcGpdPlaceholderKey );
 									if ( existing && obj.text ) {
@@ -3070,6 +3166,10 @@
 								return;
 							}
 							if ( isCustomerEditableTemplateText( obj ) ) {
+								const savedEdit = findSavedDesignForUid( viewId, obj.wcGpdUid );
+								if ( savedEdit ) {
+									applySavedTextState( obj, savedEdit );
+								}
 								if ( ! obj.wcGpdBaseFontSize ) {
 									obj.wcGpdBaseFontSize = obj.fontSize || 32;
 								}
@@ -4160,6 +4260,12 @@
 	 */
 	function loadDesignFromSvg( svgString ) {
 		return new Promise( ( resolve, reject ) => {
+			// #region agent log
+			agentDebug( 'designer.js:loadDesignFromSvg', 'entry', {
+				svgLen: svgString ? svgString.length : 0,
+				canvasBefore: canvasLayerSummary(),
+			}, 'A' );
+			// #endregion
 			fabric.loadSVGFromString( svgString, ( objects ) => {
 				if ( ! objects || ! objects.length ) {
 					reject( new Error( 'empty' ) );
@@ -4173,6 +4279,13 @@
 					canvas.add( obj );
 					obj.setCoords();
 				} );
+				// #region agent log
+				agentDebug( 'designer.js:loadDesignFromSvg', 'svg objects added', {
+					importedTypes: objects.map( ( o ) => o.type ),
+					importedCount: objects.length,
+					canvasAfter: canvasLayerSummary(),
+				}, 'A' );
+				// #endregion
 
 				purgePhantomLayers();
 				discardSelection();
@@ -4572,6 +4685,9 @@
 	 */
 	function hydrateViewDesignsFromJson( data ) {
 		if ( ! data.views || typeof data.views !== 'object' ) {
+			// #region agent log
+			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'no views in json', {}, 'B' );
+			// #endregion
 			return false;
 		}
 
@@ -4585,6 +4701,13 @@
 		const firstWithDesign = templateViews.find( ( view ) => viewDesigns[ view.id ] && viewDesigns[ view.id ].length );
 		if ( firstWithDesign ) {
 			activeViewId = firstWithDesign.id;
+			// #region agent log
+			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'hydrate ok', {
+				activeViewId,
+				objectCount: viewDesigns[ activeViewId ].length,
+				savedTypes: viewDesigns[ activeViewId ].map( ( o ) => ( { type: o.type, layerType: o.wcGpdLayerType, uid: o.wcGpdUid } ) ),
+			}, 'B' );
+			// #endregion
 			return true;
 		}
 
@@ -4596,13 +4719,44 @@
 		if ( orphanKey && templateViews.length ) {
 			viewDesigns[ templateViews[ 0 ].id ] = data.views[ orphanKey ].objects;
 			activeViewId = templateViews[ 0 ].id;
+			// #region agent log
+			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'orphan view mapped', {
+				orphanKey,
+				activeViewId,
+				objectCount: data.views[ orphanKey ].objects.length,
+			}, 'B' );
+			// #endregion
 			return true;
 		}
 
+		// #region agent log
+		agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'hydrate failed', {
+			viewKeys: Object.keys( data.views ),
+			viewCounts: Object.keys( data.views ).map( ( k ) => ( { id: k, count: ( data.views[ k ].objects || [] ).length } ) ),
+		}, 'B' );
+		// #endregion
 		return false;
 	}
 
+	function canvasLayerSummary() {
+		return canvas.getObjects().map( ( o, i ) => ( {
+			i,
+			type: o.type,
+			uid: o.wcGpdUid || null,
+			layerType: o.wcGpdLayerType || null,
+			template: !! o.wcGpdTemplateLayer,
+			textLayer: !! o.wcGpdTextLayer,
+			placeholder: !! ( o.wcGpdPlaceholderKey || ( o.wcGpdLayerType === 'placeholder' ) ),
+		} ) );
+	}
+
 	function tryLoadDesignFromSvg() {
+		if ( productHasTemplate() ) {
+			// #region agent log
+			agentDebug( 'designer.js:tryLoadDesignFromSvg', 'skipped for templated product', {}, 'A' );
+			// #endregion
+			return Promise.reject( new Error( 'svg-skip-template' ) );
+		}
 		if ( ! config.existingDesignSvg ) {
 			return Promise.reject( new Error( 'no-design' ) );
 		}
@@ -4610,26 +4764,59 @@
 	}
 
 	function loadExistingDesign() {
+		// #region agent log
+		agentDebug( 'designer.js:loadExistingDesign', 'entry', {
+			jsonLen: config.existingDesignJson ? config.existingDesignJson.length : 0,
+			svgLen: config.existingDesignSvg ? config.existingDesignSvg.length : 0,
+			isEditing: !! config.isEditing,
+			orderEdit: !! config.orderEdit,
+			canvasBefore: canvasLayerSummary(),
+		}, 'A' );
+		// #endregion
+
+		const finishLoad = ( path, promise ) => promise.then( ( result ) => {
+			// #region agent log
+			agentDebug( 'designer.js:loadExistingDesign', 'load complete', {
+				path,
+				canvasAfter: canvasLayerSummary(),
+				customerLayerCount: getCustomerLayers().length,
+			}, path.indexOf( 'svg' ) >= 0 ? 'A' : 'B' );
+			// #endregion
+			return result;
+		} );
+
 		if ( config.existingDesignJson ) {
 			try {
 				const data = JSON.parse( config.existingDesignJson );
 				if ( data.views && typeof data.views === 'object' ) {
 					if ( hydrateViewDesignsFromJson( data ) ) {
-						return loadDesignView( activeViewId );
+						// #region agent log
+						agentDebug( 'designer.js:loadExistingDesign', 'path json_multiview', { activeViewId }, 'B' );
+						// #endregion
+						return finishLoad( 'json_multiview', loadDesignView( activeViewId, { skipPersist: true } ) );
 					}
-					return tryLoadDesignFromSvg();
+					// #region agent log
+					agentDebug( 'designer.js:loadExistingDesign', 'path svg_fallback_empty_json_views', {}, 'A' );
+					// #endregion
+					return finishLoad( 'svg_fallback_empty_json_views', tryLoadDesignFromSvg() );
 				}
 				if ( data.objects && data.objects.length ) {
-					return loadDesignFromJson( config.existingDesignJson );
+					// #region agent log
+					agentDebug( 'designer.js:loadExistingDesign', 'path json_legacy', { objectCount: data.objects.length }, 'B' );
+					// #endregion
+					return finishLoad( 'json_legacy', loadDesignFromJson( config.existingDesignJson ) );
 				}
 			} catch ( error ) {
 				log.warn( 'Failed to parse saved design JSON', error );
 			}
 
-			return loadDesignFromJson( config.existingDesignJson ).catch( () => tryLoadDesignFromSvg() );
+			return finishLoad( 'json_then_svg', loadDesignFromJson( config.existingDesignJson ).catch( () => tryLoadDesignFromSvg() ) );
 		}
 
-		return tryLoadDesignFromSvg();
+		// #region agent log
+		agentDebug( 'designer.js:loadExistingDesign', 'path svg_only', {}, 'A' );
+		// #endregion
+		return finishLoad( 'svg_only', tryLoadDesignFromSvg() );
 	}
 
 	initFontSelect();
@@ -4755,8 +4942,40 @@
 		requestAnimationFrame( () => {
 			applyResponsiveScale();
 
-			loadDesignView( activeViewId ).then( () => {
-				if ( config.isEditing || config.existingDesignJson || config.existingDesignSvg ) {
+			// #region agent log
+			agentDebug( 'designer.js:bootDesigner', 'boot start', {
+				jsonLen: config.existingDesignJson ? config.existingDesignJson.length : 0,
+				svgLen: config.existingDesignSvg ? config.existingDesignSvg.length : 0,
+				isEditing: !! config.isEditing,
+			}, 'C' );
+			// #endregion
+
+			let editBootHydrated = false;
+			const bootLoad = ( config.isEditing || config.orderEdit ) && config.existingDesignJson
+				? ( () => {
+					try {
+						const data = JSON.parse( config.existingDesignJson );
+						if ( data.views && hydrateViewDesignsFromJson( data ) ) {
+							editBootHydrated = true;
+							return loadDesignView( activeViewId, { skipPersist: true } );
+						}
+					} catch ( error ) {
+						log.warn( 'Edit boot JSON hydrate failed', error );
+					}
+					return loadDesignView( activeViewId );
+				} )()
+				: loadDesignView( activeViewId );
+
+			bootLoad.then( () => {
+				// #region agent log
+				agentDebug( 'designer.js:bootDesigner', 'template loaded', {
+					editBootHydrated,
+					canvasAfterTemplate: canvasLayerSummary(),
+				}, 'C' );
+				// #endregion
+				const needsExistingLoad = ! editBootHydrated
+					&& ( config.isEditing || config.orderEdit || config.existingDesignJson || config.existingDesignSvg );
+				if ( needsExistingLoad ) {
 					loadExistingDesign().catch( () => {
 						log.warn( 'Failed to load saved design; starting fresh' );
 						if ( config.isEditing && ! config.orderEdit ) {
