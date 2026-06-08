@@ -37,6 +37,9 @@ Allow customers to add styled text layers on a product canvas and export product
 
 == Changelog ==
 
+= 1.52.0 =
+* Production: delete batches, Completed tab for finished jobs, hide cancelled/trashed orders from active queue.
+
 = 1.2.0 =
 * PoC fixes: add-to-cart submit loop, SVG sanitizer fallback, blank canvas without template.
 * Auto-add starter text layer; hide product gallery when designer is active.
