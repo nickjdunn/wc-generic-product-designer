@@ -137,4 +137,29 @@
 	$( '#wc-gpd-generate-batch-selected' ).on( 'click', function () {
 		createBatch( parseRefs( '.wc-gpd-ready-job-cb' ) );
 	} );
+
+	$( document ).on( 'click', '.wc-gpd-delete-batch', function () {
+		const btn = $( this );
+		if ( ! window.confirm( config.i18n?.confirmDeleteBatch || 'Delete this batch?' ) ) {
+			return;
+		}
+		$.post( config.ajaxUrl, {
+			action: 'wc_gpd_batch_delete',
+			nonce: config.nonce,
+			batch_id: btn.data( 'batchId' ),
+		} ).done( function ( resp ) {
+			if ( resp && resp.success ) {
+				const redirect = btn.data( 'redirect' ) || ( resp.data && resp.data.redirect );
+				if ( redirect ) {
+					window.location.href = redirect;
+					return;
+				}
+				window.location.reload();
+				return;
+			}
+			window.alert( ( resp && resp.data && resp.data.message ) || config.i18n?.error || 'Error' );
+		} ).fail( function () {
+			window.alert( config.i18n?.error || 'Error' );
+		} );
+	} );
 }( jQuery ) );

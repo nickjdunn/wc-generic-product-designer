@@ -349,4 +349,39 @@ class WC_GPD_Batch_Layout {
 
 		return true;
 	}
+
+	/**
+	 * Delete a batch and release its jobs back to ready.
+	 *
+	 * @param int $batch_id Batch ID.
+	 * @return bool|WP_Error
+	 */
+	public static function delete_batch( $batch_id ) {
+		$batch = self::get( $batch_id );
+		if ( ! $batch ) {
+			return new WP_Error( 'wc_gpd_batch_missing', __( 'Batch not found.', 'wc-generic-product-designer' ) );
+		}
+
+		foreach ( $batch['item_refs'] as $ref ) {
+			$order_id = absint( $ref['order_id'] ?? 0 );
+			$item_id  = absint( $ref['item_id'] ?? 0 );
+			if ( ! $order_id || ! $item_id ) {
+				continue;
+			}
+			$item = WC_GPD_Production_Jobs::get_item( $order_id, $item_id );
+			if ( $item ) {
+				$order = wc_get_order( $order_id );
+				WC_GPD_Production_Jobs::set_status( $item, WC_GPD_Production_Jobs::STATUS_READY, $order );
+				$item->delete_meta_data( WC_GPD_Production_Jobs::META_BATCH_ID );
+				$item->save();
+			}
+		}
+
+		$deleted = wp_delete_post( absint( $batch_id ), true );
+		if ( ! $deleted ) {
+			return new WP_Error( 'wc_gpd_batch_delete_failed', __( 'Could not delete batch.', 'wc-generic-product-designer' ) );
+		}
+
+		return true;
+	}
 }

@@ -48,6 +48,11 @@
 	color: #1e40af;
 }
 
+.wc-gpd-status-badge--completed {
+	background: #e5e7eb;
+	color: #374151;
+}
+
 .wc-gpd-status-badge--proof_sent,
 .wc-gpd-status-badge--proof_approved {
 	background: #fef3c7;

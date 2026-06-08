@@ -28,9 +28,26 @@ class WC_GPD_Production_Jobs {
 	const STATUS_READY           = 'ready';
 	const STATUS_IN_BATCH        = 'in_batch';
 	const STATUS_EXPORTED        = 'exported';
+	const STATUS_COMPLETED       = 'completed';
 
 	const SOURCE_WOOCOMMERCE = 'woocommerce';
-	const SOURCE_ETSY        = 'etsy';
+
+	/**
+	 * WooCommerce order statuses that should not appear in active production.
+	 *
+	 * @return string[]
+	 */
+	public static function excluded_order_statuses() {
+		return array(
+			'cancelled',
+			'trash',
+			'failed',
+			'refunded',
+			'checkout-draft',
+		);
+	}
+
+	const SOURCE_ETSY = 'etsy';
 
 	/**
 	 * @return string[]
@@ -43,6 +60,7 @@ class WC_GPD_Production_Jobs {
 			self::STATUS_READY,
 			self::STATUS_IN_BATCH,
 			self::STATUS_EXPORTED,
+			self::STATUS_COMPLETED,
 		);
 	}
 
@@ -58,6 +76,7 @@ class WC_GPD_Production_Jobs {
 			self::STATUS_READY          => __( 'Ready', 'wc-generic-product-designer' ),
 			self::STATUS_IN_BATCH       => __( 'In batch', 'wc-generic-product-designer' ),
 			self::STATUS_EXPORTED       => __( 'Exported', 'wc-generic-product-designer' ),
+			self::STATUS_COMPLETED      => __( 'Completed', 'wc-generic-product-designer' ),
 		);
 		return isset( $labels[ $status ] ) ? $labels[ $status ] : $status;
 	}
@@ -116,6 +135,10 @@ class WC_GPD_Production_Jobs {
 			$item->delete_meta_data( self::META_BATCH_ID );
 		}
 
+		if ( self::STATUS_COMPLETED === $status ) {
+			$item->delete_meta_data( self::META_BATCH_ID );
+		}
+
 		$item->save();
 
 		if ( $order instanceof WC_Order ) {
@@ -162,6 +185,7 @@ class WC_GPD_Production_Jobs {
 
 		$defaults = array(
 			'status'      => '',
+			'view'        => 'active',
 			'product_id'  => 0,
 			'template_id' => 0,
 			'order_id'    => 0,
@@ -214,17 +238,11 @@ class WC_GPD_Production_Jobs {
 		$join_sql  = implode( "\n", array_unique( $joins ) );
 		$where_sql = implode( ' AND ', $wheres );
 
-		$count_sql = "SELECT COUNT(DISTINCT oi.order_item_id) FROM {$oi_table} oi {$join_sql} WHERE {$where_sql}";
-		$total     = (int) $wpdb->get_var( $count_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$list_sql = "SELECT DISTINCT oi.order_item_id, oi.order_id FROM {$oi_table} oi {$join_sql} WHERE {$where_sql} ORDER BY oi.order_item_id DESC LIMIT 2000";
+		$rows     = $wpdb->get_results( $list_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
-		$list_sql = $wpdb->prepare(
-			"SELECT DISTINCT oi.order_item_id, oi.order_id FROM {$oi_table} oi {$join_sql} WHERE {$where_sql} ORDER BY oi.order_item_id DESC LIMIT %d OFFSET %d",
-			$per_page,
-			$offset
-		);
-
-		$rows  = $wpdb->get_results( $list_sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		$items = array();
+		$view           = in_array( $args['view'], array( 'active', 'completed' ), true ) ? $args['view'] : 'active';
+		$filtered_jobs  = array();
 
 		foreach ( $rows as $row ) {
 			$order = wc_get_order( (int) $row->order_id );
@@ -233,6 +251,18 @@ class WC_GPD_Production_Jobs {
 			}
 			$item = $order->get_item( (int) $row->order_item_id );
 			if ( ! $item instanceof WC_Order_Item_Product || ! self::item_has_design( $item ) ) {
+				continue;
+			}
+
+			if ( ! self::order_is_producible( $order ) ) {
+				continue;
+			}
+
+			$is_completed = self::job_is_completed( $order, $item );
+			if ( 'completed' === $view && ! $is_completed ) {
+				continue;
+			}
+			if ( 'active' === $view && $is_completed ) {
 				continue;
 			}
 
@@ -269,15 +299,117 @@ class WC_GPD_Production_Jobs {
 				continue;
 			}
 
-			$items[] = $job;
+			$filtered_jobs[] = $job;
 		}
+
+		$total = count( $filtered_jobs );
+		$items = array_slice( $filtered_jobs, $offset, $per_page );
 
 		return array(
 			'items' => $items,
 			'total' => $total,
 			'page'  => $page,
-			'pages' => (int) ceil( $total / $per_page ),
+			'pages' => max( 1, (int) ceil( $total / $per_page ) ),
 		);
+	}
+
+	/**
+	 * Whether the order should appear in active production queues.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return bool
+	 */
+	public static function order_is_producible( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return false;
+		}
+		return ! $order->has_status( self::excluded_order_statuses() );
+	}
+
+	/**
+	 * Whether a job belongs on the completed tab.
+	 *
+	 * @param WC_Order              $order Order.
+	 * @param WC_Order_Item_Product $item  Item.
+	 * @return bool
+	 */
+	public static function job_is_completed( $order, $item ) {
+		if ( ! $order instanceof WC_Order || ! $item instanceof WC_Order_Item_Product ) {
+			return false;
+		}
+		$status = self::get_status( $item );
+		if ( in_array( $status, array( self::STATUS_EXPORTED, self::STATUS_COMPLETED ), true ) ) {
+			return true;
+		}
+		return $order->has_status( 'completed' );
+	}
+
+	/**
+	 * Mark all design line items on an order as completed production jobs.
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public static function mark_order_jobs_completed( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		foreach ( $order->get_items() as $item ) {
+			if ( ! self::item_has_design( $item ) ) {
+				continue;
+			}
+			self::set_status( $item, self::STATUS_COMPLETED, $order );
+		}
+	}
+
+	/**
+	 * React to WooCommerce order status changes for production queues.
+	 *
+	 * @param int      $order_id   Order ID.
+	 * @param string   $old_status Previous status.
+	 * @param string   $new_status New status.
+	 * @param WC_Order $order      Order object.
+	 */
+	public static function on_order_status_changed( $order_id, $old_status, $new_status, $order = null ) {
+		unset( $old_status );
+		if ( ! $order instanceof WC_Order ) {
+			$order = wc_get_order( $order_id );
+		}
+		if ( ! $order ) {
+			return;
+		}
+
+		$new_status = sanitize_key( $new_status );
+		if ( 'completed' === $new_status ) {
+			self::mark_order_jobs_completed( $order );
+			return;
+		}
+
+		if ( in_array( $new_status, self::excluded_order_statuses(), true ) ) {
+			self::release_jobs_from_cancelled_order( $order );
+		}
+	}
+
+	/**
+	 * Release jobs from a batch when order is cancelled or trashed.
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public static function release_jobs_from_cancelled_order( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		if ( ! $order->has_status( self::excluded_order_statuses() ) ) {
+			return;
+		}
+		foreach ( $order->get_items() as $item ) {
+			if ( ! self::item_has_design( $item ) ) {
+				continue;
+			}
+			$batch_id = absint( $item->get_meta( self::META_BATCH_ID, true ) );
+			if ( $batch_id ) {
+				WC_GPD_Batch_Layout::remove_item( $batch_id, $order->get_id(), $item->get_id() );
+			}
+		}
 	}
 
 	/**
@@ -295,6 +427,7 @@ class WC_GPD_Production_Jobs {
 
 		return array(
 			'order_id'       => $order->get_id(),
+			'order_status'   => $order->get_status(),
 			'order_number'   => $order->get_order_number(),
 			'order_date'     => $order->get_date_created() ? $order->get_date_created()->date_i18n( get_option( 'date_format' ) ) : '',
 			'order_edit_url' => $order->get_edit_order_url(),
@@ -360,6 +493,7 @@ class WC_GPD_Production_Jobs {
 		$result = self::query(
 			array(
 				'status'   => self::STATUS_READY,
+				'view'     => 'active',
 				'per_page' => 500,
 				'page'     => 1,
 			)
