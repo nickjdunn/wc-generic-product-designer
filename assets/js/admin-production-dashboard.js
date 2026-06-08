@@ -66,10 +66,14 @@
 
 	$( document ).on( 'click', '.wc-gpd-download-proof', function () {
 		const btn = $( this );
+		const row = btn.closest( 'tr' );
+		const templateId = row.find( '.wc-gpd-proof-template-select' ).val() || config.defaultProofTemplateId || '';
 		submitAdminPost( {
 			action: config.downloadProof,
 			order_id: btn.data( 'order' ),
 			item_id: btn.data( 'item' ),
+			template_id: templateId,
+			format: btn.data( 'format' ) || 'pdf',
 			_wpnonce: btn.data( 'nonce' ),
 		} );
 	} );

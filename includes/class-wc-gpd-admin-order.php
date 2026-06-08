@@ -135,7 +135,7 @@ class WC_GPD_Admin_Order implements WC_GPD_Module {
 					<input type="hidden" name="wc_gpd_preset" value="production" />
 
 					<p><strong><?php esc_html_e( 'Download production file', 'wc-generic-product-designer' ); ?></strong></p>
-					<p class="description"><?php esc_html_e( 'Uses your default settings from WooCommerce → Product Designer.', 'wc-generic-product-designer' ); ?></p>
+					<p class="description"><?php esc_html_e( 'Uses your default production preset from Template Designer → Production.', 'wc-generic-product-designer' ); ?></p>
 					<input type="hidden" name="wc_gpd_inc_background" value="<?php echo ! empty( $defaults['include_background'] ) ? '1' : '0'; ?>" />
 					<input type="hidden" name="wc_gpd_inc_text" value="<?php echo ! empty( $defaults['include_text'] ) ? '1' : '0'; ?>" />
 					<input type="hidden" name="wc_gpd_inc_outlines" value="<?php echo ! empty( $defaults['include_outlines'] ) ? '1' : '0'; ?>" />

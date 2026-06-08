@@ -117,44 +117,7 @@ class WC_GPD_Admin_Settings implements WC_GPD_Module {
 					</tr>
 				</table>
 
-				<h2><?php esc_html_e( 'Production download defaults', 'wc-generic-product-designer' ); ?></h2>
-				<p class="description">
-					<?php esc_html_e( 'Used by the “Download production file” button on orders. You can override per download with custom checkboxes.', 'wc-generic-product-designer' ); ?>
-				</p>
-
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Production file includes', 'wc-generic-product-designer' ); ?></th>
-						<td>
-							<label><input type="checkbox" name="export_include_background" value="1" <?php checked( ! empty( $settings['export_include_background'] ) ); ?> /> <?php esc_html_e( 'Product background image', 'wc-generic-product-designer' ); ?></label><br />
-							<label><input type="checkbox" name="export_include_text" value="1" <?php checked( ! empty( $settings['export_include_text'] ) ); ?> /> <?php esc_html_e( 'Customer text layers', 'wc-generic-product-designer' ); ?></label><br />
-							<label><input type="checkbox" name="export_include_outlines" value="1" <?php checked( ! empty( $settings['export_include_outlines'] ) ); ?> /> <?php esc_html_e( 'Template outline lines', 'wc-generic-product-designer' ); ?></label><br />
-							<label><input type="checkbox" name="export_include_shapes" value="1" <?php checked( ! empty( $settings['export_include_shapes'] ) ); ?> /> <?php esc_html_e( 'Customer shape layers', 'wc-generic-product-designer' ); ?></label><br />
-							<label><input type="checkbox" name="export_rasterize" value="1" <?php checked( ! empty( $settings['export_rasterize'] ) ); ?> /> <?php esc_html_e( 'Rasterize export (PNG via Imagick)', 'wc-generic-product-designer' ); ?></label>
-						</td>
-					</tr>
-				</table>
-
-				<h2><?php esc_html_e( 'Batch production bed', 'wc-generic-product-designer' ); ?></h2>
-				<p class="description"><?php esc_html_e( 'Default machine bed size for the batch layout editor.', 'wc-generic-product-designer' ); ?></p>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Bed size', 'wc-generic-product-designer' ); ?></th>
-						<td>
-							<input type="number" step="0.1" min="1" name="batch_bed_width" value="<?php echo esc_attr( (string) ( $settings['batch_bed_width'] ?? 24 ) ); ?>" class="small-text" />
-							×
-							<input type="number" step="0.1" min="1" name="batch_bed_height" value="<?php echo esc_attr( (string) ( $settings['batch_bed_height'] ?? 18 ) ); ?>" class="small-text" />
-							<select name="batch_bed_unit">
-								<option value="in" <?php selected( $settings['batch_bed_unit'] ?? 'in', 'in' ); ?>><?php esc_html_e( 'Inches', 'wc-generic-product-designer' ); ?></option>
-								<option value="mm" <?php selected( $settings['batch_bed_unit'] ?? 'in', 'mm' ); ?>><?php esc_html_e( 'Millimeters', 'wc-generic-product-designer' ); ?></option>
-							</select>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="wc_gpd_batch_export_dpi"><?php esc_html_e( 'Export DPI', 'wc-generic-product-designer' ); ?></label></th>
-						<td><input type="number" min="72" max="600" id="wc_gpd_batch_export_dpi" name="batch_export_dpi" value="<?php echo esc_attr( (string) ( $settings['batch_export_dpi'] ?? 96 ) ); ?>" class="small-text" /></td>
-					</tr>
-				</table>
+				<p class="description"><?php esc_html_e( 'Production export options and batch bed settings are configured in Template Designer → Production → batch layout editor.', 'wc-generic-product-designer' ); ?></p>
 
 				<p class="submit">
 					<button type="submit" class="button button-primary"><?php esc_html_e( 'Save settings', 'wc-generic-product-designer' ); ?></button>
@@ -185,15 +148,6 @@ class WC_GPD_Admin_Settings implements WC_GPD_Module {
 			array(
 				'start_designing_label'     => isset( $_POST['start_designing_label'] ) ? sanitize_text_field( wp_unslash( $_POST['start_designing_label'] ) ) : '',
 				'cta_button_custom_css'     => isset( $_POST['cta_button_custom_css'] ) ? WC_GPD_Admin_Settings::sanitize_cta_css( wp_unslash( $_POST['cta_button_custom_css'] ) ) : '',
-				'export_include_background' => isset( $_POST['export_include_background'] ),
-				'export_include_text'       => isset( $_POST['export_include_text'] ),
-				'export_include_outlines'   => isset( $_POST['export_include_outlines'] ),
-				'export_include_shapes'     => isset( $_POST['export_include_shapes'] ),
-				'export_rasterize'          => isset( $_POST['export_rasterize'] ),
-				'batch_bed_width'         => isset( $_POST['batch_bed_width'] ) ? (float) $_POST['batch_bed_width'] : 24,
-				'batch_bed_height'        => isset( $_POST['batch_bed_height'] ) ? (float) $_POST['batch_bed_height'] : 18,
-				'batch_bed_unit'          => isset( $_POST['batch_bed_unit'] ) ? sanitize_key( wp_unslash( $_POST['batch_bed_unit'] ) ) : 'in',
-				'batch_export_dpi'        => isset( $_POST['batch_export_dpi'] ) ? absint( $_POST['batch_export_dpi'] ) : 96,
 			)
 		);
 	}

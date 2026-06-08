@@ -59,15 +59,6 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 
 		add_submenu_page(
 			self::PAGE_SLUG,
-			__( 'Export defaults', 'wc-generic-product-designer' ),
-			__( 'Export defaults', 'wc-generic-product-designer' ),
-			'manage_woocommerce',
-			WC_GPD_Admin_Settings::PAGE_SLUG,
-			array( WC_GPD_Admin_Settings::instance(), 'render_page' )
-		);
-
-		add_submenu_page(
-			self::PAGE_SLUG,
 			__( 'Debug', 'wc-generic-product-designer' ),
 			__( 'Debug', 'wc-generic-product-designer' ),
 			'manage_woocommerce',
@@ -993,12 +984,6 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<p><label><?php esc_html_e( 'Outline width', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_ps_outline_stroke_width" name="wc_gpd_ps_outline_stroke_width" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['outline_stroke_width'] ); ?>" /></label></p>
 				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'BBox color', 'wc-generic-product-designer' ); ?> <input type="color" id="wc_gpd_ps_bbox_stroke_color" name="wc_gpd_ps_bbox_stroke_color" value="<?php echo esc_attr( $ps['bbox_stroke_color'] ); ?>" /></label></p>
 				<p><label><?php esc_html_e( 'BBox width', 'wc-generic-product-designer' ); ?> <input type="number" id="wc_gpd_ps_bbox_stroke_width" name="wc_gpd_ps_bbox_stroke_width" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['bbox_stroke_width'] ); ?>" /></label></p>
-			</div>
-			<div class="wc-gpd-settings-card">
-				<h4><?php esc_html_e( 'Production export', 'wc-generic-product-designer' ); ?></h4>
-				<p><label class="wc-gpd-settings-color"><?php esc_html_e( 'Outline color', 'wc-generic-product-designer' ); ?> <input type="color" name="wc_gpd_ps_export_outline_color" value="<?php echo esc_attr( $ps['export_outline_color'] ); ?>" /></label></p>
-				<p><label><?php esc_html_e( 'Outline width', 'wc-generic-product-designer' ); ?> <input type="number" name="wc_gpd_ps_export_outline_width" min="0.1" max="20" step="0.1" value="<?php echo esc_attr( (string) $ps['export_outline_width'] ); ?>" /></label></p>
-				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_export_hairline_outline" value="1" <?php checked( $ps['export_hairline_outline'] ); ?> /> <?php esc_html_e( 'Hairline on export', 'wc-generic-product-designer' ); ?></label></p>
 			</div>
 		</div>
 		<?php

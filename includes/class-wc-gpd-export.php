@@ -82,6 +82,8 @@ class WC_GPD_Export {
 		$defaults = WC_GPD_Settings::export_defaults();
 		$merged   = wp_parse_args( $options, $defaults );
 
+		$color = sanitize_hex_color( $merged['outline_color'] ?? '#ff0000' );
+
 		return array(
 			'include_background' => ! empty( $merged['include_background'] ),
 			'include_text'       => ! empty( $merged['include_text'] ),
@@ -89,7 +91,11 @@ class WC_GPD_Export {
 			'include_shapes'     => ! empty( $merged['include_shapes'] ),
 			'rasterize'          => ! empty( $merged['rasterize'] ),
 			'transparent_raster' => ! empty( $merged['transparent_raster'] ),
+			'outline_color'      => $color ? $color : '#ff0000',
+			'outline_width'      => max( 0.1, min( 20, (float) ( $merged['outline_width'] ?? 0.25 ) ) ),
 			'preset'             => isset( $merged['preset'] ) ? sanitize_key( (string) $merged['preset'] ) : 'custom',
+			'preset_id'          => isset( $merged['preset_id'] ) ? sanitize_key( (string) $merged['preset_id'] ) : '',
+			'template_id'        => isset( $merged['template_id'] ) ? sanitize_key( (string) $merged['template_id'] ) : '',
 		);
 	}
 
@@ -172,9 +178,11 @@ class WC_GPD_Export {
 
 			if ( ! empty( $options['include_outlines'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
 				$outline_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'outline' );
-				if ( ! empty( $product_settings ) ) {
-					$outline_objects = WC_GPD_Fabric_Svg::apply_export_outline_style( $outline_objects, $product_settings );
-				}
+				$outline_style   = array(
+					'outline_color' => $options['outline_color'] ?? '#ff0000',
+					'outline_width' => $options['outline_width'] ?? 0.25,
+				);
+				$outline_objects = WC_GPD_Fabric_Svg::apply_export_outline_style( $outline_objects, $outline_style );
 				$outline_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $outline_objects );
 				if ( $outline_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="outlines">' . $outline_markup . '</g>';
@@ -248,7 +256,7 @@ class WC_GPD_Export {
 	 * @param string $svg SVG document.
 	 * @return string|WP_Error
 	 */
-	private static function rasterize_svg( $svg, $transparent = true ) {
+	private static function rasterize_svg( $svg, $transparent = true, $dpi = 96 ) {
 		if ( ! class_exists( 'Imagick' ) ) {
 			return new WP_Error(
 				'wc_gpd_no_imagick',
@@ -256,11 +264,15 @@ class WC_GPD_Export {
 			);
 		}
 
+		$dpi = max( 72, min( 600, absint( $dpi ) ) );
+
 		try {
 			$imagick = new Imagick();
 			$imagick->setBackgroundColor( new ImagickPixel( $transparent ? 'transparent' : 'white' ) );
+			$imagick->setResolution( $dpi, $dpi );
 			$imagick->readImageBlob( $svg );
 			$imagick->setImageFormat( 'png32' );
+			$imagick->setImageResolution( $dpi, $dpi );
 			$binary = $imagick->getImageBlob();
 			$imagick->clear();
 			$imagick->destroy();
@@ -268,6 +280,37 @@ class WC_GPD_Export {
 			return $binary ? $binary : new WP_Error( 'wc_gpd_raster_failed', __( 'Raster export failed.', 'wc-generic-product-designer' ) );
 		} catch ( Exception $exception ) {
 			return new WP_Error( 'wc_gpd_raster_failed', $exception->getMessage() );
+		}
+	}
+
+	/**
+	 * Wrap raster image bytes in a single-page PDF.
+	 *
+	 * @param string $png_blob PNG binary.
+	 * @param int    $width_px Image width.
+	 * @param int    $height_px Image height.
+	 * @return string|WP_Error
+	 */
+	private static function png_to_pdf( $png_blob, $width_px, $height_px ) {
+		if ( ! class_exists( 'Imagick' ) ) {
+			return new WP_Error(
+				'wc_gpd_no_imagick',
+				__( 'PDF export requires the Imagick PHP extension on your server.', 'wc-generic-product-designer' )
+			);
+		}
+
+		try {
+			$imagick = new Imagick();
+			$imagick->readImageBlob( $png_blob );
+			$imagick->setImageFormat( 'pdf' );
+			$imagick->setImagePage( $width_px, $height_px, 0, 0 );
+			$binary = $imagick->getImageBlob();
+			$imagick->clear();
+			$imagick->destroy();
+
+			return $binary ? $binary : new WP_Error( 'wc_gpd_pdf_failed', __( 'PDF export failed.', 'wc-generic-product-designer' ) );
+		} catch ( Exception $exception ) {
+			return new WP_Error( 'wc_gpd_pdf_failed', $exception->getMessage() );
 		}
 	}
 
@@ -366,12 +409,13 @@ class WC_GPD_Export {
 	}
 
 	/**
-	 * Build proof composite SVG with header block + design.
+	 * Build proof composite SVG with template preset.
 	 *
-	 * @param WC_Order_Item_Product $item Line item.
+	 * @param WC_Order_Item_Product $item        Line item.
+	 * @param string                $template_id Proof template ID.
 	 * @return array{content:string,filename:string,mime:string}|WP_Error
 	 */
-	public static function build_proof_for_order_item( $item ) {
+	public static function build_proof_for_order_item( $item, $template_id = '' ) {
 		if ( ! $item instanceof WC_Order_Item_Product ) {
 			return new WP_Error( 'wc_gpd_invalid_item', __( 'Invalid order line item.', 'wc-generic-product-designer' ) );
 		}
@@ -381,34 +425,71 @@ class WC_GPD_Export {
 			return new WP_Error( 'wc_gpd_missing_order', __( 'Order not found.', 'wc-generic-product-designer' ) );
 		}
 
-		$design = self::build_for_order_item( $item, WC_GPD_Settings::proof_export_defaults() );
-		if ( is_wp_error( $design ) ) {
-			return $design;
+		$template_id = $template_id ? sanitize_key( $template_id ) : WC_GPD_Proof_Template::default_id();
+		$svg         = WC_GPD_Proof_Template::render_composite_svg( $order, $item, $template_id );
+		if ( is_wp_error( $svg ) ) {
+			return $svg;
 		}
 
-		$product_id = $item->get_product_id();
-		$settings   = $product_id ? WC_GPD_Product_Meta::get_settings( $product_id ) : array();
-		$width      = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
-		$height     = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
-		$header_h   = 120;
-
-		$header_svg = WC_GPD_Proof_Header::render_svg( $order, $item, $width );
-		$design_inner = WC_GPD_Preview::extract_svg_inner_public( $design['content'] );
-
-		$total_h = $header_h + $height;
-		$parts   = array();
-		$parts[] = '<?xml version="1.0" encoding="UTF-8"?>';
-		$parts[] = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' . $width . ' ' . $total_h . '" width="' . $width . '" height="' . $total_h . '">';
-		$parts[] = '<g transform="translate(0,0)">' . $header_svg . '</g>';
-		$parts[] = '<g transform="translate(0,' . $header_h . ')">' . $design_inner . '</g>';
-		$parts[] = '</svg>';
-
 		return array(
-			'content'  => implode( "\n", $parts ),
+			'content'  => $svg,
 			'filename' => sanitize_file_name(
 				sprintf( 'proof-order-%d-item-%d.svg', $order->get_id(), $item->get_id() )
 			),
 			'mime'     => 'image/svg+xml',
+		);
+	}
+
+	/**
+	 * Build raster PDF proof for customer delivery.
+	 *
+	 * @param WC_Order_Item_Product $item        Line item.
+	 * @param string                $template_id Proof template ID.
+	 * @return array{content:string,filename:string,mime:string}|WP_Error
+	 */
+	public static function build_proof_pdf_for_order_item( $item, $template_id = '' ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return new WP_Error( 'wc_gpd_invalid_item', __( 'Invalid order line item.', 'wc-generic-product-designer' ) );
+		}
+
+		$order = wc_get_order( $item->get_order_id() );
+		if ( ! $order ) {
+			return new WP_Error( 'wc_gpd_missing_order', __( 'Order not found.', 'wc-generic-product-designer' ) );
+		}
+
+		$template_id = $template_id ? sanitize_key( $template_id ) : WC_GPD_Proof_Template::default_id();
+		$template    = WC_GPD_Proof_Template::get( $template_id );
+		if ( ! $template ) {
+			$template = WC_GPD_Proof_Template::get_default();
+		}
+
+		$svg = WC_GPD_Proof_Template::render_composite_svg( $order, $item, $template );
+		if ( is_wp_error( $svg ) ) {
+			return $svg;
+		}
+
+		$width  = absint( $template['canvas_width'] ?? 800 );
+		$header = absint( $template['header_design']['height'] ?? 120 );
+		$design = absint( $template['design_height'] ?? 600 );
+		$height = $header + $design;
+		$dpi    = absint( $template['pdf_dpi'] ?? 150 );
+
+		$png = self::rasterize_svg( $svg, false, $dpi );
+		if ( is_wp_error( $png ) ) {
+			return $png;
+		}
+
+		$pdf = self::png_to_pdf( $png, $width, $height );
+		if ( is_wp_error( $pdf ) ) {
+			return $pdf;
+		}
+
+		return array(
+			'content'  => $pdf,
+			'filename' => sanitize_file_name(
+				sprintf( 'proof-order-%d-item-%d.pdf', $order->get_id(), $item->get_id() )
+			),
+			'mime'     => 'application/pdf',
 		);
 	}
 }

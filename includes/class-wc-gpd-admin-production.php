@@ -47,7 +47,13 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		add_action( 'wp_ajax_wc_gpd_batch_save_layout', array( $this, 'ajax_save_batch_layout' ) );
 		add_action( 'wp_ajax_wc_gpd_batch_job_svg', array( $this, 'ajax_batch_job_svg' ) );
 		add_action( 'wp_ajax_wc_gpd_batch_remove_item', array( $this, 'ajax_batch_remove_item' ) );
+		add_action( 'wp_ajax_wc_gpd_export_presets_save', array( $this, 'ajax_export_presets_save' ) );
+		add_action( 'wp_ajax_wc_gpd_export_presets_delete', array( $this, 'ajax_export_presets_delete' ) );
+		add_action( 'wp_ajax_wc_gpd_proof_templates_save', array( $this, 'ajax_proof_templates_save' ) );
+		add_action( 'wp_ajax_wc_gpd_proof_templates_delete', array( $this, 'ajax_proof_templates_delete' ) );
+		add_action( 'wp_ajax_wc_gpd_proof_templates_duplicate', array( $this, 'ajax_proof_templates_duplicate' ) );
 		add_action( 'wp_ajax_wc_gpd_etsy_sync_now', array( $this, 'ajax_etsy_sync' ) );
+		add_action( 'admin_init', array( $this, 'run_migrations' ) );
 		add_filter( 'manage_edit-shop_order_columns', array( $this, 'order_columns' ) );
 		add_action( 'manage_shop_order_posts_custom_column', array( $this, 'order_column_content' ), 10, 2 );
 	}
@@ -108,7 +114,7 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			wp_localize_script(
 				'wc-gpd-admin-batch-layout',
 				'wcGpdProduction',
-				$this->production_script_config()
+				$this->production_script_config( false, true )
 			);
 		} elseif ( 'proof' === $tab ) {
 			wp_enqueue_script(
@@ -119,22 +125,27 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				true
 			);
 			wp_enqueue_script(
-				'wc-gpd-admin-proof-header',
-				WC_GPD_PLUGIN_URL . 'assets/js/admin-proof-header-designer.js',
+				'wc-gpd-admin-proof-template',
+				WC_GPD_PLUGIN_URL . 'assets/js/admin-proof-template-designer.js',
 				array( 'jquery', 'fabric-js' ),
 				WC_GPD_VERSION,
 				true
 			);
-			$logo_id = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+			$default_template = WC_GPD_Proof_Template::get_default();
 			wp_localize_script(
-				'wc-gpd-admin-proof-header',
-				'wcGpdProofHeader',
+				'wc-gpd-admin-proof-template',
+				'wcGpdProofTemplate',
 				array(
-					'design'      => WC_GPD_Proof_Header::get_design(),
-					'tokens'      => WC_GPD_Proof_Header::token_labels(),
-					'sample'      => WC_GPD_Proof_Header::sample_tokens(),
-					'logoUrl'     => $logo_id ? wp_get_attachment_url( $logo_id ) : '',
-					'defaultText' => array(
+					'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+					'nonce'            => wp_create_nonce( self::NONCE_ACTION ),
+					'templates'        => WC_GPD_Proof_Template::list(),
+					'defaultId'        => WC_GPD_Proof_Template::default_id(),
+					'activeTemplate'   => $default_template,
+					'tokens'           => WC_GPD_Proof_Header::token_labels(),
+					'sample'           => WC_GPD_Proof_Header::sample_tokens(),
+					'logoUrl'          => ! empty( $default_template['logo_id'] ) ? wp_get_attachment_url( $default_template['logo_id'] ) : '',
+					'mockupUrl'        => ! empty( $default_template['mockup_attachment_id'] ) ? wp_get_attachment_url( $default_template['mockup_attachment_id'] ) : '',
+					'defaultText'      => array(
 						'site_name'               => '{site_name}',
 						'site_url'                => '{site_url}',
 						'order_number'            => 'Order {order_number}',
@@ -157,9 +168,17 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			wp_localize_script(
 				'wc-gpd-admin-production-dashboard',
 				'wcGpdProduction',
-				$this->production_script_config( 'batches' === $tab )
+				$this->production_script_config( 'batches' === $tab, false, 'dashboard' === $tab )
 			);
 		}
+	}
+
+	/**
+	 * Run data migrations for presets.
+	 */
+	public function run_migrations() {
+		WC_GPD_Export_Presets::maybe_migrate();
+		WC_GPD_Proof_Template::maybe_migrate();
 	}
 
 	/**
@@ -171,12 +190,6 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		}
 
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-		if ( isset( $_POST['wc_gpd_proof_header_save'] ) ) {
-			check_admin_referer( self::NONCE_ACTION );
-			$this->save_proof_header_settings();
-			echo '<div class="notice notice-success"><p>' . esc_html__( 'Proof header saved.', 'wc-generic-product-designer' ) . '</p></div>';
-		}
 
 		if ( isset( $_POST['wc_gpd_etsy_save'] ) ) {
 			check_admin_referer( self::NONCE_ACTION );
@@ -216,7 +229,7 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		$tabs = array(
 			'dashboard' => __( 'Jobs', 'wc-generic-product-designer' ),
 			'batches'   => __( 'Batches', 'wc-generic-product-designer' ),
-			'proof'     => __( 'Proof header', 'wc-generic-product-designer' ),
+			'proof'     => __( 'Proof templates', 'wc-generic-product-designer' ),
 			'etsy'      => __( 'Etsy', 'wc-generic-product-designer' ),
 		);
 		echo '<nav class="nav-tab-wrapper wc-gpd-production-tabs">';
@@ -316,10 +329,21 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 								<?php if ( $job['edit_url'] ) : ?>
 									<a class="button button-small" href="<?php echo esc_url( $job['edit_url'] ); ?>"><?php esc_html_e( 'Edit design', 'wc-generic-product-designer' ); ?></a>
 								<?php endif; ?>
+								<select class="wc-gpd-proof-template-select" title="<?php esc_attr_e( 'Proof template', 'wc-generic-product-designer' ); ?>">
+									<?php foreach ( WC_GPD_Proof_Template::list() as $proof_tpl ) : ?>
+										<option value="<?php echo esc_attr( $proof_tpl['id'] ); ?>" <?php selected( WC_GPD_Proof_Template::default_id(), $proof_tpl['id'] ); ?>><?php echo esc_html( $proof_tpl['name'] ); ?></option>
+									<?php endforeach; ?>
+								</select>
 								<button type="button" class="button button-small wc-gpd-download-proof"
+									data-format="pdf"
 									data-order="<?php echo esc_attr( (string) $job['order_id'] ); ?>"
 									data-item="<?php echo esc_attr( (string) $job['item_id'] ); ?>"
-									data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_PROOF . '_' . $job['order_id'] . '_' . $job['item_id'] ) ); ?>"><?php esc_html_e( 'Proof', 'wc-generic-product-designer' ); ?></button>
+									data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_PROOF . '_' . $job['order_id'] . '_' . $job['item_id'] ) ); ?>"><?php esc_html_e( 'Proof PDF', 'wc-generic-product-designer' ); ?></button>
+								<button type="button" class="button button-small wc-gpd-download-proof"
+									data-format="svg"
+									data-order="<?php echo esc_attr( (string) $job['order_id'] ); ?>"
+									data-item="<?php echo esc_attr( (string) $job['item_id'] ); ?>"
+									data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_PROOF . '_' . $job['order_id'] . '_' . $job['item_id'] ) ); ?>"><?php esc_html_e( 'Proof SVG', 'wc-generic-product-designer' ); ?></button>
 								<button type="button" class="button button-small wc-gpd-mark-ready" data-order="<?php echo esc_attr( (string) $job['order_id'] ); ?>" data-item="<?php echo esc_attr( (string) $job['item_id'] ); ?>"><?php esc_html_e( 'Ready', 'wc-generic-product-designer' ); ?></button>
 							</td>
 						</tr>
@@ -428,19 +452,22 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			return;
 		}
 
-		$bed = $batch['bed'];
+		$bed    = $batch['bed'];
+		$export = $batch['export_options'];
 		?>
 		<div class="wc-gpd-batch-editor" id="wc-gpd-batch-editor"
 			data-batch-id="<?php echo esc_attr( (string) $batch_id ); ?>"
 			data-bed-width-px="<?php echo esc_attr( (string) ( $bed['width_px'] ?? 2304 ) ); ?>"
 			data-bed-height-px="<?php echo esc_attr( (string) ( $bed['height_px'] ?? 1728 ) ); ?>"
-			data-layout="<?php echo esc_attr( wp_json_encode( $batch['layout'] ) ); ?>">
+			data-layout="<?php echo esc_attr( wp_json_encode( $batch['layout'] ) ); ?>"
+			data-export-options="<?php echo esc_attr( wp_json_encode( $export ) ); ?>"
+			data-bed="<?php echo esc_attr( wp_json_encode( $bed ) ); ?>">
 			<div class="wc-gpd-batch-editor__toolbar">
-				<button type="button" class="button button-primary" id="wc-gpd-batch-save"><?php esc_html_e( 'Save layout', 'wc-generic-product-designer' ); ?></button>
+				<button type="button" class="button button-primary" id="wc-gpd-batch-save"><?php esc_html_e( 'Save now', 'wc-generic-product-designer' ); ?></button>
 				<button type="button" class="button wc-gpd-download-batch"
 					data-batch-id="<?php echo esc_attr( (string) $batch_id ); ?>"
 					data-nonce="<?php echo esc_attr( wp_create_nonce( self::DOWNLOAD_BATCH . '_' . $batch_id ) ); ?>"><?php esc_html_e( 'Download combined SVG', 'wc-generic-product-designer' ); ?></button>
-				<span class="description"><?php echo esc_html( sprintf( __( 'Bed: %1$s × %2$s %3$s', 'wc-generic-product-designer' ), $bed['width'], $bed['height'], $bed['unit'] ) ); ?></span>
+				<span id="wc-gpd-batch-save-status" class="description"></span>
 			</div>
 			<div class="wc-gpd-batch-editor__body">
 				<aside class="wc-gpd-batch-editor__sidebar">
@@ -467,72 +494,139 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				<div class="wc-gpd-batch-editor__canvas-wrap">
 					<canvas id="wc-gpd-batch-canvas"></canvas>
 				</div>
+				<aside class="wc-gpd-batch-editor__export-panel" id="wc-gpd-batch-export-panel">
+					<h3><?php esc_html_e( 'Export options', 'wc-generic-product-designer' ); ?></h3>
+					<p>
+						<label for="wc-gpd-batch-preset"><?php esc_html_e( 'Preset', 'wc-generic-product-designer' ); ?></label>
+						<select id="wc-gpd-batch-preset" class="widefat">
+							<?php foreach ( WC_GPD_Export_Presets::list() as $preset ) : ?>
+								<option value="<?php echo esc_attr( $preset['id'] ); ?>"><?php echo esc_html( $preset['name'] ); ?></option>
+							<?php endforeach; ?>
+						</select>
+					</p>
+					<p class="wc-gpd-batch-preset-actions">
+						<button type="button" class="button button-small" id="wc-gpd-batch-load-preset"><?php esc_html_e( 'Load preset', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button button-small" id="wc-gpd-batch-save-preset"><?php esc_html_e( 'Save as preset', 'wc-generic-product-designer' ); ?></button>
+						<button type="button" class="button button-small" id="wc-gpd-batch-delete-preset"><?php esc_html_e( 'Delete preset', 'wc-generic-product-designer' ); ?></button>
+					</p>
+					<fieldset class="wc-gpd-batch-export-toggles">
+						<label><input type="checkbox" id="wc-gpd-exp-background" /> <?php esc_html_e( 'Product background', 'wc-generic-product-designer' ); ?></label>
+						<label><input type="checkbox" id="wc-gpd-exp-text" /> <?php esc_html_e( 'Customer text', 'wc-generic-product-designer' ); ?></label>
+						<label><input type="checkbox" id="wc-gpd-exp-outlines" /> <?php esc_html_e( 'Template outlines', 'wc-generic-product-designer' ); ?></label>
+						<label><input type="checkbox" id="wc-gpd-exp-shapes" /> <?php esc_html_e( 'Shapes & graphics', 'wc-generic-product-designer' ); ?></label>
+						<p class="description"><?php esc_html_e( 'Combined batch download is always SVG.', 'wc-generic-product-designer' ); ?></p>
+					</fieldset>
+					<p>
+						<label><?php esc_html_e( 'Outline color', 'wc-generic-product-designer' ); ?>
+							<input type="color" id="wc-gpd-exp-outline-color" value="#ff0000" />
+						</label>
+					</p>
+					<p>
+						<label><?php esc_html_e( 'Outline width', 'wc-generic-product-designer' ); ?>
+							<input type="number" id="wc-gpd-exp-outline-width" min="0.1" max="20" step="0.1" value="0.25" />
+						</label>
+					</p>
+					<h4><?php esc_html_e( 'Machine bed', 'wc-generic-product-designer' ); ?></h4>
+					<p class="wc-gpd-batch-bed-fields">
+						<input type="number" id="wc-gpd-bed-width" min="1" step="0.1" />
+						<input type="number" id="wc-gpd-bed-height" min="1" step="0.1" />
+						<select id="wc-gpd-bed-unit">
+							<option value="in"><?php esc_html_e( 'in', 'wc-generic-product-designer' ); ?></option>
+							<option value="mm"><?php esc_html_e( 'mm', 'wc-generic-product-designer' ); ?></option>
+						</select>
+					</p>
+					<p>
+						<label><?php esc_html_e( 'DPI', 'wc-generic-product-designer' ); ?>
+							<input type="number" id="wc-gpd-bed-dpi" min="72" max="600" step="1" />
+						</label>
+					</p>
+				</aside>
 			</div>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Proof header settings tab.
+	 * Proof templates tab.
 	 */
 	private function render_proof_header_settings() {
-		$logo_id = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
-		$tokens  = WC_GPD_Proof_Header::token_labels();
+		$tokens = WC_GPD_Proof_Header::token_labels();
 		?>
-		<form method="post" id="wc-gpd-proof-header-form">
-			<?php wp_nonce_field( self::NONCE_ACTION ); ?>
-			<input type="hidden" name="wc_gpd_proof_header_save" value="1" />
-			<input type="hidden" id="wc-gpd-proof-design-json" name="proof_header_design" value="" />
-			<p class="description"><?php esc_html_e( 'Design the branded header shown above proofs. Drag elements on the canvas and insert autofill tokens from the palette.', 'wc-generic-product-designer' ); ?></p>
-			<table class="form-table">
-				<tr>
-					<th><label for="wc_gpd_proof_logo"><?php esc_html_e( 'Logo', 'wc-generic-product-designer' ); ?></label></th>
-					<td>
-						<input type="hidden" id="wc_gpd_proof_logo_id" name="proof_header_logo_id" value="<?php echo esc_attr( (string) $logo_id ); ?>" />
-						<button type="button" class="button" id="wc-gpd-proof-logo-pick"><?php esc_html_e( 'Select logo', 'wc-generic-product-designer' ); ?></button>
-						<button type="button" class="button" id="wc-gpd-proof-add-logo"><?php esc_html_e( 'Add logo to header', 'wc-generic-product-designer' ); ?></button>
-						<span id="wc-gpd-proof-logo-preview"><?php echo $logo_id ? wp_get_attachment_image( $logo_id, 'thumbnail' ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
-					</td>
-				</tr>
-			</table>
-			<div class="wc-gpd-proof-designer">
-				<aside class="wc-gpd-proof-designer__palette">
-					<h3><?php esc_html_e( 'Autofill tokens', 'wc-generic-product-designer' ); ?></h3>
-					<p class="description"><?php esc_html_e( 'Click to add a text block. Tokens are replaced with real order data on each proof.', 'wc-generic-product-designer' ); ?></p>
-					<div class="wc-gpd-proof-token-list">
-						<?php foreach ( $tokens as $key => $label ) : ?>
-							<?php if ( 'logo' === $key ) : ?>
-								<?php continue; ?>
-							<?php endif; ?>
-							<button type="button" class="button wc-gpd-proof-add-token" data-token="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></button>
-						<?php endforeach; ?>
+		<div class="wc-gpd-proof-templates" id="wc-gpd-proof-templates">
+			<aside class="wc-gpd-proof-templates__list">
+				<h3><?php esc_html_e( 'Templates', 'wc-generic-product-designer' ); ?></h3>
+				<ul id="wc-gpd-proof-template-list"></ul>
+				<p>
+					<button type="button" class="button" id="wc-gpd-proof-template-add"><?php esc_html_e( 'Add template', 'wc-generic-product-designer' ); ?></button>
+					<button type="button" class="button" id="wc-gpd-proof-template-duplicate"><?php esc_html_e( 'Duplicate', 'wc-generic-product-designer' ); ?></button>
+					<button type="button" class="button" id="wc-gpd-proof-template-delete"><?php esc_html_e( 'Delete', 'wc-generic-product-designer' ); ?></button>
+				</p>
+			</aside>
+			<div class="wc-gpd-proof-templates__editor">
+				<p class="description"><?php esc_html_e( 'Design proof layouts with a branded header, optional product mockup photo, and layer options. Proofs download as PDF by default.', 'wc-generic-product-designer' ); ?></p>
+				<p>
+					<label><?php esc_html_e( 'Template name', 'wc-generic-product-designer' ); ?>
+						<input type="text" id="wc-gpd-proof-template-name" class="regular-text" />
+					</label>
+				</p>
+				<table class="form-table">
+					<tr>
+						<th><?php esc_html_e( 'Logo', 'wc-generic-product-designer' ); ?></th>
+						<td>
+							<input type="hidden" id="wc-gpd-proof-logo-id" value="0" />
+							<button type="button" class="button" id="wc-gpd-proof-logo-pick"><?php esc_html_e( 'Select logo', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button" id="wc-gpd-proof-add-logo"><?php esc_html_e( 'Add logo to header', 'wc-generic-product-designer' ); ?></button>
+							<span id="wc-gpd-proof-logo-preview"></span>
+						</td>
+					</tr>
+					<tr>
+						<th><?php esc_html_e( 'Proof mockup photo', 'wc-generic-product-designer' ); ?></th>
+						<td>
+							<input type="hidden" id="wc-gpd-proof-mockup-id" value="0" />
+							<button type="button" class="button" id="wc-gpd-proof-mockup-pick"><?php esc_html_e( 'Select mockup (e.g. slate)', 'wc-generic-product-designer' ); ?></button>
+							<span id="wc-gpd-proof-mockup-preview"></span>
+						</td>
+					</tr>
+					<tr>
+						<th><?php esc_html_e( 'Proof body layers', 'wc-generic-product-designer' ); ?></th>
+						<td>
+							<label><input type="checkbox" id="wc-gpd-proof-inc-background" /> <?php esc_html_e( 'Template background / mockup layer', 'wc-generic-product-designer' ); ?></label><br />
+							<label><input type="checkbox" id="wc-gpd-proof-inc-text" /> <?php esc_html_e( 'Customer text', 'wc-generic-product-designer' ); ?></label><br />
+							<label><input type="checkbox" id="wc-gpd-proof-inc-outlines" /> <?php esc_html_e( 'Template outlines', 'wc-generic-product-designer' ); ?></label><br />
+							<label><input type="checkbox" id="wc-gpd-proof-inc-shapes" /> <?php esc_html_e( 'Shapes & graphics', 'wc-generic-product-designer' ); ?></label>
+						</td>
+					</tr>
+					<tr>
+						<th><?php esc_html_e( 'PDF quality', 'wc-generic-product-designer' ); ?></th>
+						<td>
+							<label><?php esc_html_e( 'DPI', 'wc-generic-product-designer' ); ?>
+								<input type="number" id="wc-gpd-proof-pdf-dpi" min="72" max="600" value="150" />
+							</label>
+						</td>
+					</tr>
+				</table>
+				<div class="wc-gpd-proof-designer">
+					<aside class="wc-gpd-proof-designer__palette">
+						<h3><?php esc_html_e( 'Header tokens', 'wc-generic-product-designer' ); ?></h3>
+						<div class="wc-gpd-proof-token-list">
+							<?php foreach ( $tokens as $key => $label ) : ?>
+								<?php if ( 'logo' === $key ) : continue; endif; ?>
+								<button type="button" class="button wc-gpd-proof-add-token" data-token="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></button>
+							<?php endforeach; ?>
+						</div>
+						<label><input type="checkbox" id="wc-gpd-proof-preview-sample" checked="checked" /> <?php esc_html_e( 'Show sample values', 'wc-generic-product-designer' ); ?></label>
+					</aside>
+					<div class="wc-gpd-proof-designer__canvas-wrap">
+						<canvas id="wc-gpd-proof-header-canvas" width="800" height="120"></canvas>
 					</div>
-					<h3><?php esc_html_e( 'Preview data', 'wc-generic-product-designer' ); ?></h3>
-					<label><input type="checkbox" id="wc-gpd-proof-preview-sample" checked="checked" /> <?php esc_html_e( 'Show sample values', 'wc-generic-product-designer' ); ?></label>
-				</aside>
-				<div class="wc-gpd-proof-designer__canvas-wrap">
-					<canvas id="wc-gpd-proof-header-canvas" width="800" height="120"></canvas>
 				</div>
+				<p>
+					<button type="button" class="button" id="wc-gpd-proof-set-default"><?php esc_html_e( 'Set as default', 'wc-generic-product-designer' ); ?></button>
+					<button type="button" class="button button-primary" id="wc-gpd-proof-template-save"><?php esc_html_e( 'Save template', 'wc-generic-product-designer' ); ?></button>
+					<span id="wc-gpd-proof-template-status" class="description"></span>
+				</p>
 			</div>
-			<p><button type="submit" class="button button-primary" id="wc-gpd-proof-save"><?php esc_html_e( 'Save proof header', 'wc-generic-product-designer' ); ?></button></p>
-		</form>
-		<script>
-		jQuery(function($){
-			$('#wc-gpd-proof-logo-pick').on('click', function(e){
-				e.preventDefault();
-				var frame = wp.media({ title: 'Logo', button: { text: 'Use logo' }, multiple: false });
-				frame.on('select', function(){
-					var att = frame.state().get('selection').first().toJSON();
-					$('#wc-gpd-proof-logo_id').val(att.id);
-					$('#wc-gpd-proof-logo-preview').html('<img src="'+att.url+'" style="max-height:60px" />');
-					if ( window.wcGpdProofHeader ) {
-						window.wcGpdProofHeader.logoUrl = att.url;
-					}
-				});
-				frame.open();
-			});
-		});
-		</script>
+		</div>
 		<?php
 	}
 
@@ -611,7 +705,7 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 	 * @param bool $include_ready_jobs Include ready jobs list.
 	 * @return array<string,mixed>
 	 */
-	private function production_script_config( $include_ready_jobs = false ) {
+	private function production_script_config( $include_ready_jobs = false, $include_export_presets = false, $include_proof_templates = false ) {
 		$config = array(
 			'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
 			'adminPostUrl'   => admin_url( 'admin-post.php' ),
@@ -631,12 +725,23 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 				'selectJobs'       => __( 'Select at least one job.', 'wc-generic-product-designer' ),
 				'noReadyJobs'      => __( 'No ready jobs available.', 'wc-generic-product-designer' ),
 				'saved'            => __( 'Layout saved.', 'wc-generic-product-designer' ),
+				'saving'           => __( 'Saving…', 'wc-generic-product-designer' ),
 				'error'            => __( 'Something went wrong.', 'wc-generic-product-designer' ),
 				'batchCreated'     => __( 'Batch created.', 'wc-generic-product-designer' ),
+				'presetSaved'      => __( 'Preset saved.', 'wc-generic-product-designer' ),
+				'presetDeleted'    => __( 'Preset deleted.', 'wc-generic-product-designer' ),
+				'confirmDeletePreset' => __( 'Delete this preset?', 'wc-generic-product-designer' ),
 			),
 		);
 		if ( $include_ready_jobs ) {
 			$config['readyJobs'] = WC_GPD_Production_Jobs::get_ready_jobs();
+		}
+		if ( $include_export_presets ) {
+			$config['exportPresets'] = WC_GPD_Export_Presets::list();
+		}
+		if ( $include_proof_templates ) {
+			$config['proofTemplates'] = WC_GPD_Proof_Template::list();
+			$config['defaultProofTemplateId'] = WC_GPD_Proof_Template::default_id();
 		}
 		return $config;
 	}
@@ -659,20 +764,6 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 			}
 		}
 		return $parsed;
-	}
-
-	/**
-	 * Save proof header settings.
-	 */
-	private function save_proof_header_settings() {
-		$design_raw = isset( $_POST['proof_header_design'] ) ? wp_unslash( $_POST['proof_header_design'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-		$design     = is_string( $design_raw ) ? json_decode( $design_raw, true ) : array();
-		WC_GPD_Settings::update(
-			array(
-				'proof_header_design'   => is_array( $design ) ? wp_json_encode( $design ) : '',
-				'proof_header_logo_id'  => isset( $_POST['proof_header_logo_id'] ) ? absint( $_POST['proof_header_logo_id'] ) : 0,
-			)
-		);
 	}
 
 	/**
@@ -815,11 +906,18 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		}
 		$batch_id = isset( $_POST['batch_id'] ) ? absint( $_POST['batch_id'] ) : 0;
 		$layout   = isset( $_POST['layout'] ) ? json_decode( wp_unslash( $_POST['layout'] ), true ) : array();
-		$result   = WC_GPD_Batch_Layout::save_layout( $batch_id, is_array( $layout ) ? $layout : array() );
+		$bed      = isset( $_POST['bed'] ) ? json_decode( wp_unslash( $_POST['bed'] ), true ) : array();
+		$options  = isset( $_POST['export_options'] ) ? json_decode( wp_unslash( $_POST['export_options'] ), true ) : array();
+		$result   = WC_GPD_Batch_Layout::save_batch_state(
+			$batch_id,
+			is_array( $layout ) ? $layout : array(),
+			is_array( $bed ) ? $bed : array(),
+			is_array( $options ) ? $options : array()
+		);
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
-		wp_send_json_success();
+		wp_send_json_success( array( 'saved_at' => wp_date( 'g:i A' ) ) );
 	}
 
 	/**
@@ -837,11 +935,102 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		if ( ! $item ) {
 			wp_send_json_error();
 		}
-		$result = WC_GPD_Export::build_for_order_item( $item, WC_GPD_Settings::export_defaults() );
+		$batch_id = isset( $_POST['batch_id'] ) ? absint( $_POST['batch_id'] ) : 0;
+		$options  = WC_GPD_Settings::export_defaults();
+		if ( $batch_id ) {
+			$batch = WC_GPD_Batch_Layout::get( $batch_id );
+			if ( $batch && ! empty( $batch['export_options'] ) ) {
+				$options = $batch['export_options'];
+			}
+		}
+		$result = WC_GPD_Export::build_for_order_item( $item, $options );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 		wp_send_json_success( array( 'svg' => $result['content'] ) );
+	}
+
+	/**
+	 * AJAX save export preset.
+	 */
+	public function ajax_export_presets_save() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+		$preset = isset( $_POST['preset'] ) ? json_decode( wp_unslash( $_POST['preset'] ), true ) : array();
+		$result = WC_GPD_Export_Presets::save( is_array( $preset ) ? $preset : array() );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'preset' => $result, 'presets' => WC_GPD_Export_Presets::list() ) );
+	}
+
+	/**
+	 * AJAX delete export preset.
+	 */
+	public function ajax_export_presets_delete() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+		$id     = isset( $_POST['preset_id'] ) ? sanitize_key( wp_unslash( $_POST['preset_id'] ) ) : '';
+		$result = WC_GPD_Export_Presets::delete( $id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'presets' => WC_GPD_Export_Presets::list() ) );
+	}
+
+	/**
+	 * AJAX save proof template.
+	 */
+	public function ajax_proof_templates_save() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+		$template = isset( $_POST['template'] ) ? json_decode( wp_unslash( $_POST['template'] ), true ) : array();
+		$result   = WC_GPD_Proof_Template::save( is_array( $template ) ? $template : array() );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		if ( ! empty( $_POST['set_default'] ) ) {
+			WC_GPD_Proof_Template::set_default( $result['id'] );
+		}
+		wp_send_json_success( array( 'template' => $result, 'templates' => WC_GPD_Proof_Template::list() ) );
+	}
+
+	/**
+	 * AJAX delete proof template.
+	 */
+	public function ajax_proof_templates_delete() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+		$id     = isset( $_POST['template_id'] ) ? sanitize_key( wp_unslash( $_POST['template_id'] ) ) : '';
+		$result = WC_GPD_Proof_Template::delete( $id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'templates' => WC_GPD_Proof_Template::list(), 'defaultId' => WC_GPD_Proof_Template::default_id() ) );
+	}
+
+	/**
+	 * AJAX duplicate proof template.
+	 */
+	public function ajax_proof_templates_duplicate() {
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error();
+		}
+		$id     = isset( $_POST['template_id'] ) ? sanitize_key( wp_unslash( $_POST['template_id'] ) ) : '';
+		$result = WC_GPD_Proof_Template::duplicate( $id );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'template' => $result, 'templates' => WC_GPD_Proof_Template::list() ) );
 	}
 
 	/**
@@ -900,7 +1089,13 @@ class WC_GPD_Admin_Production implements WC_GPD_Module {
 		if ( ! $item ) {
 			wp_die( esc_html__( 'Job not found.', 'wc-generic-product-designer' ), 404 );
 		}
-		$result = WC_GPD_Export::build_proof_for_order_item( $item );
+		$template_id = isset( $_POST['template_id'] ) ? sanitize_key( wp_unslash( $_POST['template_id'] ) ) : '';
+		$format      = isset( $_POST['format'] ) ? sanitize_key( wp_unslash( $_POST['format'] ) ) : 'pdf';
+		if ( 'svg' === $format ) {
+			$result = WC_GPD_Export::build_proof_for_order_item( $item, $template_id );
+		} else {
+			$result = WC_GPD_Export::build_proof_pdf_for_order_item( $item, $template_id );
+		}
 		if ( is_wp_error( $result ) ) {
 			wp_die( esc_html( $result->get_error_message() ), 500 );
 		}

@@ -47,13 +47,7 @@ class WC_GPD_Batch_Layout {
 	 * @return array{width:float,height:float,unit:string,dpi:int,width_px:int,height_px:int}
 	 */
 	public static function default_bed() {
-		$width  = (float) WC_GPD_Settings::get( 'batch_bed_width', 24 );
-		$height = (float) WC_GPD_Settings::get( 'batch_bed_height', 18 );
-		$unit   = (string) WC_GPD_Settings::get( 'batch_bed_unit', 'in' );
-		$dpi    = absint( WC_GPD_Settings::get( 'batch_export_dpi', 96 ) );
-		$dpi    = max( 72, min( 600, $dpi ) );
-
-		return self::bed_with_pixels( $width, $height, $unit, $dpi );
+		return WC_GPD_Export_Presets::bed_from_preset();
 	}
 
 	/**
@@ -91,12 +85,14 @@ class WC_GPD_Batch_Layout {
 	 * @param array $bed       Bed config.
 	 * @return int|WP_Error
 	 */
-	public static function create( array $item_refs, array $bed = array() ) {
+	public static function create( array $item_refs, array $bed = array(), $preset_id = '' ) {
 		if ( empty( $item_refs ) ) {
 			return new WP_Error( 'wc_gpd_batch_empty', __( 'Select at least one job for the batch.', 'wc-generic-product-designer' ) );
 		}
 
-		$bed = ! empty( $bed ) ? $bed : self::default_bed();
+		$preset = $preset_id ? WC_GPD_Export_Presets::get( $preset_id ) : WC_GPD_Export_Presets::default_production();
+		$bed    = ! empty( $bed ) ? $bed : WC_GPD_Export_Presets::bed_from_preset( $preset );
+		$export = WC_GPD_Export_Presets::export_options( $preset );
 		$title = sprintf(
 			/* translators: %s: date */
 			__( 'Batch %s', 'wc-generic-product-designer' ),
@@ -143,7 +139,7 @@ class WC_GPD_Batch_Layout {
 		update_post_meta( $batch_id, self::META_LAYOUT, wp_json_encode( $layout ) );
 		update_post_meta( $batch_id, self::META_BED, wp_json_encode( $bed ) );
 		update_post_meta( $batch_id, self::META_ITEMS, wp_json_encode( $item_refs ) );
-		update_post_meta( $batch_id, self::META_EXPORT_OPTS, wp_json_encode( WC_GPD_Settings::export_defaults() ) );
+		update_post_meta( $batch_id, self::META_EXPORT_OPTS, wp_json_encode( $export ) );
 
 		foreach ( $item_refs as $ref ) {
 			$item = WC_GPD_Production_Jobs::get_item( $ref['order_id'], $ref['item_id'] );
@@ -214,15 +210,67 @@ class WC_GPD_Batch_Layout {
 
 		update_post_meta( $batch_id, self::META_LAYOUT, wp_json_encode( $clean ) );
 		if ( ! empty( $bed ) ) {
-			$bed_clean = self::bed_with_pixels(
-				(float) ( $bed['width'] ?? 24 ),
-				(float) ( $bed['height'] ?? 18 ),
-				(string) ( $bed['unit'] ?? 'in' ),
-				absint( $bed['dpi'] ?? 96 )
-			);
-			update_post_meta( $batch_id, self::META_BED, wp_json_encode( $bed_clean ) );
+			self::save_bed( $batch_id, $bed );
 		}
 
+		return true;
+	}
+
+	/**
+	 * @param int   $batch_id Batch ID.
+	 * @param array $bed      Bed config.
+	 * @return bool|WP_Error
+	 */
+	public static function save_bed( $batch_id, array $bed ) {
+		$batch = self::get( $batch_id );
+		if ( ! $batch ) {
+			return new WP_Error( 'wc_gpd_batch_missing', __( 'Batch not found.', 'wc-generic-product-designer' ) );
+		}
+		$bed_clean = self::bed_with_pixels(
+			(float) ( $bed['width'] ?? 24 ),
+			(float) ( $bed['height'] ?? 18 ),
+			(string) ( $bed['unit'] ?? 'in' ),
+			absint( $bed['dpi'] ?? 96 )
+		);
+		update_post_meta( $batch_id, self::META_BED, wp_json_encode( $bed_clean ) );
+		return true;
+	}
+
+	/**
+	 * @param int   $batch_id Batch ID.
+	 * @param array $options  Export options.
+	 * @return bool|WP_Error
+	 */
+	public static function save_export_options( $batch_id, array $options ) {
+		$batch = self::get( $batch_id );
+		if ( ! $batch ) {
+			return new WP_Error( 'wc_gpd_batch_missing', __( 'Batch not found.', 'wc-generic-product-designer' ) );
+		}
+		$clean = WC_GPD_Export::normalize_options( $options );
+		update_post_meta( $batch_id, self::META_EXPORT_OPTS, wp_json_encode( $clean ) );
+		return true;
+	}
+
+	/**
+	 * Save layout, bed, and export options together.
+	 *
+	 * @param int   $batch_id Batch ID.
+	 * @param array $layout   Layout rows.
+	 * @param array $bed      Bed config.
+	 * @param array $options  Export options.
+	 * @return bool|WP_Error
+	 */
+	public static function save_batch_state( $batch_id, array $layout, array $bed = array(), array $options = array() ) {
+		$result = self::save_layout( $batch_id, $layout, $bed );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( ! empty( $options ) ) {
+			$opt_result = self::save_export_options( $batch_id, $options );
+			if ( is_wp_error( $opt_result ) ) {
+				return $opt_result;
+			}
+		}
 		return true;
 	}
 

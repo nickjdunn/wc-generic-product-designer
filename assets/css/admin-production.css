@@ -156,3 +156,76 @@
 #wc-gpd-proof-header-canvas {
 	border: 1px solid #94a3b8;
 }
+
+.wc-gpd-batch-editor__export-panel {
+	flex: 0 0 260px;
+	border: 1px solid #dcdcde;
+	background: #fff;
+	padding: 12px;
+	max-height: 720px;
+	overflow: auto;
+}
+
+.wc-gpd-batch-editor__export-panel label {
+	display: block;
+	margin-bottom: 6px;
+}
+
+.wc-gpd-batch-export-toggles label {
+	display: block;
+}
+
+.wc-gpd-batch-bed-fields {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.wc-gpd-batch-preset-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.wc-gpd-proof-templates {
+	display: flex;
+	gap: 20px;
+	align-items: flex-start;
+}
+
+.wc-gpd-proof-templates__list {
+	flex: 0 0 220px;
+	border: 1px solid #dcdcde;
+	background: #fff;
+	padding: 12px;
+}
+
+.wc-gpd-proof-templates__list ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wc-gpd-proof-templates__list li {
+	padding: 8px 10px;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.wc-gpd-proof-templates__list li.is-active {
+	background: #f0f6fc;
+	font-weight: 600;
+}
+
+.wc-gpd-proof-templates__editor {
+	flex: 1;
+	min-width: 0;
+}
+
+.wc-gpd-proof-template-select {
+	max-width: 140px;
+}
+
+.wc-gpd-production-actions .wc-gpd-proof-template-select {
+	margin-bottom: 4px;
+}

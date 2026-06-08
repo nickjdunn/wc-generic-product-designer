@@ -179,11 +179,11 @@ class WC_GPD_Proof_Header {
 	 * @param int                   $width  Width.
 	 * @return string
 	 */
-	public static function design_to_svg( array $design, $order, $item, $width = 800 ) {
+	public static function design_to_svg( array $design, $order, $item, $width = 800, $logo_id = 0 ) {
 		$tokens   = self::tokens( $order, $item, $width );
 		$height   = absint( $design['height'] ?? 120 );
 		$bg       = sanitize_hex_color( $design['background'] ?? '#1e293b' ) ?: '#1e293b';
-		$logo_id  = absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
+		$logo_id  = $logo_id ? absint( $logo_id ) : absint( WC_GPD_Settings::get( 'proof_header_logo_id', 0 ) );
 		$logo_url = $logo_id ? wp_get_attachment_url( $logo_id ) : '';
 
 		$svg = '<rect x="0" y="0" width="' . absint( $width ) . '" height="' . $height . '" fill="' . esc_attr( $bg ) . '"/>';

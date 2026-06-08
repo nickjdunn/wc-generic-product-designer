@@ -103,12 +103,16 @@ class WC_GPD_Fabric_Svg {
 			return is_array( $objects ) ? $objects : array();
 		}
 
-		$color = ! empty( $product_settings['export_outline_color'] )
-			? sanitize_hex_color( (string) $product_settings['export_outline_color'] )
-			: '#ff0000';
-		$width = isset( $product_settings['export_outline_width'] )
-			? (float) $product_settings['export_outline_width']
-			: 0.25;
+		$color = ! empty( $product_settings['outline_color'] )
+			? sanitize_hex_color( (string) $product_settings['outline_color'] )
+			: ( ! empty( $product_settings['export_outline_color'] )
+				? sanitize_hex_color( (string) $product_settings['export_outline_color'] )
+				: '#ff0000' );
+		$width = isset( $product_settings['outline_width'] )
+			? (float) $product_settings['outline_width']
+			: ( isset( $product_settings['export_outline_width'] )
+				? (float) $product_settings['export_outline_width']
+				: 0.25 );
 
 		if ( ! $color ) {
 			$color = '#ff0000';

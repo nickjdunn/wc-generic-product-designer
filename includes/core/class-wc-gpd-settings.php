@@ -37,6 +37,10 @@ class WC_GPD_Settings {
 		'etsy_refresh_token'            => '',
 		'etsy_shop_id'                  => '',
 		'etsy_listing_map'              => array(),
+		'export_presets'                => array(),
+		'default_export_preset_id'      => '',
+		'proof_templates'               => array(),
+		'default_proof_template_id'     => '',
 	);
 
 	/**
@@ -142,14 +146,7 @@ class WC_GPD_Settings {
 	 * @return array
 	 */
 	public static function export_defaults() {
-		return array(
-			'include_background' => (bool) self::get( 'export_include_background', false ),
-			'include_text'       => (bool) self::get( 'export_include_text', true ),
-			'include_outlines'   => (bool) self::get( 'export_include_outlines', true ),
-			'include_shapes'     => (bool) self::get( 'export_include_shapes', true ),
-			'rasterize'          => (bool) self::get( 'export_rasterize', false ),
-			'preset'             => 'production',
-		);
+		return WC_GPD_Export_Presets::export_options();
 	}
 
 	/**
@@ -197,13 +194,6 @@ class WC_GPD_Settings {
 	}
 
 	public static function proof_export_defaults() {
-		return array(
-			'include_background' => true,
-			'include_text'       => true,
-			'include_outlines'   => false,
-			'include_shapes'     => true,
-			'rasterize'          => false,
-			'preset'             => 'proof',
-		);
+		return WC_GPD_Proof_Template::export_options();
 	}
 }
