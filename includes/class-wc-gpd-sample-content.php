@@ -16,7 +16,8 @@ class WC_GPD_Sample_Content {
 	const PENDING_OPTION     = 'wc_gpd_pending_demo_install';
 	const VERSION_OPTION     = 'wc_gpd_demo_content_version';
 	const META_FLAG          = '_wc_gpd_demo_sample';
-	const SAMPLE_VERSION     = '9';
+	const SAMPLE_VERSION     = '10';
+	const DEMO_MIN_OBJECTS   = 8;
 	const DEMO_MARKER_UID    = 'gpd-demo-text-all';
 	const BUNDLED_JSON       = 'assets/demo/gpd-demo-template.json';
 	const PRODUCT_SLUG       = 'gpd-demo-product';
@@ -189,12 +190,13 @@ class WC_GPD_Sample_Content {
 			)
 		);
 
-		if ( $object_count < 4 ) {
+		if ( $object_count < self::DEMO_MIN_OBJECTS ) {
 			WC_GPD_Logger::error(
 				'Demo template missing expected layers — check bundled demo JSON',
 				array(
 					'template_id'  => $template_id,
 					'object_count' => $object_count,
+					'expected_min' => self::DEMO_MIN_OBJECTS,
 				)
 			);
 		}
@@ -330,7 +332,7 @@ class WC_GPD_Sample_Content {
 		update_post_meta( $post_id, self::META_FLAG, 'yes' );
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_CANVAS_WIDTH, 800 );
 		update_post_meta( $post_id, WC_GPD_Design_Template::META_CANVAS_HEIGHT, 600 );
-		update_post_meta( $post_id, WC_GPD_Design_Template::META_MAX_DESIGN_VIEWS, 1 );
+		update_post_meta( $post_id, WC_GPD_Design_Template::META_MAX_DESIGN_VIEWS, 6 );
 
 		self::persist_template_json( $post_id );
 
@@ -402,6 +404,8 @@ class WC_GPD_Sample_Content {
 				'allow_graphic_resize' => true,
 				'allow_graphic_color'  => true,
 				'allow_free_text'   => true,
+				'allow_details_panel'    => true,
+				'allow_customer_graphics' => true,
 			)
 		);
 	}
@@ -422,12 +426,12 @@ class WC_GPD_Sample_Content {
 		WC_GPD_Design_Template::update_template_json( $post_id, $json );
 
 		$stored_count = self::template_object_count( $post_id );
-		if ( $stored_count < 4 ) {
+		if ( $stored_count < self::DEMO_MIN_OBJECTS ) {
 			WC_GPD_Logger::error(
 				'Demo template JSON did not persist correctly after save',
 				array(
 					'template_id'   => $post_id,
-					'expected'      => 4,
+					'expected'      => self::DEMO_MIN_OBJECTS,
 					'stored_count'  => $stored_count,
 					'payload_count' => self::json_object_count( $json ),
 					'json_bytes'    => strlen( $json ),
@@ -444,7 +448,7 @@ class WC_GPD_Sample_Content {
 		if ( is_readable( $bundled_path ) ) {
 			$raw       = file_get_contents( $bundled_path );
 			$sanitized = is_string( $raw ) ? WC_GPD_Template_Json::sanitize( $raw ) : false;
-			if ( $sanitized && self::json_object_count( $sanitized ) >= 4 ) {
+			if ( $sanitized && self::json_object_count( $sanitized ) >= self::DEMO_MIN_OBJECTS ) {
 				return $sanitized;
 			}
 		}
@@ -455,7 +459,7 @@ class WC_GPD_Sample_Content {
 		}
 
 		$sanitized = WC_GPD_Template_Json::sanitize( $encoded );
-		if ( $sanitized && self::json_object_count( $sanitized ) >= 4 ) {
+		if ( $sanitized && self::json_object_count( $sanitized ) >= self::DEMO_MIN_OBJECTS ) {
 			return $sanitized;
 		}
 
@@ -507,10 +511,10 @@ class WC_GPD_Sample_Content {
 		$product->set_regular_price( '1.00' );
 		$product->set_slug( self::PRODUCT_SLUG );
 		$product->set_description(
-			__( 'Demo product created by WC Generic Product Designer. Open the designer, select each labeled layer, and use Copy diagnostics in the footer when troubleshooting.', 'wc-generic-product-designer' )
+			__( 'Demo product for WC Generic Product Designer. Test front/back views, text permissions, palettes, shapes, placeholders, and graphic slots. Use Add for graphics, icons, photos, and shapes.', 'wc-generic-product-designer' )
 		);
 		$product->set_short_description(
-			__( 'Demo product with sample text and shape layers for testing customer permissions.', 'wc-generic-product-designer' )
+			__( 'Multi-view demo with labeled layers for every customer designer feature.', 'wc-generic-product-designer' )
 		);
 
 		$saved_id = $product->save();
@@ -531,13 +535,14 @@ class WC_GPD_Sample_Content {
 	 * @return array
 	 */
 	private static function build_template_document() {
-		$objects = array(
+		$front            = WC_GPD_Template_Json::empty_view( 'view_front', __( 'Front', 'wc-generic-product-designer' ) );
+		$front['objects'] = array(
 			self::text_layer(
 				'gpd-demo-text-all',
 				'Demo: all editable',
 				'All controls editable',
-				80,
-				80,
+				40,
+				36,
 				array(
 					'wcGpdCustomerPaletteOnly' => false,
 					'wcGpdPaletteId'           => 'pal_demo',
@@ -547,8 +552,8 @@ class WC_GPD_Sample_Content {
 				'gpd-demo-text-color',
 				'Demo: color only',
 				'Color only layer',
-				80,
-				190,
+				40,
+				118,
 				array(
 					'wcGpdLockFont'            => true,
 					'wcGpdLockSize'            => true,
@@ -567,11 +572,40 @@ class WC_GPD_Sample_Content {
 				)
 			),
 			self::text_layer(
+				'gpd-demo-text-move',
+				'Demo: move + resize',
+				'Move me around',
+				40,
+				200,
+				array(
+					'wcGpdLockFont'          => true,
+					'wcGpdLockSize'          => true,
+					'wcGpdLockBold'          => true,
+					'wcGpdLockItalic'        => true,
+					'wcGpdLockUnderline'     => true,
+					'wcGpdLockAlign'         => true,
+					'wcGpdLockLineHeight'    => true,
+					'wcGpdLockLetterSpacing' => true,
+					'wcGpdLockText'          => true,
+					'wcGpdLockColor'         => true,
+					'wcGpdLockMove'          => false,
+					'wcGpdLockScale'         => false,
+				)
+			),
+			self::placeholder_layer(
+				'gpd-demo-placeholder-name',
+				'Demo: name field',
+				'Your name',
+				'name',
+				40,
+				282
+			),
+			self::text_layer(
 				'gpd-demo-text-locked',
 				'Demo: locked',
 				'Fully locked text',
-				80,
-				300,
+				40,
+				364,
 				array(
 					'wcGpdLockFont'          => true,
 					'wcGpdLockSize'          => true,
@@ -591,19 +625,91 @@ class WC_GPD_Sample_Content {
 			self::shape_layer(
 				'gpd-demo-shape',
 				'Demo: shape color + move',
-				500,
-				120,
-				160,
-				110
+				470,
+				48,
+				150,
+				100
+			),
+			self::graphic_slot_layer(
+				'gpd-demo-graphic-slot',
+				'Demo: graphic slot',
+				470,
+				220,
+				140,
+				140
 			),
 		);
 
-		$view            = WC_GPD_Template_Json::empty_view( 'view_front', __( 'Front', 'wc-generic-product-designer' ) );
-		$view['objects'] = $objects;
+		$back            = WC_GPD_Template_Json::empty_view( 'view_back', __( 'Back', 'wc-generic-product-designer' ) );
+		$back['objects'] = array(
+			self::text_layer(
+				'gpd-demo-back-title',
+				'Back: all editable',
+				'Back view title',
+				40,
+				48,
+				array(
+					'wcGpdCustomerPaletteOnly' => false,
+					'wcGpdPaletteId'           => 'pal_demo',
+				)
+			),
+			self::text_layer(
+				'gpd-demo-back-palette',
+				'Back: palette only',
+				'Palette swatches only',
+				40,
+				140,
+				array(
+					'wcGpdLockFont'            => true,
+					'wcGpdLockSize'            => true,
+					'wcGpdLockBold'            => true,
+					'wcGpdLockItalic'          => true,
+					'wcGpdLockUnderline'       => true,
+					'wcGpdLockAlign'           => true,
+					'wcGpdLockLineHeight'      => true,
+					'wcGpdLockLetterSpacing'   => true,
+					'wcGpdLockText'            => true,
+					'wcGpdLockMove'            => true,
+					'wcGpdLockScale'           => true,
+					'wcGpdLockColor'           => false,
+					'wcGpdCustomerPaletteOnly' => true,
+					'wcGpdPaletteId'           => 'pal_demo',
+				)
+			),
+			self::shape_layer(
+				'gpd-demo-back-shape',
+				'Back: shape move only',
+				470,
+				72,
+				140,
+				90,
+				array(
+					'wcGpdLockColor' => true,
+					'wcGpdLockMove'  => false,
+					'wcGpdLockScale' => false,
+				)
+			),
+			self::text_layer(
+				'gpd-demo-back-hint',
+				'Back: hint',
+				'Switch views with the tabs above',
+				40,
+				420,
+				array(
+					'wcGpdLockMove'  => true,
+					'wcGpdLockScale' => true,
+					'wcGpdLockText'  => true,
+					'wcGpdLockColor' => true,
+					'wcGpdLockFont'  => true,
+					'wcGpdLockSize'  => true,
+					'fontSize'       => 22,
+				)
+			),
+		);
 
 		return array(
 			'version' => 2,
-			'views'   => array( $view ),
+			'views'   => array( $front, $back ),
 		);
 	}
 
@@ -671,10 +777,11 @@ class WC_GPD_Sample_Content {
 	 * @param int    $top    Y position.
 	 * @param int    $width  Width.
 	 * @param int    $height Height.
+	 * @param array  $extra_props Extra props.
 	 * @return array
 	 */
-	private static function shape_layer( $uid, $label, $left, $top, $width, $height ) {
-		return array(
+	private static function shape_layer( $uid, $label, $left, $top, $width, $height, array $extra_props = array() ) {
+		$base = array(
 			'type'                     => 'rect',
 			'version'                  => '5.3.0',
 			'left'                     => $left,
@@ -704,6 +811,68 @@ class WC_GPD_Sample_Content {
 			'wcGpdLockScale'           => false,
 			'selectable'               => false,
 			'evented'                  => false,
+		);
+
+		return array_merge( $base, $extra_props );
+	}
+
+	/**
+	 * @param string $uid   Layer UID.
+	 * @param string $label Layer label.
+	 * @param string $text  Placeholder text.
+	 * @param string $key   Placeholder key.
+	 * @param int    $left  X position.
+	 * @param int    $top   Y position.
+	 * @return array
+	 */
+	private static function placeholder_layer( $uid, $label, $text, $key, $left, $top ) {
+		return array_merge(
+			self::text_layer( $uid, $label, $text, $left, $top, array() ),
+			array(
+				'wcGpdLayerType'         => 'placeholder',
+				'wcGpdPlaceholderKey'    => $key,
+				'wcGpdPlaceholderLabel'  => $label,
+				'wcGpdCustomerPaletteOnly' => false,
+				'wcGpdPaletteId'         => 'pal_demo',
+			)
+		);
+	}
+
+	/**
+	 * @param string $uid    Layer UID.
+	 * @param string $label  Layer label.
+	 * @param int    $left   X position.
+	 * @param int    $top    Y position.
+	 * @param int    $width  Width.
+	 * @param int    $height Height.
+	 * @return array
+	 */
+	private static function graphic_slot_layer( $uid, $label, $left, $top, $width, $height ) {
+		return array(
+			'type'                   => 'rect',
+			'version'                => '5.3.0',
+			'left'                   => $left,
+			'top'                    => $top,
+			'width'                  => $width,
+			'height'                 => $height,
+			'scaleX'                 => 1,
+			'scaleY'                 => 1,
+			'angle'                  => 0,
+			'originX'                => 'left',
+			'originY'                => 'top',
+			'fill'                   => 'rgba(34,113,177,0.08)',
+			'stroke'                 => '#2271b1',
+			'strokeWidth'            => 1,
+			'strokeDashArray'        => array( 6, 4 ),
+			'wcGpdUid'               => $uid,
+			'wcGpdTemplateLayer'     => true,
+			'wcGpdLayerType'         => 'graphic_slot',
+			'wcGpdGraphicSlot'       => true,
+			'wcGpdLayerLabel'        => $label,
+			'wcGpdCustomerMovable'   => false,
+			'wcGpdCustomerResizable' => false,
+			'selectable'             => false,
+			'evented'                => false,
 		);
 	}
 }

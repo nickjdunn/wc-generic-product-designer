@@ -1,0 +1,47 @@
+/**
+ * Shop / category loop — Start designing button layout.
+ */
+
+.wc-gpd-loop-cta-wrap {
+	display: block;
+	width: 100%;
+	margin-top: 0.75rem;
+	position: relative;
+	z-index: 5;
+}
+
+.wc-gpd-loop-cta-wrap .wc-gpd-start-designing-link,
+a.wc-gpd-start-designing-link.button,
+a.wc-gpd-start-designing-link.add_to_cart_button {
+	display: inline-block !important;
+	width: auto !important;
+	max-width: 100%;
+	height: auto !important;
+	min-height: 0 !important;
+	position: relative !important;
+	inset: auto !important;
+	top: auto !important;
+	right: auto !important;
+	bottom: auto !important;
+	left: auto !important;
+	flex: 0 0 auto !important;
+	align-self: flex-start;
+	text-align: center;
+	white-space: normal;
+}
+
+.woocommerce ul.products li.product.wc-gpd-has-designer,
+.wc-block-product.wc-gpd-has-designer,
+li.wc-block-grid__product.wc-gpd-has-designer {
+	position: relative;
+}
+
+.wc-block-product.wc-gpd-has-designer .wc-gpd-loop-cta-wrap,
+.wc-block-product.wc-gpd-has-designer .wp-block-woocommerce-product-button {
+	margin-top: 0.75rem;
+	width: 100%;
+}
+
+.wc-block-product.wc-gpd-has-designer .wc-gpd-start-designing-link {
+	margin: 0;
+}

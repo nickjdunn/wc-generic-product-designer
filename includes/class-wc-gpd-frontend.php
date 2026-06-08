@@ -56,6 +56,7 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		add_filter( 'woocommerce_product_single_add_to_cart_text', array( $this, 'filter_add_to_cart_text' ), 10, 2 );
 		add_filter( 'woocommerce_product_add_to_cart_text', array( $this, 'filter_add_to_cart_text' ), 10, 2 );
 		add_filter( 'woocommerce_loop_add_to_cart_link', array( $this, 'filter_loop_add_to_cart_link' ), 10, 3 );
+		add_filter( 'render_block', array( $this, 'filter_product_button_block' ), 10, 2 );
 		add_filter( 'post_class', array( $this, 'add_designer_product_post_class' ), 10, 3 );
 	}
 
@@ -136,11 +137,47 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		$classes .= ' wc-gpd-start-designing-link';
 
 		return sprintf(
-			'<a href="%s" class="%s" aria-label="%s">%s</a>',
+			'<div class="wc-gpd-loop-cta-wrap"><a href="%s" class="%s" aria-label="%s">%s</a></div>',
 			esc_url( $url ),
 			esc_attr( $classes ),
 			esc_attr( $this->get_cta_label( $product ) ),
 			esc_html( $this->get_cta_label( $product ) )
+		);
+	}
+
+	/**
+	 * Block themes: replace product-button output for designer products.
+	 *
+	 * @param string $block_content Rendered block HTML.
+	 * @param array  $block         Block data.
+	 * @return string
+	 */
+	public function filter_product_button_block( $block_content, $block ) {
+		if ( empty( $block['blockName'] ) || 'woocommerce/product-button' !== $block['blockName'] ) {
+			return $block_content;
+		}
+
+		if ( is_admin() || ! function_exists( 'wc_get_product' ) ) {
+			return $block_content;
+		}
+
+		$post_id = get_the_ID();
+		if ( ! $post_id || 'product' !== get_post_type( $post_id ) ) {
+			return $block_content;
+		}
+
+		$product = wc_get_product( $post_id );
+		if ( ! $this->product_uses_designer_cta( $product ) ) {
+			return $block_content;
+		}
+
+		$url   = add_query_arg( 'wc_gpd_design', '1', $product->get_permalink() );
+		$label = $this->get_cta_label( $product );
+
+		return sprintf(
+			'<div class="wc-gpd-loop-cta-wrap wp-block-button wc-block-components-product-button"><a href="%1$s" class="wp-block-button__link wc-gpd-start-designing-link add_to_cart_button button" aria-label="%2$s">%2$s</a></div>',
+			esc_url( $url ),
+			esc_html( $label )
 		);
 	}
 
@@ -152,13 +189,22 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			return;
 		}
 
+		if ( ! ( is_shop() || is_product_taxonomy() || is_post_type_archive( 'product' ) || is_product() ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'wc-gpd-storefront-cta',
+			WC_GPD_PLUGIN_URL . 'assets/css/storefront-cta.css',
+			array(),
+			WC_GPD_VERSION
+		);
+
 		$css_block = WC_GPD_Settings::cta_button_css_block();
 		if ( '' === $css_block ) {
 			return;
 		}
 
-		wp_register_style( 'wc-gpd-storefront-cta', false, array(), WC_GPD_VERSION );
-		wp_enqueue_style( 'wc-gpd-storefront-cta' );
 		wp_add_inline_style( 'wc-gpd-storefront-cta', $css_block );
 	}
 
