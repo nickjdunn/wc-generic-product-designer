@@ -153,17 +153,90 @@ class WC_GPD_Design_Template {
 	 * @return array
 	 */
 	public static function get_palettes( $template_id ) {
-		$raw = get_post_meta( absint( $template_id ), self::META_TEMPLATE_PALETTES, true );
+		$template_id = absint( $template_id );
+		self::maybe_migrate_site_libraries_from_template( $template_id );
+		$definitions = WC_GPD_Site_Libraries::get_color_palettes_document();
+		$settings    = self::get_template_palette_settings( $template_id );
+		return array_merge( $definitions, $settings );
+	}
+
+	/**
+	 * Template-only color palette settings (not shared definitions).
+	 *
+	 * @param int $template_id Template ID.
+	 * @return array
+	 */
+	public static function get_template_palette_settings( $template_id ) {
+		$defaults = array(
+			'use_global_colors'   => false,
+			'global_palette_id'   => 'pal_custom',
+			'global_colors'       => array( '#000000' ),
+		);
+		$raw      = get_post_meta( absint( $template_id ), self::META_TEMPLATE_PALETTES, true );
+		$data     = array();
 		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
-			$data = json_decode( $raw, true );
-			if ( is_array( $data ) ) {
-				return self::sanitize_palettes_data( $data );
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) ) {
+				$data = $decoded;
+			}
+		} elseif ( is_array( $raw ) ) {
+			$data = $raw;
+		}
+		return self::sanitize_palette_settings_data( $data, $defaults );
+	}
+
+	/**
+	 * @param array $data     Settings payload.
+	 * @param array $defaults Defaults.
+	 * @return array
+	 */
+	public static function sanitize_palette_settings_data( array $data, array $definitions = array() ) {
+		$clean = array(
+			'use_global_colors' => ! empty( $data['use_global_colors'] ),
+			'global_palette_id' => 'pal_custom',
+			'global_colors'     => array(),
+		);
+
+		$known = array();
+		if ( ! empty( $definitions['palettes'] ) && is_array( $definitions['palettes'] ) ) {
+			$known = wp_list_pluck( $definitions['palettes'], 'id' );
+		}
+
+		$global_palette_id = ! empty( $data['global_palette_id'] ) ? sanitize_key( (string) $data['global_palette_id'] ) : 'pal_custom';
+		if ( 'pal_custom' !== $global_palette_id && ! empty( $known ) && ! in_array( $global_palette_id, $known, true ) ) {
+			$global_palette_id = 'pal_custom';
+		}
+		$clean['global_palette_id'] = $global_palette_id;
+
+		if ( ! empty( $data['global_colors'] ) && is_array( $data['global_colors'] ) ) {
+			foreach ( $data['global_colors'] as $color ) {
+				$hex = sanitize_hex_color( (string) $color );
+				if ( $hex ) {
+					$clean['global_colors'][] = $hex;
+				}
 			}
 		}
-		if ( is_array( $raw ) ) {
-			return self::sanitize_palettes_data( $raw );
+		if ( empty( $clean['global_colors'] ) ) {
+			$clean['global_colors'] = array( '#000000' );
 		}
-		return self::default_palettes_data();
+
+		return $clean;
+	}
+
+	/**
+	 * @param string $json JSON settings.
+	 * @return array
+	 */
+	public static function sanitize_palette_settings_json( $json ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::sanitize_palette_settings_data( array() );
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::sanitize_palette_settings_data( array() );
+		}
+		$definitions = WC_GPD_Site_Libraries::get_color_palettes_document();
+		return self::sanitize_palette_settings_data( $data, $definitions );
 	}
 
 	/**
@@ -277,17 +350,82 @@ class WC_GPD_Design_Template {
 	 * @return array
 	 */
 	public static function get_font_palettes( $template_id ) {
-		$raw = get_post_meta( absint( $template_id ), self::META_TEMPLATE_FONT_PALETTES, true );
+		$template_id = absint( $template_id );
+		self::maybe_migrate_site_libraries_from_template( $template_id );
+		$definitions = WC_GPD_Site_Libraries::font_libraries_as_template_palettes();
+		$settings    = self::get_template_font_palette_settings( $template_id );
+		return array_merge( $definitions, $settings );
+	}
+
+	/**
+	 * Template-only font palette settings.
+	 *
+	 * @param int $template_id Template ID.
+	 * @return array
+	 */
+	public static function get_template_font_palette_settings( $template_id ) {
+		$raw  = get_post_meta( absint( $template_id ), self::META_TEMPLATE_FONT_PALETTES, true );
+		$data = array();
 		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
-			$data = json_decode( $raw, true );
-			if ( is_array( $data ) ) {
-				return self::sanitize_font_palettes_data( $data, $template_id );
+			$decoded = json_decode( $raw, true );
+			if ( is_array( $decoded ) ) {
+				$data = $decoded;
 			}
+		} elseif ( is_array( $raw ) ) {
+			$data = $raw;
 		}
-		if ( is_array( $raw ) ) {
-			return self::sanitize_font_palettes_data( $raw, $template_id );
+		$definitions = WC_GPD_Site_Libraries::font_libraries_as_template_palettes();
+		return self::sanitize_font_palette_settings_data( $data, $template_id, $definitions );
+	}
+
+	/**
+	 * @param array $data          Settings payload.
+	 * @param int   $template_id   Template ID.
+	 * @param array $definitions   Font library definitions.
+	 * @return array
+	 */
+	public static function sanitize_font_palette_settings_data( array $data, $template_id = 0, array $definitions = array() ) {
+		$allowed_keys = self::get_template_font_keys_for_palettes( $template_id );
+		$clean        = array(
+			'use_global_fonts'       => ! empty( $data['use_global_fonts'] ),
+			'global_font_palette_id' => 'fp_custom',
+			'global_fonts'           => array(),
+		);
+
+		$known = array();
+		if ( ! empty( $definitions['palettes'] ) && is_array( $definitions['palettes'] ) ) {
+			$known = wp_list_pluck( $definitions['palettes'], 'id' );
 		}
-		return self::sanitize_font_palettes_data( self::default_font_palettes_data(), $template_id );
+
+		$global_palette_id = ! empty( $data['global_font_palette_id'] ) ? sanitize_key( (string) $data['global_font_palette_id'] ) : 'fp_custom';
+		if ( 'fp_custom' !== $global_palette_id && ! empty( $known ) && ! in_array( $global_palette_id, $known, true ) ) {
+			$global_palette_id = 'fp_custom';
+		}
+		$clean['global_font_palette_id'] = $global_palette_id;
+
+		$clean['global_fonts'] = self::sanitize_font_palette_keys( $data['global_fonts'] ?? array(), $allowed_keys );
+		if ( empty( $clean['global_fonts'] ) && ! empty( $allowed_keys ) ) {
+			$clean['global_fonts'] = $allowed_keys;
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * @param string $json        JSON settings.
+	 * @param int    $template_id Template ID.
+	 * @return array
+	 */
+	public static function sanitize_font_palette_settings_json( $json, $template_id = 0 ) {
+		if ( ! is_string( $json ) || '' === trim( $json ) ) {
+			return self::sanitize_font_palette_settings_data( array(), $template_id );
+		}
+		$data = json_decode( $json, true );
+		if ( ! is_array( $data ) ) {
+			return self::sanitize_font_palette_settings_data( array(), $template_id );
+		}
+		$definitions = WC_GPD_Site_Libraries::font_libraries_as_template_palettes();
+		return self::sanitize_font_palette_settings_data( $data, $template_id, $definitions );
 	}
 
 	/**
@@ -516,11 +654,11 @@ class WC_GPD_Design_Template {
 		update_post_meta( $template_id, self::META_TEMPLATE_FONTS, $fonts );
 
 		$palettes_raw = isset( $_POST['wc_gpd_template_palettes'] ) ? wp_unslash( $_POST['wc_gpd_template_palettes'] ) : '';
-		$palettes     = self::sanitize_palettes_json( is_string( $palettes_raw ) ? $palettes_raw : '' );
+		$palettes     = self::sanitize_palette_settings_json( is_string( $palettes_raw ) ? $palettes_raw : '' );
 		update_post_meta( $template_id, self::META_TEMPLATE_PALETTES, wp_slash( wp_json_encode( $palettes ) ) );
 
 		$font_palettes_raw = isset( $_POST['wc_gpd_template_font_palettes'] ) ? wp_unslash( $_POST['wc_gpd_template_font_palettes'] ) : '';
-		$font_palettes     = self::sanitize_font_palettes_json( is_string( $font_palettes_raw ) ? $font_palettes_raw : '', $template_id );
+		$font_palettes     = self::sanitize_font_palette_settings_json( is_string( $font_palettes_raw ) ? $font_palettes_raw : '', $template_id );
 		update_post_meta( $template_id, self::META_TEMPLATE_FONT_PALETTES, wp_slash( wp_json_encode( $font_palettes ) ) );
 
 		WC_GPD_Product_Settings::save( $template_id, WC_GPD_Product_Settings::from_post( wp_unslash( $_POST ) ) );
@@ -993,5 +1131,37 @@ class WC_GPD_Design_Template {
 			),
 			admin_url( 'admin.php' )
 		);
+	}
+
+	/**
+	 * One-time copy of legacy per-template palette definitions to site libraries.
+	 *
+	 * @param int $template_id Template ID.
+	 */
+	public static function maybe_migrate_site_libraries_from_template( $template_id ) {
+		$template_id = absint( $template_id );
+		if ( ! $template_id ) {
+			return;
+		}
+
+		if ( false === get_option( WC_GPD_Site_Libraries::OPTION_COLOR_PALETTES, false ) ) {
+			$raw = get_post_meta( $template_id, self::META_TEMPLATE_PALETTES, true );
+			if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+				$data = json_decode( $raw, true );
+				if ( is_array( $data ) && ! empty( $data['palettes'] ) ) {
+					WC_GPD_Site_Libraries::save_color_palettes_document( array( 'palettes' => $data['palettes'] ) );
+				}
+			}
+		}
+
+		if ( false === get_option( WC_GPD_Site_Libraries::OPTION_FONT_LIBRARIES, false ) ) {
+			$raw = get_post_meta( $template_id, self::META_TEMPLATE_FONT_PALETTES, true );
+			if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+				$data = json_decode( $raw, true );
+				if ( is_array( $data ) && ! empty( $data['palettes'] ) ) {
+					WC_GPD_Site_Libraries::save_font_libraries_document( array( 'libraries' => $data['palettes'] ) );
+				}
+			}
+		}
 	}
 }

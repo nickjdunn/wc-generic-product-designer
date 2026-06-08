@@ -1339,6 +1339,30 @@
 	align-items: start;
 }
 
+.wc-gpd-customer-tools-panels {
+	min-width: 0;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+	overflow: hidden;
+}
+
+.wc-gpd-customer-tools-panels .wc-gpd-accordion-body {
+	padding: 12px 14px 14px;
+}
+
+.wc-gpd-libraries-accordion.wc-gpd-tpl-accordion {
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+	overflow: hidden;
+	margin: 16px 0;
+}
+
+.wc-gpd-libraries-accordion .wc-gpd-accordion-body {
+	padding: 12px 14px 14px;
+}
+
 .wc-gpd-customer-mockup-wrap {
 	min-width: 0;
 }

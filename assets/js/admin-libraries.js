@@ -430,6 +430,316 @@
 		persist();
 	} );
 
+	// —— Site color palettes ——
+	const colorHidden = document.getElementById( 'wc_gpd_site_color_palettes_json' );
+	const colorListEl = document.getElementById( 'wc-gpd-site-color-palettes-list' );
+	let colorPalettesDoc = { palettes: [] };
+
+	function loadColorPalettes() {
+		if ( config.colorPalettes && typeof config.colorPalettes === 'object' ) {
+			colorPalettesDoc = {
+				palettes: Array.isArray( config.colorPalettes.palettes ) ? config.colorPalettes.palettes : [],
+			};
+		}
+		if ( colorHidden && colorHidden.value ) {
+			try {
+				const parsed = JSON.parse( colorHidden.value );
+				if ( parsed && Array.isArray( parsed.palettes ) ) {
+					colorPalettesDoc.palettes = parsed.palettes;
+				}
+			} catch ( e ) {
+				// Keep loaded value.
+			}
+		}
+		if ( ! colorPalettesDoc.palettes.length ) {
+			colorPalettesDoc.palettes = [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ];
+		}
+	}
+
+	function syncColorPalettesHidden() {
+		if ( colorHidden ) {
+			colorHidden.value = JSON.stringify( colorPalettesDoc );
+		}
+	}
+
+	function renderColorPalettes() {
+		if ( ! colorListEl ) {
+			return;
+		}
+		colorListEl.innerHTML = '';
+		if ( ! colorPalettesDoc.palettes.length ) {
+			colorListEl.innerHTML = '<p class="description">' + ( config.i18n?.emptyColorPalettes || 'No color palettes yet.' ) + '</p>';
+			return;
+		}
+		colorPalettesDoc.palettes.forEach( ( palette, paletteIndex ) => {
+			const card = document.createElement( 'div' );
+			card.className = 'wc-gpd-palette-card';
+			card.dataset.paletteId = palette.id;
+
+			const header = document.createElement( 'div' );
+			header.className = 'wc-gpd-palette-card__header';
+			const nameInput = document.createElement( 'input' );
+			nameInput.type = 'text';
+			nameInput.className = 'wc-gpd-palette-name regular-text';
+			nameInput.value = palette.name || palette.id;
+			nameInput.addEventListener( 'input', () => {
+				palette.name = nameInput.value;
+				syncColorPalettesHidden();
+			} );
+			const removeBtn = document.createElement( 'button' );
+			removeBtn.type = 'button';
+			removeBtn.className = 'button button-link-delete';
+			removeBtn.textContent = config.i18n?.removeLibrary || 'Remove';
+			removeBtn.disabled = colorPalettesDoc.palettes.length <= 1;
+			removeBtn.addEventListener( 'click', () => {
+				if ( colorPalettesDoc.palettes.length <= 1 ) {
+					return;
+				}
+				colorPalettesDoc.palettes.splice( paletteIndex, 1 );
+				syncColorPalettesHidden();
+				renderColorPalettes();
+			} );
+			header.appendChild( nameInput );
+			header.appendChild( removeBtn );
+
+			const swatches = document.createElement( 'div' );
+			swatches.className = 'wc-gpd-palette-swatches';
+			( palette.colors || [] ).forEach( ( color, colorIndex ) => {
+				const row = document.createElement( 'label' );
+				row.className = 'wc-gpd-palette-color-row';
+				const picker = document.createElement( 'input' );
+				picker.type = 'color';
+				picker.value = color;
+				picker.addEventListener( 'input', () => {
+					palette.colors[ colorIndex ] = picker.value;
+					syncColorPalettesHidden();
+				} );
+				const rm = document.createElement( 'button' );
+				rm.type = 'button';
+				rm.className = 'button-link-delete wc-gpd-palette-remove-color';
+				rm.textContent = '×';
+				rm.disabled = ( palette.colors || [] ).length <= 1;
+				rm.addEventListener( 'click', () => {
+					if ( ( palette.colors || [] ).length <= 1 ) {
+						return;
+					}
+					palette.colors.splice( colorIndex, 1 );
+					syncColorPalettesHidden();
+					renderColorPalettes();
+				} );
+				row.appendChild( picker );
+				row.appendChild( rm );
+				swatches.appendChild( row );
+			} );
+
+			const addColorBtn = document.createElement( 'button' );
+			addColorBtn.type = 'button';
+			addColorBtn.className = 'button button-small';
+			addColorBtn.textContent = config.i18n?.addColor || 'Add color';
+			addColorBtn.addEventListener( 'click', () => {
+				palette.colors = palette.colors || [];
+				palette.colors.push( '#000000' );
+				syncColorPalettesHidden();
+				renderColorPalettes();
+			} );
+
+			card.appendChild( header );
+			card.appendChild( swatches );
+			card.appendChild( addColorBtn );
+			colorListEl.appendChild( card );
+		} );
+	}
+
+	document.getElementById( 'wc-gpd-add-site-color-palette' )?.addEventListener( 'click', () => {
+		colorPalettesDoc.palettes.push( {
+			id: 'pal_' + Date.now().toString( 36 ),
+			name: 'Palette ' + ( colorPalettesDoc.palettes.length + 1 ),
+			colors: [ '#000000' ],
+		} );
+		syncColorPalettesHidden();
+		renderColorPalettes();
+	} );
+
+	// —— Site font libraries ——
+	const fontHidden = document.getElementById( 'wc_gpd_site_font_libraries_json' );
+	const fontListEl = document.getElementById( 'wc-gpd-font-libraries-list' );
+	const fontOptions = Array.isArray( config.fontOptions ) ? config.fontOptions : [];
+	let fontLibrariesDoc = { libraries: [] };
+
+	function loadFontLibraries() {
+		if ( config.fontLibraries && typeof config.fontLibraries === 'object' ) {
+			const rows = config.fontLibraries.libraries || config.fontLibraries.palettes || [];
+			fontLibrariesDoc.libraries = Array.isArray( rows ) ? rows : [];
+		}
+		if ( fontHidden && fontHidden.value ) {
+			try {
+				const parsed = JSON.parse( fontHidden.value );
+				const rows = parsed.libraries || parsed.palettes || [];
+				if ( Array.isArray( rows ) ) {
+					fontLibrariesDoc.libraries = rows;
+				}
+			} catch ( e ) {
+				// Keep loaded value.
+			}
+		}
+		if ( ! fontLibrariesDoc.libraries.length ) {
+			const defaultFonts = fontOptions.map( ( font ) => font.key ).filter( Boolean ).slice( 0, 8 );
+			fontLibrariesDoc.libraries = [ { id: 'fp_default', name: 'Default', fonts: defaultFonts } ];
+		}
+	}
+
+	function syncFontLibrariesHidden() {
+		if ( fontHidden ) {
+			fontHidden.value = JSON.stringify( { libraries: fontLibrariesDoc.libraries } );
+		}
+	}
+
+	function renderFontLibraries() {
+		if ( ! fontListEl ) {
+			return;
+		}
+		fontListEl.innerHTML = '';
+		if ( ! fontLibrariesDoc.libraries.length ) {
+			fontListEl.innerHTML = '<p class="description">' + ( config.i18n?.emptyFontLibs || 'No font libraries yet.' ) + '</p>';
+			return;
+		}
+		fontLibrariesDoc.libraries.forEach( ( library, libraryIndex ) => {
+			const card = document.createElement( 'div' );
+			card.className = 'wc-gpd-palette-card wc-gpd-font-palette-card';
+			card.dataset.libraryId = library.id;
+
+			const header = document.createElement( 'div' );
+			header.className = 'wc-gpd-palette-card__header';
+			const nameInput = document.createElement( 'input' );
+			nameInput.type = 'text';
+			nameInput.className = 'wc-gpd-palette-name regular-text';
+			nameInput.value = library.name || library.id;
+			nameInput.addEventListener( 'input', () => {
+				library.name = nameInput.value;
+				syncFontLibrariesHidden();
+			} );
+			const removeBtn = document.createElement( 'button' );
+			removeBtn.type = 'button';
+			removeBtn.className = 'button button-link-delete';
+			removeBtn.textContent = config.i18n?.removeLibrary || 'Remove';
+			removeBtn.disabled = fontLibrariesDoc.libraries.length <= 1;
+			removeBtn.addEventListener( 'click', () => {
+				if ( fontLibrariesDoc.libraries.length <= 1 ) {
+					return;
+				}
+				fontLibrariesDoc.libraries.splice( libraryIndex, 1 );
+				syncFontLibrariesHidden();
+				renderFontLibraries();
+			} );
+			header.appendChild( nameInput );
+			header.appendChild( removeBtn );
+
+			const picks = document.createElement( 'div' );
+			picks.className = 'wc-gpd-font-palette-picks';
+			const selected = new Set( library.fonts || [] );
+			fontOptions.forEach( ( font ) => {
+				const label = document.createElement( 'label' );
+				label.className = 'wc-gpd-font-palette-pick';
+				label.style.fontFamily = font.css || font.family;
+				const input = document.createElement( 'input' );
+				input.type = 'checkbox';
+				input.value = font.key;
+				input.checked = selected.has( font.key );
+				input.addEventListener( 'change', () => {
+					library.fonts = library.fonts || [];
+					if ( input.checked ) {
+						if ( ! library.fonts.includes( font.key ) ) {
+							library.fonts.push( font.key );
+						}
+					} else {
+						library.fonts = library.fonts.filter( ( key ) => key !== font.key );
+					}
+					if ( ! library.fonts.length ) {
+						library.fonts = [ font.key ];
+						input.checked = true;
+					}
+					syncFontLibrariesHidden();
+				} );
+				label.appendChild( input );
+				label.appendChild( document.createTextNode( ' ' + ( font.label || font.key ) ) );
+				picks.appendChild( label );
+			} );
+
+			card.appendChild( header );
+			card.appendChild( picks );
+			fontListEl.appendChild( card );
+		} );
+	}
+
+	document.getElementById( 'wc-gpd-add-font-library' )?.addEventListener( 'click', () => {
+		const defaultFonts = fontOptions.map( ( font ) => font.key ).filter( Boolean ).slice( 0, 8 );
+		fontLibrariesDoc.libraries.push( {
+			id: 'fp_' + Date.now().toString( 36 ),
+			name: 'Font library ' + ( fontLibrariesDoc.libraries.length + 1 ),
+			fonts: defaultFonts,
+		} );
+		syncFontLibrariesHidden();
+		renderFontLibraries();
+	} );
+
+	function initLibrariesAccordion() {
+		const accordion = document.getElementById( 'wc-gpd-libraries-accordion' );
+		if ( ! accordion ) {
+			return;
+		}
+		accordion.querySelectorAll( '.wc-gpd-accordion-toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const section = toggle.closest( '.wc-gpd-accordion-section' );
+				if ( ! section ) {
+					return;
+				}
+				const body = section.querySelector( '.wc-gpd-accordion-body' );
+				const sectionName = section.dataset.libSection || '';
+				if ( section.classList.contains( 'is-open' ) ) {
+					section.classList.remove( 'is-open' );
+					toggle.setAttribute( 'aria-expanded', 'false' );
+					if ( body ) {
+						body.hidden = true;
+					}
+					return;
+				}
+				accordion.querySelectorAll( '.wc-gpd-accordion-section' ).forEach( ( row ) => {
+					const isTarget = row.dataset.libSection === sectionName;
+					const rowToggle = row.querySelector( '.wc-gpd-accordion-toggle' );
+					const rowBody = row.querySelector( '.wc-gpd-accordion-body' );
+					if ( ! isTarget ) {
+						row.classList.remove( 'is-open' );
+						if ( rowToggle ) {
+							rowToggle.setAttribute( 'aria-expanded', 'false' );
+						}
+						if ( rowBody ) {
+							rowBody.hidden = true;
+						}
+					}
+				} );
+				section.classList.add( 'is-open' );
+				toggle.setAttribute( 'aria-expanded', 'true' );
+				if ( body ) {
+					body.hidden = false;
+				}
+			} );
+		} );
+	}
+
+	const librariesForm = document.getElementById( 'wc-gpd-libraries-form' );
+	if ( librariesForm ) {
+		librariesForm.addEventListener( 'submit', () => {
+			syncHidden();
+			syncColorPalettesHidden();
+			syncFontLibrariesHidden();
+		} );
+	}
+
 	load();
 	render();
+	loadColorPalettes();
+	renderColorPalettes();
+	loadFontLibraries();
+	renderFontLibraries();
+	initLibrariesAccordion();
 }( jQuery ) );

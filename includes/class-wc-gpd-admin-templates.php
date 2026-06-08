@@ -145,6 +145,9 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			true
 		);
 		$template_id = isset( $_GET['template_id'] ) ? absint( $_GET['template_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( $template_id ) {
+			WC_GPD_Design_Template::maybe_migrate_site_libraries_from_template( $template_id );
+		}
 		$template_settings = $template_id ? WC_GPD_Design_Template::get_settings( $template_id ) : null;
 		wp_localize_script(
 			'wc-gpd-admin-template-editor',
@@ -157,7 +160,10 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				'libraryAssignments' => ( $template_settings && ! empty( $template_settings['library_assignments'] ) )
 					? $template_settings['library_assignments']
 					: WC_GPD_Design_Template::default_library_assignments(),
-				'siteLibraries' => WC_GPD_Graphic_Libraries::get_all(),
+				'siteLibraries'      => WC_GPD_Graphic_Libraries::get_all(),
+				'siteColorPalettes'  => WC_GPD_Site_Libraries::get_color_palettes_document(),
+				'siteFontLibraries'  => WC_GPD_Site_Libraries::font_libraries_as_template_palettes(),
+				'librariesUrl'       => add_query_arg( 'page', WC_GPD_Admin_Libraries::PAGE_SLUG, admin_url( 'admin.php' ) ),
 				'bootstrapIcons' => array(
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
 					'nonce'       => wp_create_nonce( WC_GPD_Bootstrap_Icons::NONCE_ACTION ),
@@ -567,10 +573,11 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 	 * @param array  $ps            Product settings.
 	 */
 	private function render_template_canvas( $settings, $template_json, $ps ) {
-		$template_fonts_json    = wp_json_encode( $settings['template_fonts'] );
-		$template_palettes_json      = wp_json_encode( ! empty( $settings['template_palettes'] ) ? $settings['template_palettes'] : WC_GPD_Design_Template::default_palettes_data() );
-		$template_font_palettes_json = wp_json_encode( ! empty( $settings['template_font_palettes'] ) ? $settings['template_font_palettes'] : WC_GPD_Design_Template::default_font_palettes_data() );
-		$font_options                = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
+		$template_fonts_json           = wp_json_encode( $settings['template_fonts'] );
+		$template_palettes_json        = wp_json_encode( WC_GPD_Design_Template::get_template_palette_settings( $settings['id'] ) );
+		$template_font_palettes_json   = wp_json_encode( WC_GPD_Design_Template::get_template_font_palette_settings( $settings['id'] ) );
+		$font_options                  = WC_GPD_Font_Registry::fonts_for_template( $settings['id'] );
+		$libraries_url                 = add_query_arg( 'page', WC_GPD_Admin_Libraries::PAGE_SLUG, admin_url( 'admin.php' ) );
 		?>
 		<div class="wc-gpd-template-editor-wrap wc-gpd-modern-studio-root" id="wc-gpd-template-editor-root">
 			<textarea id="wc_gpd_template_json" name="wc_gpd_template_json" class="wc-gpd-template-json-field" aria-hidden="true"><?php echo esc_textarea( $template_json ); ?></textarea>
@@ -703,18 +710,16 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 									</label>
 								<?php endforeach; ?>
 							</div>
-							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Color palettes', 'wc-generic-product-designer' ); ?></h5>
-							<div id="wc-gpd-palettes-admin">
-								<p class="description"><?php esc_html_e( 'Create palettes for customer color choices. Enable “same colors on entire template” in Settings for one global palette.', 'wc-generic-product-designer' ); ?></p>
-								<div id="wc-gpd-palettes-list"></div>
-								<button type="button" class="button button-small" id="wc-gpd-add-palette"><?php esc_html_e( 'Add palette', 'wc-generic-product-designer' ); ?></button>
-							</div>
-							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Font palettes', 'wc-generic-product-designer' ); ?></h5>
-							<div id="wc-gpd-font-palettes-admin">
-								<p class="description"><?php esc_html_e( 'Group template fonts into palettes (e.g. 7–10 fonts per product). Enable “same fonts on entire template” in Settings for one global palette.', 'wc-generic-product-designer' ); ?></p>
-								<div id="wc-gpd-font-palettes-list"></div>
-								<button type="button" class="button button-small" id="wc-gpd-add-font-palette"><?php esc_html_e( 'Add font palette', 'wc-generic-product-designer' ); ?></button>
-							</div>
+							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Color & font libraries', 'wc-generic-product-designer' ); ?></h5>
+							<p class="wc-gpd-tpl-panel-desc">
+								<?php
+								printf(
+									/* translators: %s: Libraries admin URL */
+									esc_html__( 'Create shared color palettes and font libraries under %s. Assign them per layer here or set template-wide defaults on the Settings tab.', 'wc-generic-product-designer' ),
+									'<a href="' . esc_url( $libraries_url ) . '">' . esc_html__( 'Template Designer → Libraries', 'wc-generic-product-designer' ) . '</a>'
+								);
+								?>
+							</p>
 							<h5 class="wc-gpd-tpl-subheading"><?php esc_html_e( 'Canvas guides', 'wc-generic-product-designer' ); ?></h5>
 							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_ruler" /> <?php esc_html_e( 'Show ruler', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-tpl-check"><input type="checkbox" id="wc_gpd_tpl_show_measurements" /> <?php esc_html_e( 'Show measurements', 'wc-generic-product-designer' ); ?></label>
@@ -814,14 +819,17 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 					</div>
 				</div>
 			</div>
-		<div class="wc-gpd-settings-grid wc-gpd-settings-grid--customer-global">
-			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
-				<h4><?php esc_html_e( 'Assigned libraries', 'wc-generic-product-designer' ); ?></h4>
+		<div class="wc-gpd-customer-tools-panels wc-gpd-tpl-accordion" id="wc-gpd-customer-tools-accordion">
+			<div class="wc-gpd-accordion-section is-open" data-cust-section="libraries">
+				<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="true"><?php esc_html_e( 'Assigned libraries', 'wc-generic-product-designer' ); ?></button>
+				<div class="wc-gpd-accordion-body">
 				<p class="description"><?php esc_html_e( 'Choose which graphic, photo, and icon libraries customers can use on this template. Create libraries under Template Designer → Libraries.', 'wc-generic-product-designer' ); ?></p>
 				<div id="wc-gpd-library-assignments" class="wc-gpd-library-assignments"></div>
+				</div>
 			</div>
-			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
-				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
+			<div class="wc-gpd-accordion-section" data-cust-section="add">
+				<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></button>
+				<div class="wc-gpd-accordion-body" hidden>
 				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
 				<p id="wc-gpd-customer-tools-template-colors-notice" class="description wc-gpd-template-colors-notice" data-template-colors-lock hidden><?php esc_html_e( 'Template color settings are active. Customer add palette options are disabled while “Use same colors on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
 				<p id="wc-gpd-customer-tools-template-fonts-notice" class="description wc-gpd-template-colors-notice" data-template-fonts-lock hidden><?php esc_html_e( 'Template font settings are active. Per-layer font palette options are disabled while “Use same fonts on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
@@ -899,15 +907,19 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 						</div>
 					</div>
 				</div>
+				</div>
 			</div>
-			<div class="wc-gpd-settings-card">
-				<h4><?php esc_html_e( 'Panels', 'wc-generic-product-designer' ); ?></h4>
+			<div class="wc-gpd-accordion-section" data-cust-section="panels">
+				<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Panels', 'wc-generic-product-designer' ); ?></button>
+				<div class="wc-gpd-accordion-body" hidden>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_layers_panel" value="1" <?php checked( $ps['allow_layers_panel'] ); ?> /> <?php esc_html_e( 'Layers panel', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_details_panel" value="1" <?php checked( $ps['allow_details_panel'] ); ?> /> <?php esc_html_e( 'Details panel (variable fields)', 'wc-generic-product-designer' ); ?></label></p>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_customer_graphics" value="1" <?php checked( $ps['allow_customer_graphics'] ); ?> /> <?php esc_html_e( 'Graphic picker in Details (for template slots)', 'wc-generic-product-designer' ); ?></label></p>
+				</div>
 			</div>
-			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
-				<h4><?php esc_html_e( 'Customer-added text formatting', 'wc-generic-product-designer' ); ?></h4>
+			<div class="wc-gpd-accordion-section" data-cust-section="text">
+				<button type="button" class="wc-gpd-accordion-toggle" aria-expanded="false"><?php esc_html_e( 'Customer-added text formatting', 'wc-generic-product-designer' ); ?></button>
+				<div class="wc-gpd-accordion-body" hidden>
 				<p class="description"><?php esc_html_e( 'Applies only to text the customer adds — not template layers (those use per-layer locks on the Template tab).', 'wc-generic-product-designer' ); ?></p>
 				<div class="wc-gpd-settings-check-grid">
 					<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_font_family" value="1" <?php checked( $ps['allow_font_family'] ); ?> /> <?php esc_html_e( 'Font family', 'wc-generic-product-designer' ); ?></label>
@@ -927,6 +939,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<option value=""><?php esc_html_e( 'Template default', 'wc-generic-product-designer' ); ?></option>
 						</select>
 					</label></p>
+				</div>
 				</div>
 			</div>
 		</div>

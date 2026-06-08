@@ -925,19 +925,26 @@
 		return !! obj && ( isTextLayer( obj ) || isShape( obj ) );
 	}
 
+	function syncPalettesFromSite() {
+		const site = editorConfig.siteColorPalettes;
+		if ( site && Array.isArray( site.palettes ) && site.palettes.length ) {
+			palettesData.palettes = site.palettes;
+		}
+	}
+
 	function loadPalettesFromInput() {
+		syncPalettesFromSite();
 		if ( ! palettesInput || ! palettesInput.value ) {
 			return;
 		}
 		try {
 			const parsed = JSON.parse( palettesInput.value );
 			if ( parsed && typeof parsed === 'object' ) {
-				palettesData = {
-					palettes: Array.isArray( parsed.palettes ) && parsed.palettes.length ? parsed.palettes : palettesData.palettes,
-					use_global_colors: !! parsed.use_global_colors,
-					global_palette_id: parsed.global_palette_id || 'pal_custom',
-					global_colors: Array.isArray( parsed.global_colors ) && parsed.global_colors.length ? parsed.global_colors : [ '#000000' ],
-				};
+				palettesData.use_global_colors = !! parsed.use_global_colors;
+				palettesData.global_palette_id = parsed.global_palette_id || PAL_CUSTOM;
+				palettesData.global_colors = Array.isArray( parsed.global_colors ) && parsed.global_colors.length
+					? parsed.global_colors
+					: [ '#000000' ];
 			}
 		} catch ( e ) {
 			// Keep defaults.
@@ -951,7 +958,11 @@
 		if ( ! palettesData.global_colors || ! palettesData.global_colors.length ) {
 			palettesData.global_colors = [ '#000000' ];
 		}
-		palettesInput.value = JSON.stringify( palettesData );
+		palettesInput.value = JSON.stringify( {
+			use_global_colors: !! palettesData.use_global_colors,
+			global_palette_id: palettesData.global_palette_id || PAL_CUSTOM,
+			global_colors: palettesData.global_colors,
+		} );
 	}
 
 	function templateFontCatalog() {
@@ -962,7 +973,15 @@
 		return templateFontCatalog().map( ( font ) => font.key ).filter( Boolean );
 	}
 
+	function syncFontPalettesFromSite() {
+		const site = editorConfig.siteFontLibraries;
+		if ( site && Array.isArray( site.palettes ) && site.palettes.length ) {
+			fontPalettesData.palettes = site.palettes;
+		}
+	}
+
 	function loadFontPalettesFromInput() {
+		syncFontPalettesFromSite();
 		if ( ! fontPalettesInput || ! fontPalettesInput.value ) {
 			return;
 		}
@@ -970,12 +989,11 @@
 			const parsed = JSON.parse( fontPalettesInput.value );
 			if ( parsed && typeof parsed === 'object' ) {
 				const defaults = defaultTemplateFontKeys();
-				fontPalettesData = {
-					palettes: Array.isArray( parsed.palettes ) && parsed.palettes.length ? parsed.palettes : fontPalettesData.palettes,
-					use_global_fonts: !! parsed.use_global_fonts,
-					global_font_palette_id: parsed.global_font_palette_id || FP_CUSTOM,
-					global_fonts: Array.isArray( parsed.global_fonts ) && parsed.global_fonts.length ? parsed.global_fonts : defaults,
-				};
+				fontPalettesData.use_global_fonts = !! parsed.use_global_fonts;
+				fontPalettesData.global_font_palette_id = parsed.global_font_palette_id || FP_CUSTOM;
+				fontPalettesData.global_fonts = Array.isArray( parsed.global_fonts ) && parsed.global_fonts.length
+					? parsed.global_fonts
+					: defaults;
 			}
 		} catch ( e ) {
 			// Keep defaults.
@@ -993,7 +1011,11 @@
 		if ( ! fontPalettesData.global_fonts || ! fontPalettesData.global_fonts.length ) {
 			fontPalettesData.global_fonts = defaults;
 		}
-		fontPalettesInput.value = JSON.stringify( fontPalettesData );
+		fontPalettesInput.value = JSON.stringify( {
+			use_global_fonts: !! fontPalettesData.use_global_fonts,
+			global_font_palette_id: fontPalettesData.global_font_palette_id || FP_CUSTOM,
+			global_fonts: fontPalettesData.global_fonts,
+		} );
 	}
 
 	function getFontPaletteById( paletteId ) {
@@ -2155,6 +2177,54 @@
 				}
 			} );
 		} );
+	}
+
+	function initPanelAccordion( accordion, sectionKey ) {
+		if ( ! accordion ) {
+			return;
+		}
+		const key = sectionKey || 'section';
+		accordion.querySelectorAll( '.wc-gpd-accordion-toggle' ).forEach( ( toggle ) => {
+			toggle.addEventListener( 'click', () => {
+				const section = toggle.closest( '.wc-gpd-accordion-section' );
+				if ( ! section ) {
+					return;
+				}
+				const body = section.querySelector( '.wc-gpd-accordion-body' );
+				const sectionName = section.dataset[ key ] || '';
+				if ( section.classList.contains( 'is-open' ) ) {
+					section.classList.remove( 'is-open' );
+					toggle.setAttribute( 'aria-expanded', 'false' );
+					if ( body ) {
+						body.hidden = true;
+					}
+					return;
+				}
+				accordion.querySelectorAll( '.wc-gpd-accordion-section' ).forEach( ( row ) => {
+					const isTarget = row.dataset[ key ] === sectionName;
+					const rowToggle = row.querySelector( '.wc-gpd-accordion-toggle' );
+					const rowBody = row.querySelector( '.wc-gpd-accordion-body' );
+					if ( ! isTarget ) {
+						row.classList.remove( 'is-open' );
+						if ( rowToggle ) {
+							rowToggle.setAttribute( 'aria-expanded', 'false' );
+						}
+						if ( rowBody ) {
+							rowBody.hidden = true;
+						}
+					}
+				} );
+				section.classList.add( 'is-open' );
+				toggle.setAttribute( 'aria-expanded', 'true' );
+				if ( body ) {
+					body.hidden = false;
+				}
+			} );
+		} );
+	}
+
+	function initCustomerToolsAccordion() {
+		initPanelAccordion( document.getElementById( 'wc-gpd-customer-tools-accordion' ), 'custSection' );
 	}
 
 	function objectDimensions( obj ) {
@@ -4178,6 +4248,7 @@
 	initMockupStudioNav();
 	initAdminStudioNav();
 	initAccordion();
+	initCustomerToolsAccordion();
 	initContextAccordions();
 	updateUnitSuffixes();
 	loadPalettesFromInput();
@@ -4188,8 +4259,6 @@
 	if ( useSameFontsCheckbox ) {
 		fontPalettesData.use_global_fonts = useSameFontsCheckbox.checked;
 	}
-	renderPalettesAdmin();
-	renderFontPalettesAdmin();
 	renderGlobalColorsList();
 	renderGlobalFontsList();
 	syncGlobalPaletteSelect();
