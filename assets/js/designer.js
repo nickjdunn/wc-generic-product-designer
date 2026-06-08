@@ -887,14 +887,29 @@
 		obj.wcGpdGraphicColors = colors;
 	}
 
-	function finalizeCustomerGraphic( obj, onAdded ) {
-		applyGraphicInteractivity( obj );
+	function finalizeCustomerGraphic( obj, onAdded, options ) {
+		const opts = options || {};
+		const isReplaceable = opts.replaceable || isReplaceableContent( obj );
+
+		if ( isReplaceable ) {
+			if ( opts.frameObj ) {
+				fitObjectToReplaceableFrame( obj, opts.frameObj );
+			}
+			applyReplaceableContentInteractivity( obj );
+		} else {
+			applyGraphicInteractivity( obj );
+		}
+
 		canvas.add( obj );
-		canvas.setActiveObject( obj );
 		canvas.requestRenderAll();
-		syncToolbar( obj );
 		syncLayersList();
-		openCustomerSection( 'context' );
+
+		if ( ! opts.skipToolbar && ! isReplaceable ) {
+			canvas.setActiveObject( obj );
+			syncToolbar( obj );
+			openCustomerSection( 'context' );
+		}
+
 		if ( typeof onAdded === 'function' ) {
 			onAdded( obj );
 		}
@@ -904,11 +919,14 @@
 		if ( ! item || ! item.url ) {
 			return;
 		}
+		const isReplaceable = !!( placement && placement.replaceable );
+		const frameObj = placement && placement.frameObj;
 		const region = ( placement && placement.region ) || getConstraintRect();
 		const maxW = ( placement && placement.maxW ) || Math.min( region.width * 0.45, 240 );
 		const left = placement && placement.left !== undefined ? placement.left : region.left + region.width / 2;
 		const top = placement && placement.top !== undefined ? placement.top : region.top + region.height / 2;
 		const extra = ( placement && placement.extra ) || {};
+		const finalizeOpts = isReplaceable ? { replaceable: true, frameObj, skipToolbar: true } : {};
 		const baseMeta = {
 			left,
 			top,
@@ -931,11 +949,11 @@
 					const scale = maxW / Math.max( img.width || 1, 1 );
 					img.set( {
 						...baseMeta,
-						scaleX: scale,
-						scaleY: scale,
+						scaleX: isReplaceable ? 1 : scale,
+						scaleY: isReplaceable ? 1 : scale,
 						wcGpdGraphicVector: false,
 					} );
-					finalizeCustomerGraphic( img, onAdded );
+					finalizeCustomerGraphic( img, onAdded, finalizeOpts );
 				},
 				{ crossOrigin: 'anonymous' }
 			);
@@ -965,14 +983,14 @@
 					const scale = maxW / base;
 					obj.set( {
 						...baseMeta,
-						scaleX: scale,
-						scaleY: scale,
+						scaleX: isReplaceable ? 1 : scale,
+						scaleY: isReplaceable ? 1 : scale,
 						wcGpdGraphicVector: true,
 						wcGpdGraphicColorSlots: slots,
 						wcGpdGraphicColors: slots.slice(),
 					} );
 					assignGraphicPathSlots( obj, slots );
-					finalizeCustomerGraphic( obj, onAdded );
+					finalizeCustomerGraphic( obj, onAdded, finalizeOpts );
 				} );
 			} )
 			.catch( () => {
@@ -1804,7 +1822,7 @@
 				customInput.type = 'color';
 				customInput.className = 'wc-gpd-color-custom-input';
 				customInput.value = normalizePickerColor( currentColor );
-				customInput.addEventListener( 'input', () => {
+				customInput.addEventListener( 'change', () => {
 					if ( ! activeText ) {
 						return;
 					}
@@ -1828,7 +1846,7 @@
 		customInput.type = 'color';
 		customInput.className = 'wc-gpd-color-custom-input';
 		customInput.value = normalizePickerColor( currentColor );
-		customInput.addEventListener( 'input', () => {
+		customInput.addEventListener( 'change', () => {
 			if ( ! activeText ) {
 				return;
 			}
@@ -1995,7 +2013,7 @@
 			customInput.type = 'color';
 			customInput.className = 'wc-gpd-color-custom-input';
 			customInput.value = normalizePickerColor( currentColor );
-			customInput.addEventListener( 'input', ( event ) => {
+			customInput.addEventListener( 'change', ( event ) => {
 				event.stopPropagation();
 				if ( ! activeText ) {
 					return;
@@ -2059,6 +2077,7 @@
 	let activeViewId = templateViews[ 0 ].id;
 	let activeText = null;
 	let replaceablePickerSlotUid = '';
+	let suppressReplaceablePicker = false;
 	let displayScale = 1;
 	let submitApproved = false;
 
@@ -2166,25 +2185,60 @@
 		} );
 	}
 
+	function applyReplaceableClipPath( obj, frameObj ) {
+		if ( ! obj || ! frameObj ) {
+			return;
+		}
+		frameObj.setCoords();
+		const frame = frameObj.getBoundingRect( true );
+		if ( frame.width <= 0 || frame.height <= 0 ) {
+			obj.clipPath = null;
+			return;
+		}
+		obj.clipPath = new fabric.Rect( {
+			left: frame.left + frame.width / 2,
+			top: frame.top + frame.height / 2,
+			width: frame.width,
+			height: frame.height,
+			originX: 'center',
+			originY: 'center',
+			absolutePositioned: true,
+		} );
+	}
+
 	function fitObjectToReplaceableFrame( obj, frameObj ) {
 		if ( ! obj || ! frameObj ) {
 			return;
 		}
-		const frameWidth = ( frameObj.width || 0 ) * ( frameObj.scaleX || 1 );
-		const frameHeight = ( frameObj.height || 0 ) * ( frameObj.scaleY || 1 );
-		if ( frameWidth <= 0 || frameHeight <= 0 || ! obj.width || ! obj.height ) {
+		frameObj.setCoords();
+		const frame = frameObj.getBoundingRect( true );
+		if ( frame.width <= 0 || frame.height <= 0 ) {
 			return;
 		}
+
+		const savedAngle = obj.angle || 0;
+		obj.set( { angle: 0 } );
+		obj.setCoords();
+		const bounds = obj.getBoundingRect( true );
+		if ( bounds.width <= 0 || bounds.height <= 0 ) {
+			obj.set( { angle: savedAngle } );
+			return;
+		}
+
+		const uniform = Math.min( frame.width / bounds.width, frame.height / bounds.height );
+		const centerX = frame.left + frame.width / 2;
+		const centerY = frame.top + frame.height / 2;
 		obj.set( {
-			left: frameObj.left,
-			top: frameObj.top,
+			left: centerX,
+			top: centerY,
 			originX: 'center',
 			originY: 'center',
 			angle: frameObj.angle || 0,
-			scaleX: frameWidth / obj.width,
-			scaleY: frameHeight / obj.height,
+			scaleX: ( obj.scaleX || 1 ) * uniform,
+			scaleY: ( obj.scaleY || 1 ) * uniform,
 		} );
 		obj.setCoords();
+		applyReplaceableClipPath( obj, frameObj );
 	}
 
 	function getReplaceableFrameForObject( obj ) {
@@ -2233,7 +2287,6 @@
 			btn.appendChild( img );
 			btn.addEventListener( 'click', () => {
 				replaceReplaceableContent( frameObj, item );
-				closeReplaceablePicker();
 			} );
 			ui.replaceableModalGrid.appendChild( btn );
 		} );
@@ -2390,26 +2443,33 @@
 		if ( ! frameObj || ! libraryItem || ! libraryItem.url ) {
 			return;
 		}
+		closeReplaceablePicker();
+		suppressReplaceablePicker = true;
 		const slotUid = frameObj.wcGpdUid;
 		canvas.getObjects().slice().forEach( ( obj ) => {
 			if ( isCustomerGraphic( obj ) && ( obj.wcGpdReplaceableUid === slotUid || obj.wcGpdGraphicSlotUid === slotUid ) ) {
 				canvas.remove( obj );
 			}
 		} );
+		const frameWidth = ( frameObj.width || 0 ) * ( frameObj.scaleX || 1 );
+		const frameHeight = ( frameObj.height || 0 ) * ( frameObj.scaleY || 1 );
 		loadCustomerGraphic( libraryItem, {
+			replaceable: true,
+			frameObj,
 			left: frameObj.left,
 			top: frameObj.top,
-			maxW: ( frameObj.width || 0 ) * ( frameObj.scaleX || 1 ),
+			maxW: Math.max( frameWidth, frameHeight ),
 			extra: {
 				wcGpdReplaceableUid: slotUid,
 				wcGpdGraphicSlotUid: slotUid,
 			},
-		}, ( obj ) => {
-			fitObjectToReplaceableFrame( obj, frameObj );
-			applyReplaceableContentInteractivity( obj );
-			canvas.bringToFront( obj );
+		}, () => {
+			canvas.discardActiveObject();
 			canvas.requestRenderAll();
 			syncLayersList();
+			setTimeout( () => {
+				suppressReplaceablePicker = false;
+			}, 0 );
 		} );
 	}
 
@@ -2775,7 +2835,17 @@
 									obj.wcGpdLayerType = 'graphic';
 									obj.wcGpdGraphicLayer = true;
 									ensureGraphicPathSlots( obj );
-									applyGraphicInteractivity( obj );
+									if ( isReplaceableContent( obj ) ) {
+										const frame = getReplaceableFrameForObject( obj );
+										if ( frame ) {
+											fitObjectToReplaceableFrame( obj, frame );
+											applyReplaceableContentInteractivity( obj );
+										} else {
+											applyGraphicInteractivity( obj );
+										}
+									} else {
+										applyGraphicInteractivity( obj );
+									}
 									canvas.add( obj );
 									obj.setCoords();
 									return;
@@ -3427,7 +3497,6 @@
 			const frameObj = getReplaceableFrameForObject( obj );
 			if ( frameObj ) {
 				applyReplaceableFrameInteractivity( frameObj );
-				openReplaceablePicker( frameObj );
 			}
 		}
 
@@ -4159,6 +4228,12 @@
 		if ( isCustomerSelectableLayer( target ) ) {
 			syncToolbar( target );
 			syncLayersList();
+			if ( ! suppressReplaceablePicker && ( isReplaceableFrame( target ) || isReplaceableContent( target ) ) ) {
+				const frameObj = getReplaceableFrameForObject( target );
+				if ( frameObj ) {
+					openReplaceablePicker( frameObj );
+				}
+			}
 		} else {
 			discardSelection();
 		}
@@ -4311,7 +4386,7 @@
 	} );
 
 	if ( ui.textColor ) {
-		ui.textColor.addEventListener( 'input', () => {
+		ui.textColor.addEventListener( 'change', () => {
 			if ( ! activeText || ! textColorAllowed( activeText ) ) {
 				return;
 			}
