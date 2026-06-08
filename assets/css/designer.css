@@ -859,6 +859,10 @@ body.wc-gpd-gallery-open {
 	border-radius: 6px;
 }
 
+.wc-gpd-placeholder-edit-row[hidden] {
+	display: none !important;
+}
+
 .wc-gpd-replaceable-modal {
 	position: fixed;
 	inset: 0;
