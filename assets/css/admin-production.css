@@ -1,0 +1,76 @@
+.wc-gpd-production-wrap {
+	margin-top: 12px;
+}
+
+.wc-gpd-production-tabs {
+	margin-bottom: 16px;
+}
+
+.wc-gpd-production-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 16px 0;
+	align-items: center;
+}
+
+.wc-gpd-production-table .wc-gpd-production-thumb {
+	object-fit: contain;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+}
+
+.wc-gpd-production-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.wc-gpd-status-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: #f0f0f1;
+	color: #1d2327;
+}
+
+.wc-gpd-status-badge--ready {
+	background: #d1fae5;
+	color: #065f46;
+}
+
+.wc-gpd-status-badge--in_batch,
+.wc-gpd-status-badge--exported {
+	background: #dbeafe;
+	color: #1e40af;
+}
+
+.wc-gpd-status-badge--proof_sent,
+.wc-gpd-status-badge--proof_approved {
+	background: #fef3c7;
+	color: #92400e;
+}
+
+.wc-gpd-batch-editor__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.wc-gpd-batch-editor__canvas-wrap {
+	border: 1px solid #dcdcde;
+	background: #f8fafc;
+	padding: 12px;
+	overflow: auto;
+	max-width: 100%;
+}
+
+#wc-gpd-batch-canvas {
+	border: 1px solid #cbd5e1;
+	background: #fff;
+}

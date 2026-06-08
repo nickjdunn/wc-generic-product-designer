@@ -573,6 +573,8 @@ class WC_GPD_Cart implements WC_GPD_Module {
 					true
 				);
 			}
+			WC_GPD_Production_Jobs::maybe_init_status( $item );
+
 			WC_GPD_Logger::info(
 				'Design saved to order line item',
 				array(

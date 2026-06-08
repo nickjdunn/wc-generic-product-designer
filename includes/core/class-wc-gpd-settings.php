@@ -25,6 +25,17 @@ class WC_GPD_Settings {
 		'export_rasterize'              => false,
 		'start_designing_label'         => '',
 		'cta_button_custom_css'         => '',
+		'batch_bed_width'               => 24,
+		'batch_bed_height'              => 18,
+		'batch_bed_unit'                => 'in',
+		'batch_export_dpi'              => 96,
+		'proof_header_template'         => '',
+		'proof_header_logo_id'          => 0,
+		'etsy_api_key'                  => '',
+		'etsy_shared_secret'            => '',
+		'etsy_refresh_token'            => '',
+		'etsy_shop_id'                  => '',
+		'etsy_listing_map'              => array(),
 	);
 
 	/**

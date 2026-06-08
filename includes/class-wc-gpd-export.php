@@ -292,4 +292,123 @@ class WC_GPD_Export {
 			)
 		);
 	}
+
+	/**
+	 * Build combined SVG for a production batch.
+	 *
+	 * @param int   $batch_id Batch post ID.
+	 * @param array $options  Export options.
+	 * @return array{content:string,filename:string,mime:string}|WP_Error
+	 */
+	public static function build_for_batch( $batch_id, array $options = array() ) {
+		$batch = WC_GPD_Batch_Layout::get( $batch_id );
+		if ( ! $batch || empty( $batch['layout'] ) ) {
+			return new WP_Error( 'wc_gpd_batch_empty', __( 'Batch layout is empty.', 'wc-generic-product-designer' ) );
+		}
+
+		$bed     = $batch['bed'];
+		$width   = absint( $bed['width_px'] ?? 2304 );
+		$height  = absint( $bed['height_px'] ?? 1728 );
+		$options = self::normalize_options( ! empty( $options ) ? $options : ( $batch['export_options'] ?? array() ) );
+
+		$parts   = array();
+		$parts[] = '<?xml version="1.0" encoding="UTF-8"?>';
+		$parts[] = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' . $width . ' ' . $height . '" width="' . $width . '" height="' . $height . '">';
+		$parts[] = '<rect x="0" y="0" width="100%" height="100%" fill="none" stroke="#cccccc" stroke-width="1" stroke-dasharray="4 4" data-wc-gpd-bed="1" />';
+
+		foreach ( $batch['layout'] as $placement ) {
+			$item = WC_GPD_Production_Jobs::get_item( $placement['order_id'], $placement['item_id'] );
+			if ( ! $item ) {
+				continue;
+			}
+
+			$result = self::build_for_order_item( $item, $options );
+			if ( is_wp_error( $result ) || empty( $result['content'] ) ) {
+				continue;
+			}
+
+			$inner = WC_GPD_Preview::extract_svg_inner_public( $result['content'] );
+			if ( ! $inner ) {
+				continue;
+			}
+
+			$x        = (float) ( $placement['x'] ?? 0 );
+			$y        = (float) ( $placement['y'] ?? 0 );
+			$scale    = max( 0.01, (float) ( $placement['scale'] ?? 1 ) );
+			$rotation = (float) ( $placement['rotation'] ?? 0 );
+			$cx       = (float) ( $placement['width'] ?? 0 ) * $scale / 2;
+			$cy       = (float) ( $placement['height'] ?? 0 ) * $scale / 2;
+
+			$transform = 'translate(' . $x . ',' . $y . ')';
+			if ( $rotation ) {
+				$transform .= ' rotate(' . $rotation . ',' . $cx . ',' . $cy . ')';
+			}
+			if ( 1.0 !== $scale ) {
+				$transform .= ' scale(' . $scale . ')';
+			}
+
+			$parts[] = '<g data-wc-gpd-batch-item="' . esc_attr( $placement['order_id'] . '-' . $placement['item_id'] ) . '" transform="' . esc_attr( $transform ) . '">' . $inner . '</g>';
+
+			$order = wc_get_order( absint( $placement['order_id'] ) );
+			if ( $order ) {
+				WC_GPD_Production_Jobs::set_status( $item, WC_GPD_Production_Jobs::STATUS_EXPORTED, $order );
+			}
+		}
+
+		$parts[] = '</svg>';
+		$content = implode( "\n", $parts );
+
+		return array(
+			'content'  => $content,
+			'filename' => sanitize_file_name( 'batch-' . absint( $batch_id ) . '-' . wp_date( 'Y-m-d' ) . '.svg' ),
+			'mime'     => 'image/svg+xml',
+		);
+	}
+
+	/**
+	 * Build proof composite SVG with header block + design.
+	 *
+	 * @param WC_Order_Item_Product $item Line item.
+	 * @return array{content:string,filename:string,mime:string}|WP_Error
+	 */
+	public static function build_proof_for_order_item( $item ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return new WP_Error( 'wc_gpd_invalid_item', __( 'Invalid order line item.', 'wc-generic-product-designer' ) );
+		}
+
+		$order = wc_get_order( $item->get_order_id() );
+		if ( ! $order ) {
+			return new WP_Error( 'wc_gpd_missing_order', __( 'Order not found.', 'wc-generic-product-designer' ) );
+		}
+
+		$design = self::build_for_order_item( $item, WC_GPD_Settings::proof_export_defaults() );
+		if ( is_wp_error( $design ) ) {
+			return $design;
+		}
+
+		$product_id = $item->get_product_id();
+		$settings   = $product_id ? WC_GPD_Product_Meta::get_settings( $product_id ) : array();
+		$width      = isset( $settings['width'] ) ? absint( $settings['width'] ) : 800;
+		$height     = isset( $settings['height'] ) ? absint( $settings['height'] ) : 600;
+		$header_h   = 120;
+
+		$header_svg = WC_GPD_Proof_Header::render_svg( $order, $item, $width );
+		$design_inner = WC_GPD_Preview::extract_svg_inner_public( $design['content'] );
+
+		$total_h = $header_h + $height;
+		$parts   = array();
+		$parts[] = '<?xml version="1.0" encoding="UTF-8"?>';
+		$parts[] = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' . $width . ' ' . $total_h . '" width="' . $width . '" height="' . $total_h . '">';
+		$parts[] = '<g transform="translate(0,0)">' . $header_svg . '</g>';
+		$parts[] = '<g transform="translate(0,' . $header_h . ')">' . $design_inner . '</g>';
+		$parts[] = '</svg>';
+
+		return array(
+			'content'  => implode( "\n", $parts ),
+			'filename' => sanitize_file_name(
+				sprintf( 'proof-order-%d-item-%d.svg', $order->get_id(), $item->get_id() )
+			),
+			'mime'     => 'image/svg+xml',
+		);
+	}
 }
