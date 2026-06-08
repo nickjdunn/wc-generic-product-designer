@@ -30,6 +30,7 @@
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 		'wcGpdCustomerPaletteOnly', 'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
 		'wcGpdCustomerUpload', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
+		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
 	];
 
 	function registerFabricCustomProperties() {
@@ -466,6 +467,7 @@
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
 		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
 		'wcGpdCustomerPaletteOnly', 'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
+		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
 	];
 
 	function paletteColorsForObject( obj, role ) {
@@ -681,9 +683,18 @@
 		return obj.wcGpdGraphicColorSlots.slice();
 	}
 
-	function replaceGraphicColorOnPaths( obj, fromColor, toColor ) {
-		const source = normalizeHexColor( fromColor );
-		const target = isNoColor( toColor ) ? 'transparent' : toColor;
+	function graphicSlotIndexForColor( slots, color ) {
+		const normalized = normalizeHexColor( color );
+		if ( ! normalized || ! Array.isArray( slots ) ) {
+			return -1;
+		}
+		return slots.findIndex( ( slotColor ) => normalizeHexColor( slotColor ) === normalized );
+	}
+
+	function assignGraphicPathSlots( obj, slots ) {
+		if ( ! obj || ! Array.isArray( slots ) || ! slots.length ) {
+			return;
+		}
 		function walk( node ) {
 			if ( ! node ) {
 				return;
@@ -692,28 +703,73 @@
 				node.getObjects().forEach( walk );
 				return;
 			}
-			[ 'fill', 'stroke' ].forEach( ( prop ) => {
-				const value = node[ prop ];
-				if ( value && normalizeHexColor( value ) === source ) {
-					node.set( prop, target );
-				}
-			} );
+			const fillSlot = graphicSlotIndexForColor( slots, node.fill );
+			const strokeSlot = graphicSlotIndexForColor( slots, node.stroke );
+			if ( fillSlot >= 0 ) {
+				node.wcGpdGraphicFillSlot = fillSlot;
+			}
+			if ( strokeSlot >= 0 ) {
+				node.wcGpdGraphicStrokeSlot = strokeSlot;
+			}
 		}
 		walk( obj );
+	}
+
+	function graphicPathHasSlotTags( obj ) {
+		let tagged = false;
+		function walk( node ) {
+			if ( tagged || ! node ) {
+				return;
+			}
+			if ( node.wcGpdGraphicFillSlot !== undefined || node.wcGpdGraphicStrokeSlot !== undefined ) {
+				tagged = true;
+				return;
+			}
+			if ( node.type === 'group' && node.getObjects ) {
+				node.getObjects().forEach( walk );
+			}
+		}
+		walk( obj );
+		return tagged;
+	}
+
+	function ensureGraphicPathSlots( obj ) {
+		if ( ! obj || ! obj.wcGpdGraphicVector || ! Array.isArray( obj.wcGpdGraphicColorSlots ) ) {
+			return;
+		}
+		if ( graphicPathHasSlotTags( obj ) ) {
+			return;
+		}
+		assignGraphicPathSlots( obj, obj.wcGpdGraphicColorSlots );
 	}
 
 	function applyGraphicSlotColor( obj, slotIndex, color ) {
 		if ( ! obj || ! Array.isArray( obj.wcGpdGraphicColorSlots ) ) {
 			return;
 		}
+		ensureGraphicPathSlots( obj );
 		const colors = graphicColorValues( obj );
 		if ( slotIndex < 0 || slotIndex >= colors.length ) {
 			return;
 		}
-		const replaceFrom = colors[ slotIndex ];
-		const replaceTo = isNoColor( color ) ? colors[ slotIndex ] : color;
-		replaceGraphicColorOnPaths( obj, replaceFrom, replaceTo );
-		colors[ slotIndex ] = replaceTo;
+		const nextColor = isNoColor( color ) ? colors[ slotIndex ] : color;
+		function walk( node ) {
+			if ( ! node ) {
+				return;
+			}
+			if ( node.type === 'group' && node.getObjects ) {
+				node.getObjects().forEach( walk );
+				return;
+			}
+			if ( node.wcGpdGraphicFillSlot === slotIndex ) {
+				node.set( 'fill', nextColor );
+			}
+			if ( node.wcGpdGraphicStrokeSlot === slotIndex ) {
+				node.set( 'stroke', nextColor );
+			}
+		}
+		walk( obj );
+		colors[ slotIndex ] = nextColor;
 		obj.wcGpdGraphicColors = colors;
 	}
 
@@ -801,6 +857,7 @@
 						wcGpdGraphicColorSlots: slots,
 						wcGpdGraphicColors: slots.slice(),
 					} );
+					assignGraphicPathSlots( obj, slots );
 					finalizeCustomerGraphic( obj, onAdded );
 				} );
 			} )
@@ -2451,6 +2508,7 @@
 								if ( isCustomerGraphic( obj ) ) {
 									obj.wcGpdLayerType = 'graphic';
 									obj.wcGpdGraphicLayer = true;
+									ensureGraphicPathSlots( obj );
 									applyGraphicInteractivity( obj );
 									canvas.add( obj );
 									obj.setCoords();
