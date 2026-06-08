@@ -13,6 +13,7 @@
 	const templatePalettes = config.templatePalettes || {
 		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
 		use_global_colors: false,
+		global_palette_id: 'pal_custom',
 		global_colors: [ '#000000' ],
 	};
 
@@ -470,12 +471,82 @@
 		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
 	];
 
+	function paletteColorsById( paletteId ) {
+		if ( ! paletteId || paletteId === 'pal_custom' ) {
+			return [ '#000000' ];
+		}
+		const palette = ( templatePalettes.palettes || [] ).find( ( item ) => item.id === paletteId );
+		return palette && palette.colors && palette.colors.length ? palette.colors : [ '#000000' ];
+	}
+
+	function resolveTemplateGlobalColors() {
+		if ( ! templatePalettes.use_global_colors && ! productSettings.use_same_colors_entire_template ) {
+			return null;
+		}
+		const globalPaletteId = templatePalettes.global_palette_id || 'pal_custom';
+		if ( globalPaletteId && globalPaletteId !== 'pal_custom' ) {
+			return paletteColorsById( globalPaletteId );
+		}
+		return templatePalettes.global_colors && templatePalettes.global_colors.length
+			? templatePalettes.global_colors
+			: [ '#000000' ];
+	}
+
+	function customerAddType( obj ) {
+		if ( isCustomerAddedShape( obj ) ) {
+			return 'shape';
+		}
+		if ( isCustomerAddedIcon( obj ) ) {
+			return 'icon';
+		}
+		if ( isRecolorableCustomerGraphic( obj ) ) {
+			return 'graphic';
+		}
+		return null;
+	}
+
+	function customerAddPaletteId( addType ) {
+		if ( ! addType ) {
+			return 'pal_default';
+		}
+		const key = 'customer_add_' + addType + '_palette_id';
+		const configured = productSettings[ key ];
+		return configured || 'pal_default';
+	}
+
+	function customerAddPaletteOnly( addType ) {
+		if ( ! addType ) {
+			return false;
+		}
+		if ( resolveTemplateGlobalColors() ) {
+			return true;
+		}
+		return !! productSettings[ 'customer_add_' + addType + '_palette_only' ];
+	}
+
+	function customerAddedPaletteRestricted( obj ) {
+		const addType = customerAddType( obj );
+		return addType ? customerAddPaletteOnly( addType ) : false;
+	}
+
+	function paletteColorsForCustomerAdd( obj ) {
+		const globalColors = resolveTemplateGlobalColors();
+		if ( globalColors ) {
+			return globalColors;
+		}
+		const addType = customerAddType( obj );
+		return paletteColorsById( customerAddPaletteId( addType ) );
+	}
+
 	function paletteColorsForObject( obj, role ) {
+		const addType = customerAddType( obj );
+		if ( addType ) {
+			return paletteColorsForCustomerAdd( obj );
+		}
 		const colorRole = role || 'fill';
-		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
-			return templatePalettes.global_colors && templatePalettes.global_colors.length
-				? templatePalettes.global_colors
-				: [ '#000000' ];
+		const globalColors = resolveTemplateGlobalColors();
+		if ( globalColors ) {
+			return globalColors;
 		}
 		const paletteId = colorRole === 'stroke'
 			? ( obj && obj.wcGpdStrokePaletteId ? obj.wcGpdStrokePaletteId : 'pal_default' )
@@ -486,8 +557,7 @@
 				? layerColors
 				: [ '#000000' ];
 		}
-		const palette = ( templatePalettes.palettes || [] ).find( ( item ) => item.id === paletteId );
-		return palette && palette.colors && palette.colors.length ? palette.colors : [ '#000000' ];
+		return paletteColorsById( paletteId );
 	}
 
 	function defaultTextColor( obj ) {
@@ -544,25 +614,41 @@
 	}
 
 	function layerColorPaletteRestricted( obj ) {
-		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+		if ( ! obj ) {
 			return false;
+		}
+		if ( customerAddType( obj ) ) {
+			return customerAddedPaletteRestricted( obj );
 		}
 		return !! obj.wcGpdCustomerPaletteOnly;
 	}
 
 	function templateLayerHasPalette( obj ) {
-		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+		if ( ! obj || customerAddType( obj ) ) {
 			return false;
 		}
-		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
+		if ( resolveTemplateGlobalColors() ) {
 			return true;
 		}
 		return !!( obj.wcGpdPaletteId || obj.wcGpdStrokePaletteId );
 	}
 
 	function shouldShowInlinePaletteSwatches( obj ) {
-		if ( ! obj || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
+		if ( ! obj ) {
 			return false;
+		}
+		const addType = customerAddType( obj );
+		if ( addType ) {
+			if ( addType === 'shape' && ! shapeColorAllowed( obj ) ) {
+				return false;
+			}
+			if ( addType === 'icon' && ! iconColorAllowed( obj ) ) {
+				return false;
+			}
+			if ( addType === 'graphic' && ! graphicColorAllowed( obj ) ) {
+				return false;
+			}
+			return true;
 		}
 		if ( layerColorPaletteRestricted( obj ) ) {
 			return textColorAllowed( obj ) || shapeColorAllowed( obj );
@@ -574,14 +660,34 @@
 		if ( ! obj ) {
 			return false;
 		}
+		if ( customerAddType( obj ) ) {
+			return false;
+		}
 		if ( isCustomerAddedShape( obj ) ) {
-			return shapeColorAllowed( obj );
+			return shapeColorAllowed( obj ) && ! customerAddedPaletteRestricted( obj );
 		}
 		if ( isCustomerAddedIcon( obj ) ) {
-			return iconColorAllowed( obj );
+			return iconColorAllowed( obj ) && ! customerAddedPaletteRestricted( obj );
 		}
 		if ( isCustomerEditableTemplateShape( obj ) && shapeColorAllowed( obj ) ) {
 			return ! layerColorPaletteRestricted( obj );
+		}
+		return false;
+	}
+
+	function shouldShowInlineCustomColorPicker( obj ) {
+		if ( ! obj || customerAddedPaletteRestricted( obj ) ) {
+			return false;
+		}
+		const addType = customerAddType( obj );
+		if ( ! addType || addType === 'graphic' ) {
+			return false;
+		}
+		if ( addType === 'shape' ) {
+			return shapeColorAllowed( obj );
+		}
+		if ( addType === 'icon' ) {
+			return iconColorAllowed( obj );
 		}
 		return false;
 	}
@@ -1526,10 +1632,9 @@
 	}
 
 	function allTemplatePaletteColors() {
-		if ( templatePalettes.use_global_colors || productSettings.use_same_colors_entire_template ) {
-			return templatePalettes.global_colors && templatePalettes.global_colors.length
-				? templatePalettes.global_colors
-				: [ '#000000' ];
+		const globalColors = resolveTemplateGlobalColors();
+		if ( globalColors ) {
+			return globalColors;
 		}
 		const colors = [];
 		( templatePalettes.palettes || [] ).forEach( ( palette ) => {
@@ -1647,8 +1752,9 @@
 
 		const slots = obj.wcGpdGraphicColorSlots || [];
 		const colors = graphicColorValues( obj );
-		const palette = uniqueColors( allTemplatePaletteColors() );
+		const palette = uniqueColors( paletteColorsForCustomerAdd( obj ) );
 		const labelTemplate = config.i18n.graphicColorSlot || 'Color %d';
+		const showCustomPicker = ! customerAddedPaletteRestricted( obj );
 
 		slots.forEach( ( slotColor, slotIndex ) => {
 			const group = document.createElement( 'div' );
@@ -1682,8 +1788,49 @@
 				swatchRow.appendChild( btn );
 			} );
 			group.appendChild( swatchRow );
+
+			if ( showCustomPicker ) {
+				const customWrap = document.createElement( 'label' );
+				customWrap.className = 'wc-gpd-color-custom-wrap';
+				const customInput = document.createElement( 'input' );
+				customInput.type = 'color';
+				customInput.className = 'wc-gpd-color-custom-input';
+				customInput.value = normalizePickerColor( currentColor );
+				customInput.addEventListener( 'input', () => {
+					if ( ! activeText ) {
+						return;
+					}
+					applyGraphicSlotColor( activeText, slotIndex, customInput.value );
+					canvas.requestRenderAll();
+					renderColorSwatches( activeText );
+				} );
+				customWrap.appendChild( customInput );
+				customWrap.appendChild( document.createTextNode( ' ' + ( config.i18n.customColor || 'Custom color' ) ) );
+				group.appendChild( customWrap );
+			}
+
 			ui.colorSwatches.appendChild( group );
 		} );
+	}
+
+	function appendInlineCustomColorInput( group, obj, role, currentColor ) {
+		const customWrap = document.createElement( 'label' );
+		customWrap.className = 'wc-gpd-color-custom-wrap';
+		const customInput = document.createElement( 'input' );
+		customInput.type = 'color';
+		customInput.className = 'wc-gpd-color-custom-input';
+		customInput.value = normalizePickerColor( currentColor );
+		customInput.addEventListener( 'input', () => {
+			if ( ! activeText ) {
+				return;
+			}
+			applyLayerColor( activeText, role, customInput.value );
+			canvas.requestRenderAll();
+			renderColorSwatches( activeText );
+		} );
+		customWrap.appendChild( customInput );
+		customWrap.appendChild( document.createTextNode( ' ' + ( config.i18n.customColor || 'Custom color' ) ) );
+		group.appendChild( customWrap );
 	}
 
 	function renderColorSwatches( obj ) {
@@ -1753,6 +1900,9 @@
 					swatchRow.appendChild( btn );
 				} );
 				group.appendChild( swatchRow );
+				if ( shouldShowInlineCustomColorPicker( obj ) ) {
+					appendInlineCustomColorInput( group, obj, role, currentColor );
+				}
 				ui.colorSwatches.appendChild( group );
 				return;
 			}

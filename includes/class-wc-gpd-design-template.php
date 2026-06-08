@@ -141,6 +141,7 @@ class WC_GPD_Design_Template {
 				),
 			),
 			'use_global_colors'   => false,
+			'global_palette_id'   => 'pal_custom',
 			'global_colors'       => array( '#000000' ),
 		);
 	}
@@ -172,6 +173,7 @@ class WC_GPD_Design_Template {
 		$clean    = array(
 			'palettes'          => array(),
 			'use_global_colors' => ! empty( $data['use_global_colors'] ),
+			'global_palette_id' => 'pal_custom',
 			'global_colors'     => array(),
 		);
 
@@ -208,6 +210,15 @@ class WC_GPD_Design_Template {
 		if ( empty( $clean['palettes'] ) ) {
 			$clean['palettes'] = $defaults['palettes'];
 		}
+
+		$global_palette_id = ! empty( $data['global_palette_id'] ) ? sanitize_key( (string) $data['global_palette_id'] ) : 'pal_custom';
+		if ( 'pal_custom' !== $global_palette_id ) {
+			$known = wp_list_pluck( $clean['palettes'], 'id' );
+			if ( ! in_array( $global_palette_id, $known, true ) ) {
+				$global_palette_id = 'pal_custom';
+			}
+		}
+		$clean['global_palette_id'] = $global_palette_id;
 
 		if ( ! empty( $data['global_colors'] ) && is_array( $data['global_colors'] ) ) {
 			foreach ( $data['global_colors'] as $color ) {

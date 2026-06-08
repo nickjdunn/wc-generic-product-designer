@@ -815,6 +815,7 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 			<div class="wc-gpd-settings-card wc-gpd-settings-card--wide">
 				<h4><?php esc_html_e( 'What customers can add', 'wc-generic-product-designer' ); ?></h4>
 				<p class="description"><?php esc_html_e( 'Controls the Add menu on the storefront designer. Template layers are configured separately on the Template tab.', 'wc-generic-product-designer' ); ?></p>
+				<p id="wc-gpd-customer-tools-template-colors-notice" class="description wc-gpd-template-colors-notice" data-template-colors-lock hidden><?php esc_html_e( 'Template color settings are active. Customer add palette options are disabled while “Use same colors on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
 
 				<div class="wc-gpd-add-type-block">
 					<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_add_text" value="1" <?php checked( ! empty( $ps['allow_add_text'] ) ); ?> /> <?php esc_html_e( 'Text', 'wc-generic-product-designer' ); ?></label></p>
@@ -829,6 +830,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_shape_move" value="1" <?php checked( ! empty( $ps['allow_shape_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_shape_resize" value="1" <?php checked( ! empty( $ps['allow_shape_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
 						</div>
+						<div class="wc-gpd-add-color-palette-options" data-add-palette-options="shape" data-template-colors-lock>
+							<p class="description"><?php esc_html_e( 'Color choices for customer-added shapes:', 'wc-generic-product-designer' ); ?></p>
+							<p><label><?php esc_html_e( 'Palette', 'wc-generic-product-designer' ); ?>
+								<select name="wc_gpd_ps_customer_add_shape_palette_id" id="wc_gpd_ps_customer_add_shape_palette_id" class="wc-gpd-palette-select" data-selected="<?php echo esc_attr( $ps['customer_add_shape_palette_id'] ?? '' ); ?>">
+									<option value=""><?php esc_html_e( 'Template default', 'wc-generic-product-designer' ); ?></option>
+								</select>
+							</label></p>
+							<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_customer_add_shape_palette_only" value="1" <?php checked( ! empty( $ps['customer_add_shape_palette_only'] ) ); ?> /> <?php esc_html_e( 'Limit to palette colors only (hide full color picker)', 'wc-generic-product-designer' ); ?></label></p>
+						</div>
 					</div>
 				</div>
 
@@ -840,6 +850,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_color" value="1" <?php checked( ! empty( $ps['allow_graphic_color'] ) ); ?> /> <?php esc_html_e( 'Recolor SVG graphics (up to 4 colors)', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_move" value="1" <?php checked( ! empty( $ps['allow_graphic_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_graphic_resize" value="1" <?php checked( ! empty( $ps['allow_graphic_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
+						</div>
+						<div class="wc-gpd-add-color-palette-options" data-add-palette-options="graphic" data-template-colors-lock>
+							<p class="description"><?php esc_html_e( 'Color choices for customer-added SVG graphics:', 'wc-generic-product-designer' ); ?></p>
+							<p><label><?php esc_html_e( 'Palette', 'wc-generic-product-designer' ); ?>
+								<select name="wc_gpd_ps_customer_add_graphic_palette_id" id="wc_gpd_ps_customer_add_graphic_palette_id" class="wc-gpd-palette-select" data-selected="<?php echo esc_attr( $ps['customer_add_graphic_palette_id'] ?? '' ); ?>">
+									<option value=""><?php esc_html_e( 'Template default', 'wc-generic-product-designer' ); ?></option>
+								</select>
+							</label></p>
+							<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_customer_add_graphic_palette_only" value="1" <?php checked( ! empty( $ps['customer_add_graphic_palette_only'] ) ); ?> /> <?php esc_html_e( 'Limit to palette colors only (hide full color picker)', 'wc-generic-product-designer' ); ?></label></p>
 						</div>
 					</div>
 				</div>
@@ -859,6 +878,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_color" value="1" <?php checked( ! empty( $ps['allow_icon_color'] ) ); ?> /> <?php esc_html_e( 'Color', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_move" value="1" <?php checked( ! empty( $ps['allow_icon_move'] ) ); ?> /> <?php esc_html_e( 'Move', 'wc-generic-product-designer' ); ?></label>
 							<label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_allow_icon_resize" value="1" <?php checked( ! empty( $ps['allow_icon_resize'] ) ); ?> /> <?php esc_html_e( 'Resize', 'wc-generic-product-designer' ); ?></label>
+						</div>
+						<div class="wc-gpd-add-color-palette-options" data-add-palette-options="icon" data-template-colors-lock>
+							<p class="description"><?php esc_html_e( 'Color choices for customer-added icons:', 'wc-generic-product-designer' ); ?></p>
+							<p><label><?php esc_html_e( 'Palette', 'wc-generic-product-designer' ); ?>
+								<select name="wc_gpd_ps_customer_add_icon_palette_id" id="wc_gpd_ps_customer_add_icon_palette_id" class="wc-gpd-palette-select" data-selected="<?php echo esc_attr( $ps['customer_add_icon_palette_id'] ?? '' ); ?>">
+									<option value=""><?php esc_html_e( 'Template default', 'wc-generic-product-designer' ); ?></option>
+								</select>
+							</label></p>
+							<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_customer_add_icon_palette_only" value="1" <?php checked( ! empty( $ps['customer_add_icon_palette_only'] ) ); ?> /> <?php esc_html_e( 'Limit to palette colors only (hide full color picker)', 'wc-generic-product-designer' ); ?></label></p>
 						</div>
 					</div>
 				</div>
@@ -900,9 +928,15 @@ class WC_GPD_Admin_Templates implements WC_GPD_Module {
 				<h4><?php esc_html_e( 'Template colors', 'wc-generic-product-designer' ); ?></h4>
 				<p><label class="wc-gpd-settings-check"><input type="checkbox" name="wc_gpd_ps_use_same_colors" value="1" id="wc_gpd_ps_use_same_colors" <?php checked( ! empty( $ps['use_same_colors_entire_template'] ) ); ?> /> <?php esc_html_e( 'Use same colors on entire template', 'wc-generic-product-designer' ); ?></label></p>
 				<div id="wc-gpd-global-colors-panel" <?php echo empty( $ps['use_same_colors_entire_template'] ) ? 'hidden' : ''; ?>>
-					<p class="description"><?php esc_html_e( 'These colors apply to all layers. At least one color is required.', 'wc-generic-product-designer' ); ?></p>
-					<div id="wc-gpd-global-colors-list" class="wc-gpd-global-colors-list"></div>
-					<button type="button" class="button button-small" id="wc-gpd-add-global-color"><?php esc_html_e( 'Add color', 'wc-generic-product-designer' ); ?></button>
+					<p class="description"><?php esc_html_e( 'Choose a named palette or build a custom color list. When enabled, per-layer palette settings on the Template tab are disabled.', 'wc-generic-product-designer' ); ?></p>
+					<p><label><?php esc_html_e( 'Color palette', 'wc-generic-product-designer' ); ?>
+						<select id="wc_gpd_global_palette_id" class="wc-gpd-prop-control"></select>
+					</label></p>
+					<div id="wc-gpd-global-custom-colors-wrap">
+						<p class="description"><?php esc_html_e( 'Custom template colors (at least one required).', 'wc-generic-product-designer' ); ?></p>
+						<div id="wc-gpd-global-colors-list" class="wc-gpd-global-colors-list"></div>
+						<button type="button" class="button button-small" id="wc-gpd-add-global-color"><?php esc_html_e( 'Add color', 'wc-generic-product-designer' ); ?></button>
+					</div>
 				</div>
 			</div>
 			<div class="wc-gpd-settings-card">

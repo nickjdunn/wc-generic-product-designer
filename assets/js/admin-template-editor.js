@@ -130,6 +130,7 @@
 	let palettesData = {
 		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
 		use_global_colors: false,
+		global_palette_id: 'pal_custom',
 		global_colors: [ '#000000' ],
 	};
 
@@ -887,6 +888,7 @@
 				palettesData = {
 					palettes: Array.isArray( parsed.palettes ) && parsed.palettes.length ? parsed.palettes : palettesData.palettes,
 					use_global_colors: !! parsed.use_global_colors,
+					global_palette_id: parsed.global_palette_id || 'pal_custom',
 					global_colors: Array.isArray( parsed.global_colors ) && parsed.global_colors.length ? parsed.global_colors : [ '#000000' ],
 				};
 			}
@@ -907,6 +909,80 @@
 
 	function getPaletteById( paletteId ) {
 		return ( palettesData.palettes || [] ).find( ( palette ) => palette.id === paletteId );
+	}
+
+	function resolveGlobalPaletteColors() {
+		const paletteId = palettesData.global_palette_id || PAL_CUSTOM;
+		if ( paletteId !== PAL_CUSTOM ) {
+			const palette = getPaletteById( paletteId );
+			if ( palette && palette.colors && palette.colors.length ) {
+				return palette.colors;
+			}
+		}
+		return palettesData.global_colors && palettesData.global_colors.length
+			? palettesData.global_colors
+			: [ '#000000' ];
+	}
+
+	function isGlobalTemplateColorsActive() {
+		return !! palettesData.use_global_colors;
+	}
+
+	function populateNamedPaletteSelect( select, selectedId, options ) {
+		if ( ! select ) {
+			return;
+		}
+		const opts = options || {};
+		const keepDefault = opts.keepDefault !== false;
+		const selected = selectedId || select.dataset.selected || select.value || '';
+		while ( select.options.length > ( keepDefault ? 1 : 0 ) ) {
+			select.remove( keepDefault ? 1 : 0 );
+		}
+		( palettesData.palettes || [] ).forEach( ( palette ) => {
+			const opt = document.createElement( 'option' );
+			opt.value = palette.id;
+			opt.textContent = palette.name || palette.id;
+			select.appendChild( opt );
+		} );
+		if ( opts.includeCustom ) {
+			const customOpt = document.createElement( 'option' );
+			customOpt.value = PAL_CUSTOM;
+			customOpt.textContent = opts.customLabel || 'Custom color list';
+			select.appendChild( customOpt );
+		}
+		if ( selected ) {
+			select.value = selected;
+		}
+	}
+
+	function populateCustomerAddPaletteSelects() {
+		document.querySelectorAll( '.wc-gpd-palette-select[data-selected]' ).forEach( ( select ) => {
+			populateNamedPaletteSelect( select, select.dataset.selected || '', { keepDefault: true } );
+		} );
+	}
+
+	function syncGlobalCustomColorsVisibility() {
+		const wrap = document.getElementById( 'wc-gpd-global-custom-colors-wrap' );
+		const globalSelect = document.getElementById( 'wc_gpd_global_palette_id' );
+		if ( ! wrap || ! globalSelect ) {
+			return;
+		}
+		const useCustom = ! globalSelect.value || globalSelect.value === PAL_CUSTOM;
+		wrap.hidden = ! useCustom;
+	}
+
+	function syncTemplateColorsLockout() {
+		const active = isGlobalTemplateColorsActive();
+		document.querySelectorAll( '[data-template-colors-lock]' ).forEach( ( row ) => {
+			if ( row.id === 'wc-gpd-template-colors-active-notice' || row.id === 'wc-gpd-customer-tools-template-colors-notice' ) {
+				row.hidden = ! active;
+				return;
+			}
+			row.classList.toggle( 'is-disabled', active );
+			row.querySelectorAll( 'input, select, button, textarea' ).forEach( ( el ) => {
+				el.disabled = active;
+			} );
+		} );
 	}
 
 	function isCustomPaletteId( paletteId ) {
@@ -961,7 +1037,7 @@
 		if ( palettesData.use_global_colors ) {
 			return {
 				type: 'global',
-				colors: palettesData.global_colors || [ '#000000' ],
+				colors: resolveGlobalPaletteColors(),
 				role,
 				persist() {
 					savePalettesToInput();
@@ -1054,7 +1130,15 @@
 
 		if ( labelEl ) {
 			if ( useGlobal ) {
-				labelEl.textContent = 'Template colors';
+				const globalId = palettesData.global_palette_id || PAL_CUSTOM;
+				if ( globalId !== PAL_CUSTOM ) {
+					const palette = getPaletteById( globalId );
+					labelEl.textContent = palette && palette.name
+						? 'Template colors (' + palette.name + ')'
+						: 'Template colors';
+				} else {
+					labelEl.textContent = 'Template colors';
+				}
 			} else if ( isCustom ) {
 				labelEl.textContent = role === 'stroke' ? 'Custom outline colors' : 'Custom colors (this layer)';
 			} else {
@@ -1177,6 +1261,8 @@
 				palette.name = nameInput.value;
 				savePalettesToInput();
 				populateLayerPaletteSelect();
+				populateCustomerAddPaletteSelects();
+				syncGlobalPaletteSelect();
 			} );
 			header.appendChild( nameInput );
 
@@ -1228,6 +1314,18 @@
 			card.appendChild( addColorBtn );
 			list.appendChild( card );
 		} );
+		populateCustomerAddPaletteSelects();
+		syncGlobalPaletteSelect();
+	}
+
+	function syncGlobalPaletteSelect() {
+		const select = document.getElementById( 'wc_gpd_global_palette_id' );
+		populateNamedPaletteSelect( select, palettesData.global_palette_id || PAL_CUSTOM, {
+			keepDefault: false,
+			includeCustom: true,
+			customLabel: 'Custom color list',
+		} );
+		syncGlobalCustomColorsVisibility();
 	}
 
 	function populateLayerPaletteSelect( selectedId, selectEl ) {
@@ -1313,6 +1411,18 @@
 				paletteRowId: 'wc-gpd-stroke-colors-panel',
 			} );
 		}
+
+		setPropRowDisabled( fillPanel, useGlobal || ( isShapeLayer && ! useFill ) );
+		setPropRowDisabled( fillListRow, useGlobal || ( isShapeLayer && ! useFill ) );
+		setPropRowDisabled( strokePanel, useGlobal || ! useStroke );
+		setPropRowDisabled( strokeListRow, useGlobal || ! useStroke );
+
+		const paletteOnlyRow = document.getElementById( 'wc-gpd-customer-palette-only-row' );
+		if ( paletteOnlyRow ) {
+			setPropRowDisabled( paletteOnlyRow, useGlobal );
+		}
+
+		syncTemplateColorsLockout();
 	}
 
 	function renderGlobalColorsList() {
@@ -3491,6 +3601,13 @@
 		renderPalettesAdmin();
 		populateLayerPaletteSelect();
 	} );
+	document.getElementById( 'wc_gpd_global_palette_id' )?.addEventListener( 'change', ( event ) => {
+		palettesData.global_palette_id = event.target.value || PAL_CUSTOM;
+		savePalettesToInput();
+		syncGlobalCustomColorsVisibility();
+		renderGlobalColorsList();
+		syncColorsPanel( canvas.getActiveObject() );
+	} );
 	document.getElementById( 'wc_gpd_layer_palette_id' )?.addEventListener( 'change', ( event ) => {
 		handlePaletteSelectChange( 'fill', event.target.value );
 	} );
@@ -3520,6 +3637,7 @@
 				globalColorsPanel.hidden = ! useSameColorsCheckbox.checked;
 			}
 			syncColorsPanel( canvas.getActiveObject() );
+			syncTemplateColorsLockout();
 		} );
 	}
 	function syncAddTypeOptionsVisibility() {
@@ -3636,7 +3754,10 @@
 	}
 	renderPalettesAdmin();
 	renderGlobalColorsList();
+	syncGlobalPaletteSelect();
+	populateCustomerAddPaletteSelects();
 	populateLayerPaletteSelect();
+	syncTemplateColorsLockout();
 	bindSteppers();
 	bindTextEditor();
 	bindCustomerAccessPanel();

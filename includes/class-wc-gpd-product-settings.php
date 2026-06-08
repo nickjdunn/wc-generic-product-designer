@@ -44,6 +44,12 @@ class WC_GPD_Product_Settings {
 		'allow_graphic_move'      => true,
 		'allow_graphic_resize'    => true,
 		'allow_graphic_color'     => true,
+		'customer_add_shape_palette_id'   => '',
+		'customer_add_shape_palette_only' => false,
+		'customer_add_icon_palette_id'    => '',
+		'customer_add_icon_palette_only'  => false,
+		'customer_add_graphic_palette_id' => '',
+		'customer_add_graphic_palette_only' => false,
 		'allow_layers_panel'      => true,
 		'allow_details_panel'     => true,
 		'allow_customer_graphics' => true,
@@ -127,6 +133,12 @@ class WC_GPD_Product_Settings {
 			'allow_graphic_move'      => ! empty( $settings['allow_graphic_move'] ),
 			'allow_graphic_resize'    => ! empty( $settings['allow_graphic_resize'] ),
 			'allow_graphic_color'     => ! empty( $settings['allow_graphic_color'] ),
+			'customer_add_shape_palette_id'   => self::sanitize_palette_id( $settings['customer_add_shape_palette_id'] ?? '' ),
+			'customer_add_shape_palette_only' => ! empty( $settings['customer_add_shape_palette_only'] ),
+			'customer_add_icon_palette_id'    => self::sanitize_palette_id( $settings['customer_add_icon_palette_id'] ?? '' ),
+			'customer_add_icon_palette_only'  => ! empty( $settings['customer_add_icon_palette_only'] ),
+			'customer_add_graphic_palette_id' => self::sanitize_palette_id( $settings['customer_add_graphic_palette_id'] ?? '' ),
+			'customer_add_graphic_palette_only' => ! empty( $settings['customer_add_graphic_palette_only'] ),
 			'allow_layers_panel'      => ! empty( $settings['allow_layers_panel'] ),
 			'allow_details_panel'     => ! empty( $settings['allow_details_panel'] ),
 			'allow_customer_graphics' => ! empty( $settings['allow_customer_graphics'] ),
@@ -181,6 +193,12 @@ class WC_GPD_Product_Settings {
 			'allow_graphic_move'      => ! empty( $post['wc_gpd_ps_allow_graphic_move'] ),
 			'allow_graphic_resize'    => ! empty( $post['wc_gpd_ps_allow_graphic_resize'] ),
 			'allow_graphic_color'     => ! empty( $post['wc_gpd_ps_allow_graphic_color'] ),
+			'customer_add_shape_palette_id'   => self::sanitize_palette_id( $post['wc_gpd_ps_customer_add_shape_palette_id'] ?? '' ),
+			'customer_add_shape_palette_only' => ! empty( $post['wc_gpd_ps_customer_add_shape_palette_only'] ),
+			'customer_add_icon_palette_id'    => self::sanitize_palette_id( $post['wc_gpd_ps_customer_add_icon_palette_id'] ?? '' ),
+			'customer_add_icon_palette_only'  => ! empty( $post['wc_gpd_ps_customer_add_icon_palette_only'] ),
+			'customer_add_graphic_palette_id' => self::sanitize_palette_id( $post['wc_gpd_ps_customer_add_graphic_palette_id'] ?? '' ),
+			'customer_add_graphic_palette_only' => ! empty( $post['wc_gpd_ps_customer_add_graphic_palette_only'] ),
 			'allow_layers_panel'      => ! empty( $post['wc_gpd_ps_allow_layers_panel'] ),
 			'allow_details_panel'     => ! empty( $post['wc_gpd_ps_allow_details_panel'] ),
 			'allow_customer_graphics' => ! empty( $post['wc_gpd_ps_allow_customer_graphics'] ),
@@ -214,5 +232,14 @@ class WC_GPD_Product_Settings {
 	private static function sanitize_color( $value, $fallback ) {
 		$color = sanitize_hex_color( (string) $value );
 		return $color ? $color : $fallback;
+	}
+
+	/**
+	 * @param mixed $value Palette id from form.
+	 * @return string
+	 */
+	public static function sanitize_palette_id( $value ) {
+		$id = sanitize_key( (string) $value );
+		return $id ? $id : '';
 	}
 }

@@ -1257,6 +1257,29 @@
 	margin: 6px 0;
 }
 
+.wc-gpd-template-colors-notice {
+	margin: 0.5em 0 0.75em;
+	padding: 0.65em 0.85em;
+	background: #f6f7f7;
+	border-left: 3px solid #787c82;
+	color: #50575e;
+}
+
+.wc-gpd-add-color-palette-options {
+	margin-top: 0.75em;
+	padding-top: 0.75em;
+	border-top: 1px solid #dcdcde;
+}
+
+.wc-gpd-add-color-palette-options.is-disabled {
+	opacity: 0.55;
+	pointer-events: none;
+}
+
+.wc-gpd-add-color-palette-options .wc-gpd-palette-select {
+	min-width: 12em;
+}
+
 .wc-gpd-layer-color-list {
 	display: flex;
 	flex-direction: column;

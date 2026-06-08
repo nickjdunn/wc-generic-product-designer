@@ -101,6 +101,7 @@ defined( 'ABSPATH' ) || exit;
 			<label class="wc-gpd-prop-label" for="wc_gpd_layer_palette_id" id="wc-gpd-fill-palette-label"><?php esc_html_e( 'Color palette for this layer', 'wc-generic-product-designer' ); ?></label>
 			<select id="wc_gpd_layer_palette_id" class="wc-gpd-prop-control"></select>
 		</div>
+		<p id="wc-gpd-template-colors-active-notice" class="description wc-gpd-template-colors-notice" data-template-colors-lock hidden><?php esc_html_e( 'Template color settings are active. Per-layer palette options are disabled while “Use same colors on entire template” is enabled in Settings.', 'wc-generic-product-designer' ); ?></p>
 		<div class="wc-gpd-prop-row" id="wc-gpd-layer-colors-list-row">
 			<span class="wc-gpd-prop-label" id="wc-gpd-layer-colors-list-label"><?php esc_html_e( 'Colors', 'wc-generic-product-designer' ); ?></span>
 			<div class="wc-gpd-layer-color-list" id="wc-gpd-layer-color-swatches"></div>
