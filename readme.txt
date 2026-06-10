@@ -3,7 +3,7 @@ Contributors: wc-generic-product-designer
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.53.1
+Stable tag: 1.54.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,6 +36,11 @@ Allow customers to add styled text layers on a product canvas and export product
 5. For each release: bump `Version` in the main plugin file, commit, push, then update from **Dashboard → Updates**.
 
 == Changelog ==
+
+= 1.54.0 =
+* Admin order design editor: full layer access, save updates order preview, revert to customer design.
+* Download production/proof from order editor with preset picker and layer toggles.
+* Template document-part tags (backdrop, engraving, outline) control export contents; simplified image role UI.
 
 = 1.53.1 =
 * Fix design edit layer order and JSON round-trip for template text; includes debug logging for verification.

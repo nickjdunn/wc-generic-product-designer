@@ -346,6 +346,19 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 			|| current_user_can( 'manage_woocommerce' )
 			|| WC_GPD_Sample_Content::is_sample_product( $product_id );
 
+		$order_admin_url     = '';
+		$has_original_design = false;
+		if ( $order_edit ) {
+			$order_for_js = wc_get_order( $order_edit['order_id'] );
+			if ( $order_for_js ) {
+				$order_admin_url = $order_for_js->get_edit_order_url();
+				$item_for_js = $order_for_js->get_item( $order_edit['item_id'] );
+				if ( $item_for_js ) {
+					$has_original_design = (bool) $item_for_js->get_meta( WC_GPD_Product_Meta::ORDER_META_ORIGINAL_DESIGN_SVG, true );
+				}
+			}
+		}
+
 		wp_localize_script(
 			'wc-gpd-designer',
 			'wcGpdDesigner',
@@ -398,6 +411,14 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 				'orderItemId'        => $order_edit ? (int) $order_edit['item_id'] : 0,
 				'orderSaveNonce'     => $order_edit ? wp_create_nonce( WC_GPD_Admin_Order::NONCE_SAVE_ORDER . '_' . $order_edit['order_id'] . '_' . $order_edit['item_id'] ) : '',
 				'orderSaveAction'    => WC_GPD_Admin_Order::SAVE_ORDER_ACTION,
+				'orderRevertAction'  => WC_GPD_Admin_Order::REVERT_ORDER_ACTION,
+				'orderRevertNonce'   => $order_edit ? wp_create_nonce( WC_GPD_Admin_Order::NONCE_REVERT_ORDER . '_' . $order_edit['order_id'] . '_' . $order_edit['item_id'] ) : '',
+				'orderAdminUrl'            => $order_admin_url,
+				'exportPresets'            => $order_edit ? WC_GPD_Export_Presets::list() : array(),
+				'proofTemplates'           => $order_edit ? WC_GPD_Proof_Template::list() : array(),
+				'defaultExportPresetId'    => $order_edit ? WC_GPD_Export_Presets::default_id() : '',
+				'defaultProofTemplateId'   => $order_edit ? WC_GPD_Proof_Template::default_id() : '',
+				'hasOriginalDesign'        => $has_original_design,
 				'adminPostUrl'       => admin_url( 'admin-post.php' ),
 				'i18n'         => array(
 					'addText'       => __( 'Add text layer', 'wc-generic-product-designer' ),
@@ -454,6 +475,18 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					'orderEditNotice' => __( 'You are editing this order design. Save when finished, then return to the order to download.', 'wc-generic-product-designer' ),
 					'saveOrderDesign' => __( 'Save design to order', 'wc-generic-product-designer' ),
 					'orderSaved'      => __( 'Design saved to order.', 'wc-generic-product-designer' ),
+					'revertOrderDesign' => __( 'Revert to customer design', 'wc-generic-product-designer' ),
+					'revertConfirm'   => __( 'Restore the customer’s original design? Admin edits will be discarded.', 'wc-generic-product-designer' ),
+					'downloadModalTitle' => __( 'Download options', 'wc-generic-product-designer' ),
+					'downloadPreset'  => __( 'Preset', 'wc-generic-product-designer' ),
+					'downloadProduction' => __( 'Production file', 'wc-generic-product-designer' ),
+					'downloadProof'   => __( 'Customer proof', 'wc-generic-product-designer' ),
+					'downloadConfirm' => __( 'Download', 'wc-generic-product-designer' ),
+					'downloadCancel'  => __( 'Cancel', 'wc-generic-product-designer' ),
+					'incBackground'   => __( 'Include backdrop / mockup', 'wc-generic-product-designer' ),
+					'incText'         => __( 'Include engraving text', 'wc-generic-product-designer' ),
+					'incOutlines'     => __( 'Include outlines', 'wc-generic-product-designer' ),
+					'incShapes'       => __( 'Include graphics & shapes', 'wc-generic-product-designer' ),
 					'textColor'       => __( 'Text color', 'wc-generic-product-designer' ),
 					'underline'       => __( 'Underline', 'wc-generic-product-designer' ),
 					'lineHeight'      => __( 'Line height', 'wc-generic-product-designer' ),
@@ -527,6 +560,12 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		$order_edit   = $this->get_edit_order_context( $product->get_id() );
 		if ( $order_edit ) {
 			$edit_context = $order_edit;
+		}
+		$render_has_original = false;
+		if ( $order_edit ) {
+			$order_for_original = wc_get_order( $order_edit['order_id'] );
+			$item_for_original  = $order_for_original ? $order_for_original->get_item( $order_edit['item_id'] ) : null;
+			$render_has_original = $item_for_original && $item_for_original->get_meta( WC_GPD_Product_Meta::ORDER_META_ORIGINAL_DESIGN_SVG, true );
 		}
 		$this->designer_rendered = true;
 
@@ -791,12 +830,53 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 					<button type="button" class="button button-primary" id="wc-gpd-save-order-design">
 						<?php esc_html_e( 'Save design to order', 'wc-generic-product-designer' ); ?>
 					</button>
+					<?php if ( $render_has_original ) : ?>
+						<button type="button" class="button" id="wc-gpd-revert-order-design">
+							<?php esc_html_e( 'Revert to customer design', 'wc-generic-product-designer' ); ?>
+						</button>
+					<?php endif; ?>
 					<button type="button" class="button wc-gpd-order-download" data-preset="production" id="wc-gpd-download-production">
 						<?php esc_html_e( 'Download production file', 'wc-generic-product-designer' ); ?>
 					</button>
 					<button type="button" class="button wc-gpd-order-download" data-preset="proof" id="wc-gpd-download-proof">
 						<?php esc_html_e( 'Download customer proof', 'wc-generic-product-designer' ); ?>
 					</button>
+				</div>
+				<div class="wc-gpd-order-download-modal" id="wc-gpd-order-download-modal" hidden>
+					<div class="wc-gpd-order-download-modal__panel" role="dialog" aria-modal="true" aria-labelledby="wc-gpd-order-download-modal-title">
+						<div class="wc-gpd-order-download-modal__head">
+							<h3 id="wc-gpd-order-download-modal-title"><?php esc_html_e( 'Download options', 'wc-generic-product-designer' ); ?></h3>
+							<button type="button" class="wc-gpd-order-download-modal__close" id="wc-gpd-order-download-modal-close" aria-label="<?php esc_attr_e( 'Close', 'wc-generic-product-designer' ); ?>">&times;</button>
+						</div>
+						<div class="wc-gpd-order-download-modal__body">
+							<input type="hidden" id="wc-gpd-order-download-preset-type" value="production" />
+							<div class="wc-gpd-order-download-modal__row" id="wc-gpd-order-download-production-preset-row">
+								<label for="wc-gpd-order-download-preset"><?php esc_html_e( 'Production preset', 'wc-generic-product-designer' ); ?></label>
+								<select id="wc-gpd-order-download-preset"></select>
+							</div>
+							<div class="wc-gpd-order-download-modal__row" id="wc-gpd-order-download-proof-preset-row" hidden>
+								<label for="wc-gpd-order-download-proof-template"><?php esc_html_e( 'Proof template', 'wc-generic-product-designer' ); ?></label>
+								<select id="wc-gpd-order-download-proof-template"></select>
+							</div>
+							<fieldset class="wc-gpd-order-download-modal__options">
+								<legend><?php esc_html_e( 'Layers to include', 'wc-generic-product-designer' ); ?></legend>
+								<label><input type="checkbox" id="wc-gpd-order-inc-background" value="1" /> <?php esc_html_e( 'Backdrop / mockup', 'wc-generic-product-designer' ); ?></label>
+								<label><input type="checkbox" id="wc-gpd-order-inc-text" value="1" checked="checked" /> <?php esc_html_e( 'Engraving text', 'wc-generic-product-designer' ); ?></label>
+								<label><input type="checkbox" id="wc-gpd-order-inc-outlines" value="1" /> <?php esc_html_e( 'Outlines', 'wc-generic-product-designer' ); ?></label>
+								<label><input type="checkbox" id="wc-gpd-order-inc-shapes" value="1" checked="checked" /> <?php esc_html_e( 'Graphics & shapes', 'wc-generic-product-designer' ); ?></label>
+							</fieldset>
+							<div class="wc-gpd-order-download-modal__row wc-gpd-order-download-modal__row--pair">
+								<label for="wc-gpd-order-outline-color"><?php esc_html_e( 'Outline color', 'wc-generic-product-designer' ); ?></label>
+								<input type="color" id="wc-gpd-order-outline-color" value="#ff0000" />
+								<label for="wc-gpd-order-outline-width"><?php esc_html_e( 'Outline width', 'wc-generic-product-designer' ); ?></label>
+								<input type="number" id="wc-gpd-order-outline-width" min="0.1" max="20" step="0.1" value="0.25" />
+							</div>
+						</div>
+						<div class="wc-gpd-order-download-modal__foot">
+							<button type="button" class="button button-primary" id="wc-gpd-order-download-confirm"><?php esc_html_e( 'Download', 'wc-generic-product-designer' ); ?></button>
+							<button type="button" class="button" id="wc-gpd-order-download-cancel"><?php esc_html_e( 'Cancel', 'wc-generic-product-designer' ); ?></button>
+						</div>
+					</div>
 				</div>
 			<?php endif; ?>
 			<?php wp_nonce_field( self::NONCE_ACTION, self::NONCE_NAME ); ?>
@@ -880,6 +960,8 @@ class WC_GPD_Frontend implements WC_GPD_Module {
 		if ( ! $svg ) {
 			return null;
 		}
+
+		WC_GPD_Product_Meta::maybe_snapshot_order_original( $item );
 
 		$raw_json = (string) $item->get_meta( WC_GPD_Product_Meta::ORDER_META_DESIGN_JSON, true );
 

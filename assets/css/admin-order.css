@@ -36,6 +36,11 @@
 	align-items: center;
 }
 
+.wc-gpd-order-revert-form {
+	display: inline;
+	margin: 0;
+}
+
 .wc-gpd-order-download-form {
 	margin: 1rem 0;
 	padding: 0.85rem 0 0;

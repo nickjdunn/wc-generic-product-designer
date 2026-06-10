@@ -164,7 +164,10 @@ class WC_GPD_Export {
 			$parts[] = '<g data-wc-gpd-view="' . esc_attr( $view_id ) . '">';
 
 			if ( ! empty( $options['include_background'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
-				$mockup_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'mockup' );
+				$mockup_objects = WC_GPD_Fabric_Svg::filter_for_export_category( $view['objects'], 'background' );
+				if ( empty( $mockup_objects ) ) {
+					$mockup_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'mockup' );
+				}
 				$mockup_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $mockup_objects );
 				if ( $mockup_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="mockup">' . $mockup_markup . '</g>';
@@ -177,7 +180,10 @@ class WC_GPD_Export {
 			}
 
 			if ( ! empty( $options['include_outlines'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
-				$outline_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'outline' );
+				$outline_objects = WC_GPD_Fabric_Svg::filter_for_export_category( $view['objects'], 'outlines' );
+				if ( empty( $outline_objects ) ) {
+					$outline_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'outline' );
+				}
 				$outline_style   = array(
 					'outline_color' => $options['outline_color'] ?? '#ff0000',
 					'outline_width' => $options['outline_width'] ?? 0.25,
@@ -195,15 +201,24 @@ class WC_GPD_Export {
 			}
 
 			if ( ! empty( $options['include_text'] ) ) {
-				$text_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'text' );
+				$text_objects = WC_GPD_Fabric_Svg::filter_for_export_category( $view_design_objects, 'text' );
 				if ( ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
 					$text_objects = array_merge(
 						$text_objects,
-						WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'text' )
+						WC_GPD_Fabric_Svg::filter_for_export_category( $view['objects'], 'text' )
 					);
 				}
-				$placeholder_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'placeholder' );
-				$text_objects        = array_merge( $text_objects, $placeholder_objects );
+				if ( empty( $text_objects ) ) {
+					$text_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'text' );
+					if ( ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
+						$text_objects = array_merge(
+							$text_objects,
+							WC_GPD_Fabric_Svg::filter_by_layer_type( $view['objects'], 'text' )
+						);
+					}
+					$placeholder_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'placeholder' );
+					$text_objects        = array_merge( $text_objects, $placeholder_objects );
+				}
 				$text_markup         = WC_GPD_Fabric_Svg::objects_to_fragment( $text_objects );
 				if ( $text_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="text">' . $text_markup . '</g>';
@@ -211,11 +226,18 @@ class WC_GPD_Export {
 			}
 
 			if ( ! empty( $options['include_shapes'] ) && ! empty( $view['objects'] ) && is_array( $view['objects'] ) ) {
-				$graphic_objects = WC_GPD_Fabric_Svg::filter_export_graphics( $view['objects'] );
+				$graphic_objects = WC_GPD_Fabric_Svg::filter_for_export_category( $view['objects'], 'graphics' );
 				$graphic_objects = array_merge(
 					$graphic_objects,
-					WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'graphic' )
+					WC_GPD_Fabric_Svg::filter_for_export_category( $view_design_objects, 'graphics' )
 				);
+				if ( empty( $graphic_objects ) ) {
+					$graphic_objects = WC_GPD_Fabric_Svg::filter_export_graphics( $view['objects'] );
+					$graphic_objects = array_merge(
+						$graphic_objects,
+						WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'graphic' )
+					);
+				}
 				$graphic_markup = WC_GPD_Fabric_Svg::objects_to_fragment( $graphic_objects );
 				if ( $graphic_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="graphics">' . $graphic_markup . '</g>';
@@ -223,7 +245,10 @@ class WC_GPD_Export {
 			}
 
 			if ( ! empty( $options['include_shapes'] ) ) {
-				$shape_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'shape' );
+				$shape_objects = WC_GPD_Fabric_Svg::filter_for_export_category( $view_design_objects, 'shapes' );
+				if ( empty( $shape_objects ) ) {
+					$shape_objects = WC_GPD_Fabric_Svg::filter_by_layer_type( $view_design_objects, 'shape' );
+				}
 				$shape_markup  = WC_GPD_Fabric_Svg::objects_to_fragment( $shape_objects );
 				if ( $shape_markup ) {
 					$parts[] = '<g data-wc-gpd-layer="shapes">' . $shape_markup . '</g>';

@@ -29,9 +29,12 @@ class WC_GPD_Product_Meta {
 	const CART_KEY_PREVIEW_URL = 'wc_gpd_preview_url';
 	const CART_KEY_PREVIEW_ID  = 'wc_gpd_preview_id';
 
-	const ORDER_META_DESIGN_SVG   = '_wc_gpd_design_svg';
-	const ORDER_META_DESIGN_JSON  = '_wc_gpd_design_json';
-	const ORDER_META_PREVIEW_URL  = '_wc_gpd_preview_url';
+	const ORDER_META_DESIGN_SVG            = '_wc_gpd_design_svg';
+	const ORDER_META_DESIGN_JSON           = '_wc_gpd_design_json';
+	const ORDER_META_PREVIEW_URL           = '_wc_gpd_preview_url';
+	const ORDER_META_ORIGINAL_DESIGN_SVG   = '_wc_gpd_original_design_svg';
+	const ORDER_META_ORIGINAL_DESIGN_JSON  = '_wc_gpd_original_design_json';
+	const ORDER_META_ORIGINAL_PREVIEW_URL  = '_wc_gpd_original_preview_url';
 
 	const DEFAULT_WIDTH  = 800;
 	const DEFAULT_HEIGHT = 600;
@@ -169,5 +172,39 @@ class WC_GPD_Product_Meta {
 		);
 
 		return array_map( 'absint', $query->posts );
+	}
+
+	/**
+	 * Preserve the customer's design before the first admin edit.
+	 *
+	 * @param WC_Order_Item_Product $item Line item.
+	 */
+	public static function maybe_snapshot_order_original( $item ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return;
+		}
+
+		if ( $item->get_meta( self::ORDER_META_ORIGINAL_DESIGN_SVG, true ) ) {
+			return;
+		}
+
+		$svg = WC_GPD_SVG_Sanitizer::sanitize( $item->get_meta( self::ORDER_META_DESIGN_SVG, true ) );
+		if ( ! $svg ) {
+			return;
+		}
+
+		$item->update_meta_data( self::ORDER_META_ORIGINAL_DESIGN_SVG, $svg );
+
+		$json = (string) $item->get_meta( self::ORDER_META_DESIGN_JSON, true );
+		if ( $json ) {
+			$item->update_meta_data( self::ORDER_META_ORIGINAL_DESIGN_JSON, $json );
+		}
+
+		$preview = (string) $item->get_meta( self::ORDER_META_PREVIEW_URL, true );
+		if ( $preview ) {
+			$item->update_meta_data( self::ORDER_META_ORIGINAL_PREVIEW_URL, esc_url_raw( $preview ) );
+		}
+
+		$item->save();
 	}
 }

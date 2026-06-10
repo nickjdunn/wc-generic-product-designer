@@ -9,24 +9,11 @@
 		return;
 	}
 
-	// #region agent log
-	function agentDebug( location, message, data, hypothesisId ) {
-		fetch( 'http://127.0.0.1:7264/ingest/9953b43f-5987-48c6-a044-57eb3f754632', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '25d064' },
-			body: JSON.stringify( {
-				sessionId: '25d064',
-				location,
-				message,
-				data,
-				hypothesisId,
-				timestamp: Date.now(),
-			} ),
-		} ).catch( () => {} );
-	}
-	// #endregion
-
 	const productSettings = config.productSettings || {};
+
+	function isAdminOrderEdit() {
+		return !! config.orderEdit;
+	}
 	const templatePalettes = config.templatePalettes || {
 		palettes: [ { id: 'pal_default', name: 'Default', colors: [ '#000000' ] } ],
 		use_global_colors: false,
@@ -58,7 +45,7 @@
 		'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors', 'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors',
 		'wcGpdShapeUseFill', 'wcGpdShapeUseStroke', 'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold',
 		'wcGpdLockItalic', 'wcGpdLockAlign', 'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
-		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers', 'wcGpdExportPart',
 		'wcGpdCustomerPaletteOnly', 'wcGpdFontPaletteId', 'wcGpdLayerFonts',
 		'wcGpdTextLayer', 'wcGpdAttachmentId', 'wcGpdGraphicSlotUid', 'wcGpdGraphicLayer',
 		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
@@ -481,10 +468,22 @@
 	}
 
 	function isAddGroupEnabled( key ) {
+		if ( isAdminOrderEdit() ) {
+			if ( key === 'graphic' ) {
+				return resolveAddGraphicItems().length > 0 || ( Array.isArray( config.graphicLibraries ) && config.graphicLibraries.length > 0 );
+			}
+			if ( key === 'icon' ) {
+				return !! bootstrapIcons.iconBaseUrl;
+			}
+			return true;
+		}
 		return productAllowsAdd( key );
 	}
 
 	function isAddGroupReady( key ) {
+		if ( isAdminOrderEdit() ) {
+			return isAddGroupEnabled( key );
+		}
 		if ( key === 'graphic' ) {
 			return isAddGroupEnabled( 'graphic' ) && resolveAddGraphicItems().length > 0;
 		}
@@ -505,7 +504,7 @@
 		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
 		'wcGpdLockUnderline', 'wcGpdLockLineHeight', 'wcGpdLockLetterSpacing', 'wcGpdLockText',
-		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers',
+		'wcGpdLockMove', 'wcGpdLockScale', 'wcGpdLockAspect', 'wcGpdCustomerEditable', 'wcGpdHideFromCustomerLayers', 'wcGpdExportPart',
 		'wcGpdCustomerPaletteOnly', 'wcGpdFontPaletteId', 'wcGpdLayerFonts',
 		'wcGpdGraphicVector', 'wcGpdGraphicColorSlots', 'wcGpdGraphicColors',
 		'wcGpdGraphicFillSlot', 'wcGpdGraphicStrokeSlot',
@@ -685,6 +684,9 @@
 	}
 
 	function shapeColorAllowed( obj ) {
+		if ( isAdminOrderEdit() && ( isTemplateShape( obj ) || isCustomerEditableTemplateShape( obj ) ) ) {
+			return !! obj;
+		}
 		if ( isCustomerEditableTemplateShape( obj ) ) {
 			return !! obj && ! obj.wcGpdLockColor;
 		}
@@ -1108,6 +1110,9 @@
 	}
 
 	function productSettingsAllow( productKey ) {
+		if ( isAdminOrderEdit() ) {
+			return true;
+		}
 		if ( ! productKey ) {
 			return true;
 		}
@@ -1116,6 +1121,9 @@
 	}
 
 	function layerAllowsTool( obj, lockProp, productKey ) {
+		if ( isAdminOrderEdit() ) {
+			return !! obj;
+		}
 		if ( ! obj || isCustomerPropLocked( obj, lockProp ) ) {
 			return false;
 		}
@@ -1230,18 +1238,6 @@
 	}
 
 	function moveCustomerLayer( obj, direction ) {
-		// #region agent log
-		agentDebug( 'designer.js:moveCustomerLayer', 'layer reorder attempt', {
-			direction,
-			type: obj ? obj.type : null,
-			uid: obj && obj.wcGpdUid ? obj.wcGpdUid : null,
-			layerType: obj && obj.wcGpdLayerType ? obj.wcGpdLayerType : null,
-			templateLayer: obj ? !! obj.wcGpdTemplateLayer : null,
-			selectable: obj ? isCustomerSelectableLayer( obj ) : false,
-			canvasIndex: obj ? canvas.getObjects().indexOf( obj ) : -1,
-			totalObjects: canvas.getObjects().length,
-		}, 'D' );
-		// #endregion
 		if ( ! obj || ! isCustomerSelectableLayer( obj ) ) {
 			return;
 		}
@@ -1341,6 +1337,44 @@
 	}
 
 	function applyProductToolSettings() {
+		if ( isAdminOrderEdit() ) {
+			setToolVisible( ui.addText, true );
+			setToolVisible( ui.addImage, true );
+			designerRoot.querySelectorAll( '[data-add-group]' ).forEach( ( group ) => {
+				const key = group.getAttribute( 'data-add-group' );
+				const enabled = isAddGroupEnabled( key );
+				group.hidden = ! enabled;
+				if ( enabled ) {
+					const toggle = group.querySelector( '.wc-gpd-add-menu__toggle' );
+					const body = group.querySelector( '.wc-gpd-add-menu__body' );
+					if ( toggle && body && ! group.classList.contains( 'is-open' ) ) {
+						group.classList.add( 'is-open' );
+						toggle.setAttribute( 'aria-expanded', 'true' );
+						body.hidden = false;
+					}
+				}
+			} );
+			if ( ui.addEmpty ) {
+				ui.addEmpty.hidden = true;
+			}
+			if ( ui.addMenu ) {
+				ui.addMenu.hidden = false;
+			}
+			if ( ui.navAdd ) {
+				ui.navAdd.hidden = false;
+			}
+			if ( ui.navLayers ) {
+				ui.navLayers.hidden = false;
+			}
+			renderAddGraphicLibrary();
+			renderAddPhotoLibrary();
+			initCustomerIconBrowser();
+			if ( activeText ) {
+				applyLayerToolSettings( activeText );
+			}
+			return;
+		}
+
 		const allowText = isAddGroupReady( 'text' );
 		const allowShape = isAddGroupReady( 'shape' );
 		const allowGraphic = isAddGroupReady( 'graphic' );
@@ -1402,6 +1436,9 @@
 	}
 
 	function productAllowsAdd( key ) {
+		if ( isAdminOrderEdit() ) {
+			return isAddGroupEnabled( key );
+		}
 		const settingKey = 'allow_add_' + key;
 		if ( productSettings[ settingKey ] === false ) {
 			return false;
@@ -1661,11 +1698,15 @@
 	}
 
 	function applyLayerToolSettings( obj ) {
-		const isShapeLayer = isCustomerEditableShape( obj );
+		const isShapeLayer = isCustomerEditableShape( obj ) || ( isAdminOrderEdit() && isTemplateShape( obj ) );
 		const isAddedShape = isCustomerAddedShape( obj );
 		const isAddedIcon = isCustomerAddedIcon( obj );
-		const isGraphicLayer = isCustomerGraphic( obj );
-		const isText = !! obj && ( isPlaceholderLayer( obj ) || isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj );
+		const isGraphicLayer = isCustomerGraphic( obj ) || ( isAdminOrderEdit() && isTemplateGraphic( obj ) );
+		const isText = !! obj && (
+			isPlaceholderLayer( obj )
+			|| ( isAdminOrderEdit() && isTextLayer( obj ) && ! isPlaceholderLayer( obj ) )
+			|| ( ( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) ) && isUsableTextLayer( obj ) )
+		);
 		const textColorOk = isText && layerAllowsTool( obj, 'wcGpdLockColor', 'allow_text_color' );
 		const shapeColorOk = shapeColorAllowed( obj );
 		const iconColorOk = iconColorAllowed( obj );
@@ -2564,6 +2605,15 @@
 	}
 
 	function shouldPersistDesignState( obj ) {
+		if ( isAdminOrderEdit() ) {
+			if ( ! obj || obj.wcGpdBackground || isGraphicSlotMarker( obj ) || isMockupImage( obj ) ) {
+				return false;
+			}
+			if ( obj.wcGpdBboxRole === 'imprint_area' ) {
+				return false;
+			}
+			return isDesignLayer( obj ) || isPlaceholderLayer( obj ) || !! obj.wcGpdTemplateLayer;
+		}
 		if ( isDesignLayer( obj ) || isPlaceholderLayer( obj ) ) {
 			return true;
 		}
@@ -2584,6 +2634,24 @@
 			return null;
 		}
 		return ( viewDesigns[ viewId ] || [] ).find( ( o ) => o.wcGpdUid === uid ) || null;
+	}
+
+	function applySavedObjectState( target, saved ) {
+		if ( ! target || ! saved ) {
+			return;
+		}
+		const props = [
+			'left', 'top', 'scaleX', 'scaleY', 'angle', 'fill', 'stroke', 'strokeWidth',
+			'opacity', 'flipX', 'flipY', 'width', 'height',
+		];
+		props.forEach( ( prop ) => {
+			if ( saved[ prop ] !== undefined ) {
+				target.set( prop, saved[ prop ] );
+			}
+		} );
+		if ( saved.wcGpdExportPart ) {
+			target.wcGpdExportPart = saved.wcGpdExportPart;
+		}
 	}
 
 	function applySavedTextState( target, saved ) {
@@ -2729,6 +2797,9 @@
 	}
 
 	function isTemplateTextFullyLocked( obj ) {
+		if ( isAdminOrderEdit() ) {
+			return false;
+		}
 		if ( ! isCustomerEditableTemplateText( obj ) ) {
 			return false;
 		}
@@ -2749,6 +2820,9 @@
 	}
 
 	function isTemplateShapeFullyLocked( obj ) {
+		if ( isAdminOrderEdit() ) {
+			return false;
+		}
 		if ( ! isCustomerEditableTemplateShape( obj ) ) {
 			return false;
 		}
@@ -2760,6 +2834,15 @@
 	}
 
 	function layerVisibleToCustomer( obj ) {
+		if ( isAdminOrderEdit() ) {
+			if ( ! obj || obj.wcGpdBackground ) {
+				return false;
+			}
+			if ( obj.wcGpdBboxRole === 'imprint_area' ) {
+				return false;
+			}
+			return true;
+		}
 		return !! obj && ! obj.wcGpdHideFromCustomerLayers && obj.wcGpdCustomerEditable !== false;
 	}
 
@@ -2956,7 +3039,11 @@
 
 	function serializeDesignObject( obj ) {
 		const data = obj.toObject( DESIGN_SERIALIZE_PROPS );
-		if ( isCustomerEditableTemplateText( obj ) || isCustomerEditableTemplateShape( obj ) ) {
+		if (
+			isCustomerEditableTemplateText( obj )
+			|| isCustomerEditableTemplateShape( obj )
+			|| ( isAdminOrderEdit() && obj.wcGpdTemplateLayer && ! isMockupImage( obj ) && ! isGraphicSlotMarker( obj ) && obj.wcGpdBboxRole !== 'imprint_area' )
+		) {
 			data.wcGpdTemplateEdit = true;
 			data.wcGpdUid = obj.wcGpdUid || data.wcGpdUid || '';
 			delete data.wcGpdTemplateLayer;
@@ -3030,8 +3117,10 @@
 								if ( savedSource.wcGpdTemplateEdit && savedSource.wcGpdUid ) {
 									const templateObj = canvas.getObjects().find( ( o ) => o.wcGpdUid === savedSource.wcGpdUid );
 									if ( templateObj ) {
-										if ( isCustomerEditableTemplateText( templateObj ) || isTextLayer( templateObj ) ) {
+										if ( isTextLayer( templateObj ) ) {
 											applySavedTextState( templateObj, savedSource );
+										} else {
+											applySavedObjectState( templateObj, savedSource );
 										}
 										return;
 									}
@@ -3179,16 +3268,47 @@
 								return;
 							}
 							if ( isCustomerEditableTemplateShape( obj ) ) {
-								applyShapeCustomerInteractivity( obj );
+								const savedShape = findSavedDesignForUid( viewId, obj.wcGpdUid );
+								if ( savedShape ) {
+									applySavedObjectState( obj, savedShape );
+								}
+								if ( isAdminOrderEdit() ) {
+									applyAdminOrderEditInteractivity( obj );
+								} else {
+									applyShapeCustomerInteractivity( obj );
+								}
 								canvas.add( obj );
 								return;
 							}
-							if ( isTemplateGraphic( obj ) && layerVisibleToCustomer( obj ) && ( ! obj.wcGpdLockMove || ! obj.wcGpdLockScale ) ) {
-								applyGraphicInteractivity( obj );
-								canvas.add( obj );
+							if ( isTemplateGraphic( obj ) && layerVisibleToCustomer( obj ) ) {
+								const savedGraphic = findSavedDesignForUid( viewId, obj.wcGpdUid );
+								if ( savedGraphic ) {
+									applySavedObjectState( obj, savedGraphic );
+								}
+								if ( isAdminOrderEdit() || ! obj.wcGpdLockMove || ! obj.wcGpdLockScale ) {
+									if ( isAdminOrderEdit() ) {
+										applyAdminOrderEditInteractivity( obj );
+									} else {
+										applyGraphicInteractivity( obj );
+									}
+									canvas.add( obj );
+								}
 								return;
 							}
 							if ( isFixedTemplateText( obj ) || isTemplateGraphic( obj ) ) {
+								if ( isAdminOrderEdit() && layerVisibleToCustomer( obj ) ) {
+									const savedFixed = findSavedDesignForUid( viewId, obj.wcGpdUid );
+									if ( savedFixed ) {
+										if ( isTextLayer( obj ) ) {
+											applySavedTextState( obj, savedFixed );
+										} else {
+											applySavedObjectState( obj, savedFixed );
+										}
+									}
+									applyAdminOrderEditInteractivity( obj );
+									canvas.add( obj );
+									return;
+								}
 								obj.set( {
 									selectable: false,
 									evented: false,
@@ -3354,7 +3474,50 @@
 		return ( type === 'rect' || type === 'circle' || type === 'ellipse' ) && obj.wcGpdLayerType === 'shape';
 	}
 
+	function applyAdminOrderEditInteractivity( obj ) {
+		if ( ! isAdminOrderEdit() || ! obj || ! layerVisibleToCustomer( obj ) ) {
+			return;
+		}
+		const isText = isTextLayer( obj ) && ! isPlaceholderLayer( obj );
+		const isGraphic = isTemplateGraphic( obj ) || isCustomerGraphic( obj );
+		const isShape = isTemplateShape( obj ) || isCustomerEditableShape( obj );
+		obj.set( {
+			selectable: true,
+			evented: true,
+			hasControls: true,
+			hasBorders: true,
+			lockMovementX: false,
+			lockMovementY: false,
+			lockScalingX: false,
+			lockScalingY: false,
+			editable: isText,
+		} );
+		if ( isText ) {
+			obj.wcGpdLockText = false;
+			obj.wcGpdLockFont = false;
+			obj.wcGpdLockSize = false;
+			obj.wcGpdLockColor = false;
+			obj.wcGpdLockBold = false;
+			obj.wcGpdLockItalic = false;
+			obj.wcGpdLockUnderline = false;
+			obj.wcGpdLockAlign = false;
+			obj.wcGpdLockLineHeight = false;
+			obj.wcGpdLockLetterSpacing = false;
+			obj.wcGpdLockMove = false;
+			obj.wcGpdLockScale = false;
+		}
+		if ( isGraphic || isShape ) {
+			obj.wcGpdLockMove = false;
+			obj.wcGpdLockScale = false;
+			obj.wcGpdLockColor = false;
+		}
+	}
+
 	function applyTextCustomerInteractivity( obj ) {
+		if ( isAdminOrderEdit() ) {
+			applyAdminOrderEditInteractivity( obj );
+			return;
+		}
 		if ( ! obj || isPlaceholderLayer( obj ) ) {
 			return;
 		}
@@ -3377,6 +3540,10 @@
 	}
 
 	function applyGraphicInteractivity( obj ) {
+		if ( isAdminOrderEdit() ) {
+			applyAdminOrderEditInteractivity( obj );
+			return;
+		}
 		if ( isCustomerGraphic( obj ) && ! obj.wcGpdGraphicSlotUid && ! obj.wcGpdReplaceableUid ) {
 			const moveAllowed = productSettingsAllow( 'allow_graphic_move' );
 			const resizeAllowed = productSettingsAllow( 'allow_graphic_resize' );
@@ -3473,6 +3640,9 @@
 	}
 
 	function getCustomerLayers() {
+		if ( isAdminOrderEdit() ) {
+			return canvas.getObjects().filter( ( obj ) => layerVisibleToCustomer( obj ) );
+		}
 		return canvas.getObjects().filter( ( obj ) => {
 			if ( ! layerVisibleToCustomer( obj ) ) {
 				return false;
@@ -3500,6 +3670,9 @@
 	}
 
 	function isCustomerSelectableLayer( obj ) {
+		if ( isAdminOrderEdit() ) {
+			return layerVisibleToCustomer( obj );
+		}
 		if ( ! layerVisibleToCustomer( obj ) ) {
 			return false;
 		}
@@ -3578,6 +3751,15 @@
 	function canCustomerDeleteLayer( obj ) {
 		if ( ! obj ) {
 			return false;
+		}
+		if ( isAdminOrderEdit() ) {
+			if ( obj.wcGpdBackground || isMockupImage( obj ) || isGraphicSlotMarker( obj ) ) {
+				return false;
+			}
+			if ( obj.wcGpdBboxRole === 'imprint_area' || obj.wcGpdBboxRole === 'product_outline' ) {
+				return false;
+			}
+			return true;
 		}
 		if ( isCustomerGraphic( obj ) || isCustomerAddedShape( obj ) || isCustomerAddedIcon( obj ) ) {
 			return true;
@@ -3677,19 +3859,21 @@
 	 */
 	function syncToolbar( obj ) {
 		activeText = obj;
+		const isAdminLayer = isAdminOrderEdit() && !! obj && layerVisibleToCustomer( obj ) && ! isMockupImage( obj ) && ! isGraphicSlotMarker( obj );
 		const isPlaceholder = !! obj && isPlaceholderLayer( obj );
 		const isText = !! obj && (
 			isPlaceholder
+			|| ( isAdminOrderEdit() && isTextLayer( obj ) && ! isPlaceholder )
 			|| (
 				( isCustomerEditableTemplateText( obj ) || ( isTextLayer( obj ) && ! obj.wcGpdTemplateLayer ) )
 				&& isUsableTextLayer( obj )
 			)
 		);
-		const isShapeLayer = !! obj && isCustomerEditableShape( obj );
+		const isShapeLayer = !! obj && ( isCustomerEditableShape( obj ) || ( isAdminOrderEdit() && isTemplateShape( obj ) ) );
 		const isAddedShape = isCustomerAddedShape( obj );
-		const isGraphicLayer = !! obj && isCustomerGraphic( obj );
+		const isGraphicLayer = !! obj && ( isCustomerGraphic( obj ) || ( isAdminOrderEdit() && isTemplateGraphic( obj ) ) );
 		const isReplaceableLayer = !! obj && ( isReplaceableFrame( obj ) || isReplaceableContent( obj ) );
-		const enabled = isText || isShapeLayer || isGraphicLayer || isReplaceableLayer;
+		const enabled = isAdminLayer || isText || isShapeLayer || isGraphicLayer || isReplaceableLayer;
 
 		if ( ui.toolsPanel ) {
 			ui.toolsPanel.classList.remove( 'is-disabled' );
@@ -3701,9 +3885,11 @@
 			ui.contextPane.hidden = ! enabled;
 		}
 		setTextContextVisible( isText );
-		setGraphicContextVisible( isGraphicLayer );
+		setGraphicContextVisible( isGraphicLayer || ( isAdminLayer && isTemplateGraphic( obj ) ) );
 
-		if ( isPlaceholder ) {
+		if ( isAdminLayer && obj.wcGpdTemplateLayer ) {
+			applyAdminOrderEditInteractivity( obj );
+		} else if ( isPlaceholder ) {
 			applyPlaceholderInteractivity( obj );
 		} else if ( isAddedShape || isCustomerAddedIcon( obj ) ) {
 			applyCustomerAddedShapeInteractivity( obj );
@@ -3821,6 +4007,7 @@
 			charSpacing: 0,
 			wcGpdTextLayer: true,
 			wcGpdLayerType: 'text',
+			wcGpdExportPart: 'engraving',
 		} );
 
 		canvas.add( text );
@@ -3877,6 +4064,7 @@
 			wcGpdLayerType: 'shape',
 			wcGpdShapeUseFill: true,
 			wcGpdShapeUseStroke: true,
+			wcGpdExportPart: 'engraving',
 		};
 
 		let obj = null;
@@ -3981,6 +4169,7 @@
 					wcGpdLayerType: 'graphic',
 					wcGpdCustomerUpload: true,
 					wcGpdLayerLabel: fileLabel,
+					wcGpdExportPart: 'engraving',
 				} );
 				applyGraphicInteractivity( img );
 				canvas.add( img );
@@ -4041,6 +4230,7 @@
 						wcGpdLayerType: 'icon',
 						wcGpdShapeUseFill: true,
 						wcGpdLayerLabel: slug.replace( /-/g, ' ' ),
+						wcGpdExportPart: 'engraving',
 					} );
 					applyCustomerAddedShapeInteractivity( obj );
 					canvas.add( obj );
@@ -4260,12 +4450,6 @@
 	 */
 	function loadDesignFromSvg( svgString ) {
 		return new Promise( ( resolve, reject ) => {
-			// #region agent log
-			agentDebug( 'designer.js:loadDesignFromSvg', 'entry', {
-				svgLen: svgString ? svgString.length : 0,
-				canvasBefore: canvasLayerSummary(),
-			}, 'A' );
-			// #endregion
 			fabric.loadSVGFromString( svgString, ( objects ) => {
 				if ( ! objects || ! objects.length ) {
 					reject( new Error( 'empty' ) );
@@ -4279,13 +4463,6 @@
 					canvas.add( obj );
 					obj.setCoords();
 				} );
-				// #region agent log
-				agentDebug( 'designer.js:loadDesignFromSvg', 'svg objects added', {
-					importedTypes: objects.map( ( o ) => o.type ),
-					importedCount: objects.length,
-					canvasAfter: canvasLayerSummary(),
-				}, 'A' );
-				// #endregion
 
 				purgePhantomLayers();
 				discardSelection();
@@ -4685,9 +4862,6 @@
 	 */
 	function hydrateViewDesignsFromJson( data ) {
 		if ( ! data.views || typeof data.views !== 'object' ) {
-			// #region agent log
-			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'no views in json', {}, 'B' );
-			// #endregion
 			return false;
 		}
 
@@ -4701,13 +4875,6 @@
 		const firstWithDesign = templateViews.find( ( view ) => viewDesigns[ view.id ] && viewDesigns[ view.id ].length );
 		if ( firstWithDesign ) {
 			activeViewId = firstWithDesign.id;
-			// #region agent log
-			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'hydrate ok', {
-				activeViewId,
-				objectCount: viewDesigns[ activeViewId ].length,
-				savedTypes: viewDesigns[ activeViewId ].map( ( o ) => ( { type: o.type, layerType: o.wcGpdLayerType, uid: o.wcGpdUid } ) ),
-			}, 'B' );
-			// #endregion
 			return true;
 		}
 
@@ -4719,22 +4886,8 @@
 		if ( orphanKey && templateViews.length ) {
 			viewDesigns[ templateViews[ 0 ].id ] = data.views[ orphanKey ].objects;
 			activeViewId = templateViews[ 0 ].id;
-			// #region agent log
-			agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'orphan view mapped', {
-				orphanKey,
-				activeViewId,
-				objectCount: data.views[ orphanKey ].objects.length,
-			}, 'B' );
-			// #endregion
 			return true;
 		}
-
-		// #region agent log
-		agentDebug( 'designer.js:hydrateViewDesignsFromJson', 'hydrate failed', {
-			viewKeys: Object.keys( data.views ),
-			viewCounts: Object.keys( data.views ).map( ( k ) => ( { id: k, count: ( data.views[ k ].objects || [] ).length } ) ),
-		}, 'B' );
-		// #endregion
 		return false;
 	}
 
@@ -4752,9 +4905,6 @@
 
 	function tryLoadDesignFromSvg() {
 		if ( productHasTemplate() ) {
-			// #region agent log
-			agentDebug( 'designer.js:tryLoadDesignFromSvg', 'skipped for templated product', {}, 'A' );
-			// #endregion
 			return Promise.reject( new Error( 'svg-skip-template' ) );
 		}
 		if ( ! config.existingDesignSvg ) {
@@ -4764,24 +4914,8 @@
 	}
 
 	function loadExistingDesign() {
-		// #region agent log
-		agentDebug( 'designer.js:loadExistingDesign', 'entry', {
-			jsonLen: config.existingDesignJson ? config.existingDesignJson.length : 0,
-			svgLen: config.existingDesignSvg ? config.existingDesignSvg.length : 0,
-			isEditing: !! config.isEditing,
-			orderEdit: !! config.orderEdit,
-			canvasBefore: canvasLayerSummary(),
-		}, 'A' );
-		// #endregion
 
 		const finishLoad = ( path, promise ) => promise.then( ( result ) => {
-			// #region agent log
-			agentDebug( 'designer.js:loadExistingDesign', 'load complete', {
-				path,
-				canvasAfter: canvasLayerSummary(),
-				customerLayerCount: getCustomerLayers().length,
-			}, path.indexOf( 'svg' ) >= 0 ? 'A' : 'B' );
-			// #endregion
 			return result;
 		} );
 
@@ -4790,20 +4924,11 @@
 				const data = JSON.parse( config.existingDesignJson );
 				if ( data.views && typeof data.views === 'object' ) {
 					if ( hydrateViewDesignsFromJson( data ) ) {
-						// #region agent log
-						agentDebug( 'designer.js:loadExistingDesign', 'path json_multiview', { activeViewId }, 'B' );
-						// #endregion
 						return finishLoad( 'json_multiview', loadDesignView( activeViewId, { skipPersist: true } ) );
 					}
-					// #region agent log
-					agentDebug( 'designer.js:loadExistingDesign', 'path svg_fallback_empty_json_views', {}, 'A' );
-					// #endregion
 					return finishLoad( 'svg_fallback_empty_json_views', tryLoadDesignFromSvg() );
 				}
 				if ( data.objects && data.objects.length ) {
-					// #region agent log
-					agentDebug( 'designer.js:loadExistingDesign', 'path json_legacy', { objectCount: data.objects.length }, 'B' );
-					// #endregion
 					return finishLoad( 'json_legacy', loadDesignFromJson( config.existingDesignJson ) );
 				}
 			} catch ( error ) {
@@ -4812,10 +4937,6 @@
 
 			return finishLoad( 'json_then_svg', loadDesignFromJson( config.existingDesignJson ).catch( () => tryLoadDesignFromSvg() ) );
 		}
-
-		// #region agent log
-		agentDebug( 'designer.js:loadExistingDesign', 'path svg_only', {}, 'A' );
-		// #endregion
 		return finishLoad( 'svg_only', tryLoadDesignFromSvg() );
 	}
 
@@ -4858,7 +4979,7 @@
 	applyCtaLabel();
 	initFallbackCta();
 
-	function submitOrderDownload( preset ) {
+	function submitOrderDownload( options ) {
 		if ( ! config.orderEdit || ! config.adminPostUrl ) {
 			return;
 		}
@@ -4868,13 +4989,13 @@
 		saveForm.action = config.adminPostUrl;
 		saveForm.style.display = 'none';
 
-		const fields = {
+		const fields = Object.assign( {
 			action: config.orderDownloadAction,
 			order_id: String( config.orderId ),
 			item_id: String( config.orderItemId ),
 			_wpnonce: config.orderDownloadNonce,
-			wc_gpd_preset: preset || 'production',
-		};
+			wc_gpd_preset: 'production',
+		}, options || {} );
 
 		Object.keys( fields ).forEach( ( name ) => {
 			const input = document.createElement( 'input' );
@@ -4888,6 +5009,106 @@
 		saveForm.submit();
 	}
 
+	function applyExportPresetToDownloadModal( preset ) {
+		if ( ! preset ) {
+			return;
+		}
+		const bg = document.getElementById( 'wc-gpd-order-inc-background' );
+		const text = document.getElementById( 'wc-gpd-order-inc-text' );
+		const outlines = document.getElementById( 'wc-gpd-order-inc-outlines' );
+		const shapes = document.getElementById( 'wc-gpd-order-inc-shapes' );
+		const color = document.getElementById( 'wc-gpd-order-outline-color' );
+		const width = document.getElementById( 'wc-gpd-order-outline-width' );
+		if ( bg ) {
+			bg.checked = !! preset.include_background;
+		}
+		if ( text ) {
+			text.checked = preset.include_text !== false;
+		}
+		if ( outlines ) {
+			outlines.checked = !! preset.include_outlines;
+		}
+		if ( shapes ) {
+			shapes.checked = preset.include_shapes !== false;
+		}
+		if ( color && preset.outline_color ) {
+			color.value = preset.outline_color;
+		}
+		if ( width && preset.outline_width ) {
+			width.value = String( preset.outline_width );
+		}
+	}
+
+	function openOrderDownloadModal( presetType ) {
+		const modal = document.getElementById( 'wc-gpd-order-download-modal' );
+		if ( ! modal ) {
+			submitOrderDownload( { wc_gpd_preset: presetType || 'production' } );
+			return;
+		}
+		const typeInput = document.getElementById( 'wc-gpd-order-download-preset-type' );
+		const productionRow = document.getElementById( 'wc-gpd-order-download-production-preset-row' );
+		const proofRow = document.getElementById( 'wc-gpd-order-download-proof-preset-row' );
+		const presetSelect = document.getElementById( 'wc-gpd-order-download-preset' );
+		const proofSelect = document.getElementById( 'wc-gpd-order-download-proof-template' );
+		const isProof = presetType === 'proof';
+		if ( typeInput ) {
+			typeInput.value = isProof ? 'proof' : 'production';
+		}
+		if ( productionRow ) {
+			productionRow.hidden = isProof;
+		}
+		if ( proofRow ) {
+			proofRow.hidden = ! isProof;
+		}
+		if ( presetSelect && ! presetSelect.dataset.gpdBound ) {
+			presetSelect.dataset.gpdBound = '1';
+			( config.exportPresets || [] ).forEach( ( preset ) => {
+				const opt = document.createElement( 'option' );
+				opt.value = preset.id;
+				opt.textContent = preset.name || preset.id;
+				presetSelect.appendChild( opt );
+			} );
+			presetSelect.addEventListener( 'change', () => {
+				const selected = ( config.exportPresets || [] ).find( ( p ) => p.id === presetSelect.value );
+				applyExportPresetToDownloadModal( selected );
+			} );
+		}
+		if ( proofSelect && ! proofSelect.dataset.gpdBound ) {
+			proofSelect.dataset.gpdBound = '1';
+			( config.proofTemplates || [] ).forEach( ( template ) => {
+				const opt = document.createElement( 'option' );
+				opt.value = template.id;
+				opt.textContent = template.name || template.id;
+				proofSelect.appendChild( opt );
+			} );
+			proofSelect.addEventListener( 'change', () => {
+				const selected = ( config.proofTemplates || [] ).find( ( t ) => t.id === proofSelect.value );
+				if ( selected && selected.export_options ) {
+					applyExportPresetToDownloadModal( selected.export_options );
+				}
+			} );
+		}
+		if ( isProof ) {
+			if ( proofSelect ) {
+				proofSelect.value = config.defaultProofTemplateId || proofSelect.value;
+				const selected = ( config.proofTemplates || [] ).find( ( t ) => t.id === proofSelect.value );
+				applyExportPresetToDownloadModal( selected && selected.export_options ? selected.export_options : null );
+			}
+		} else if ( presetSelect ) {
+			presetSelect.value = config.defaultExportPresetId || presetSelect.value;
+			const selected = ( config.exportPresets || [] ).find( ( p ) => p.id === presetSelect.value );
+			applyExportPresetToDownloadModal( selected );
+		}
+		modal.hidden = false;
+	}
+
+	function closeOrderDownloadModal() {
+		const modal = document.getElementById( 'wc-gpd-order-download-modal' );
+		if ( modal ) {
+			modal.hidden = true;
+		}
+	}
+
 	function bindOrderDownloads() {
 		if ( ! config.orderEdit ) {
 			return;
@@ -4895,8 +5116,90 @@
 
 		document.querySelectorAll( '.wc-gpd-order-download' ).forEach( ( btn ) => {
 			btn.addEventListener( 'click', () => {
-				submitOrderDownload( btn.getAttribute( 'data-preset' ) || 'production' );
+				openOrderDownloadModal( btn.getAttribute( 'data-preset' ) || 'production' );
 			} );
+		} );
+
+		const confirmBtn = document.getElementById( 'wc-gpd-order-download-confirm' );
+		const cancelBtn = document.getElementById( 'wc-gpd-order-download-cancel' );
+		const closeBtn = document.getElementById( 'wc-gpd-order-download-modal-close' );
+		const modal = document.getElementById( 'wc-gpd-order-download-modal' );
+
+		if ( confirmBtn ) {
+			confirmBtn.addEventListener( 'click', () => {
+				const typeInput = document.getElementById( 'wc-gpd-order-download-preset-type' );
+				const presetType = typeInput ? typeInput.value : 'production';
+				const presetSelect = document.getElementById( 'wc-gpd-order-download-preset' );
+				const proofSelect = document.getElementById( 'wc-gpd-order-download-proof-template' );
+				const fields = {
+					wc_gpd_preset: presetType,
+				};
+				if ( presetType === 'proof' && proofSelect && proofSelect.value ) {
+					fields.wc_gpd_proof_template_id = proofSelect.value;
+				} else if ( presetSelect && presetSelect.value ) {
+					fields.wc_gpd_preset_id = presetSelect.value;
+				}
+				[ 'background', 'text', 'outlines', 'shapes' ].forEach( ( key ) => {
+					const el = document.getElementById( 'wc-gpd-order-inc-' + key );
+					if ( el ) {
+						fields[ 'wc_gpd_inc_' + key ] = el.checked ? '1' : '0';
+					}
+				} );
+				const color = document.getElementById( 'wc-gpd-order-outline-color' );
+				const width = document.getElementById( 'wc-gpd-order-outline-width' );
+				if ( color ) {
+					fields.wc_gpd_outline_color = color.value;
+				}
+				if ( width ) {
+					fields.wc_gpd_outline_width = width.value;
+				}
+				closeOrderDownloadModal();
+				submitOrderDownload( fields );
+			} );
+		}
+		if ( cancelBtn ) {
+			cancelBtn.addEventListener( 'click', closeOrderDownloadModal );
+		}
+		if ( closeBtn ) {
+			closeBtn.addEventListener( 'click', closeOrderDownloadModal );
+		}
+		if ( modal ) {
+			modal.addEventListener( 'click', ( event ) => {
+				if ( event.target === modal ) {
+					closeOrderDownloadModal();
+				}
+			} );
+		}
+	}
+
+	function bindOrderRevert() {
+		const btn = document.getElementById( 'wc-gpd-revert-order-design' );
+		if ( ! btn || ! config.orderEdit || ! config.hasOriginalDesign ) {
+			return;
+		}
+		btn.addEventListener( 'click', () => {
+			const message = config.i18n?.revertConfirm || 'Restore the customer’s original design? Admin edits will be discarded.';
+			if ( ! window.confirm( message ) ) {
+				return;
+			}
+			const form = document.createElement( 'form' );
+			form.method = 'POST';
+			form.action = config.adminPostUrl;
+			form.style.display = 'none';
+			[
+				[ 'action', config.orderRevertAction ],
+				[ 'order_id', String( config.orderId ) ],
+				[ 'item_id', String( config.orderItemId ) ],
+				[ '_wpnonce', config.orderRevertNonce ],
+			].forEach( ( pair ) => {
+				const input = document.createElement( 'input' );
+				input.type = 'hidden';
+				input.name = pair[ 0 ];
+				input.value = pair[ 1 ];
+				form.appendChild( input );
+			} );
+			document.body.appendChild( form );
+			form.submit();
 		} );
 	}
 
@@ -4942,14 +5245,6 @@
 		requestAnimationFrame( () => {
 			applyResponsiveScale();
 
-			// #region agent log
-			agentDebug( 'designer.js:bootDesigner', 'boot start', {
-				jsonLen: config.existingDesignJson ? config.existingDesignJson.length : 0,
-				svgLen: config.existingDesignSvg ? config.existingDesignSvg.length : 0,
-				isEditing: !! config.isEditing,
-			}, 'C' );
-			// #endregion
-
 			let editBootHydrated = false;
 			const bootLoad = ( config.isEditing || config.orderEdit ) && config.existingDesignJson
 				? ( () => {
@@ -4967,12 +5262,6 @@
 				: loadDesignView( activeViewId );
 
 			bootLoad.then( () => {
-				// #region agent log
-				agentDebug( 'designer.js:bootDesigner', 'template loaded', {
-					editBootHydrated,
-					canvasAfterTemplate: canvasLayerSummary(),
-				}, 'C' );
-				// #endregion
 				const needsExistingLoad = ! editBootHydrated
 					&& ( config.isEditing || config.orderEdit || config.existingDesignJson || config.existingDesignSvg );
 				if ( needsExistingLoad ) {
@@ -4991,6 +5280,7 @@
 
 				bindOrderSave();
 				bindOrderDownloads();
+				bindOrderRevert();
 				log.info( 'Designer ready' );
 			} );
 		} );

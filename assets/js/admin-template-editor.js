@@ -51,7 +51,7 @@
 		'wcGpdUid', 'wcGpdLayerType', 'wcGpdLayerLabel', 'wcGpdTemplateLayer', 'wcGpdOutlineLayer', 'wcGpdBoundingBox', 'wcGpdBboxRole',
 		'wcGpdMockupImage', 'wcGpdMockupVisible', 'wcGpdAttachmentId', 'wcGpdGraphicLayer', 'wcGpdGraphicSlot',
 		'wcGpdReplaceable', 'wcGpdReplaceableKind', 'wcGpdReplaceableUid',
-		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
+		'wcGpdGraphicLibraryId', 'wcGpdExportGraphic', 'wcGpdExportPart', 'wcGpdCustomerMovable', 'wcGpdCustomerResizable', 'wcGpdLockAspect',
 		'wcGpdPlaceholderLabel', 'wcGpdPlaceholderKey', 'wcGpdShrinkToFit', 'wcGpdFitMode', 'wcGpdPaletteId', 'wcGpdLayerColors',
 		'wcGpdStrokePaletteId', 'wcGpdStrokeLayerColors', 'wcGpdShapeUseFill', 'wcGpdShapeUseStroke',
 		'wcGpdLockFont', 'wcGpdLockSize', 'wcGpdLockColor', 'wcGpdLockBold', 'wcGpdLockItalic', 'wcGpdLockAlign',
@@ -2363,6 +2363,7 @@
 			syncSelectionDimsPanel( active );
 			syncColorsPanel( active );
 			syncFontsPanel( active );
+			syncExportPartPanel( active );
 			syncContextNav( active );
 			openAccordionForSelection( active );
 		} else {
@@ -2466,6 +2467,51 @@
 		return 'repositionable';
 	}
 
+	function exportPartForObject( obj ) {
+		if ( ! obj ) {
+			return 'engraving';
+		}
+		if ( obj.wcGpdExportPart ) {
+			return obj.wcGpdExportPart;
+		}
+		if ( isMockupImage( obj ) ) {
+			return 'backdrop';
+		}
+		if ( obj.wcGpdOutlineLayer || obj.wcGpdLayerType === 'outline' ) {
+			return 'cut_outline';
+		}
+		if ( obj.wcGpdBboxRole === 'product_outline' || obj.wcGpdBoundingBox ) {
+			return 'product_outline';
+		}
+		if ( obj.wcGpdGraphicLayer && obj.wcGpdExportGraphic === false ) {
+			return 'exclude';
+		}
+		return 'engraving';
+	}
+
+	function syncExportPartPanel( obj ) {
+		const select = document.getElementById( 'wc_gpd_export_part' );
+		if ( ! select || ! obj ) {
+			return;
+		}
+		select.value = exportPartForObject( obj );
+	}
+
+	function applyExportPart( obj, part ) {
+		if ( ! obj || ! part ) {
+			return;
+		}
+		obj.wcGpdExportPart = part;
+		if ( obj.wcGpdGraphicLayer ) {
+			obj.wcGpdExportGraphic = part !== 'exclude';
+		}
+		if ( part === 'backdrop' && isTemplateImage( obj ) ) {
+			applyImageRole( obj, 'mockup' );
+		}
+		canvas.requestRenderAll();
+		renderLayersList();
+	}
+
 	function applyImageRole( obj, role ) {
 		if ( ! obj || obj.type !== 'image' ) {
 			return;
@@ -2513,29 +2559,14 @@
 	}
 
 	function syncImagePropsPanel( obj ) {
-		const role = imageRoleForObject( obj );
-		document.querySelectorAll( 'input[name="wc_gpd_image_role"]' ).forEach( ( input ) => {
-			input.checked = input.value === role;
-		} );
-		const mockupOpts = document.getElementById( 'wc-gpd-image-mockup-options' );
-		const graphicOpts = document.getElementById( 'wc-gpd-image-graphic-options' );
-		const customerOpts = document.getElementById( 'wc-gpd-image-customer-options' );
-		if ( mockupOpts ) {
-			mockupOpts.hidden = role !== 'mockup';
+		const mockupRow = document.getElementById( 'wc-gpd-image-mockup-visible-row' );
+		const isMockup = isMockupImage( obj );
+		if ( mockupRow ) {
+			mockupRow.hidden = ! isMockup;
 		}
-		if ( graphicOpts ) {
-			graphicOpts.hidden = role === 'mockup';
-		}
-		if ( customerOpts ) {
-			customerOpts.hidden = role !== 'repositionable';
-		}
-		const exp = document.getElementById( 'wc_gpd_graphic_export' );
 		const allowMove = document.getElementById( 'wc_gpd_graphic_allow_move' );
 		const allowResize = document.getElementById( 'wc_gpd_graphic_allow_resize' );
 		const lockAspect = document.getElementById( 'wc_gpd_graphic_lock_aspect' );
-		if ( exp ) {
-			exp.checked = obj.wcGpdExportGraphic !== false;
-		}
 		if ( mockupVisibleToggle ) {
 			mockupVisibleToggle.checked = obj.wcGpdMockupVisible !== false;
 		}
@@ -3763,30 +3794,21 @@
 	}
 
 	function bindImagePropInputs() {
-		document.querySelectorAll( 'input[name="wc_gpd_image_role"]' ).forEach( ( input ) => {
-			input.addEventListener( 'change', () => {
+		const exportPartSelect = document.getElementById( 'wc_gpd_export_part' );
+		if ( exportPartSelect ) {
+			exportPartSelect.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();
-				if ( ! isTemplateImage( obj ) || ! input.checked ) {
+				if ( ! obj ) {
 					return;
 				}
-				applyImageRole( obj, input.value );
-				syncImagePropsPanel( obj );
+				applyExportPart( obj, exportPartSelect.value );
 			} );
-		} );
+		}
 
-		const exp = document.getElementById( 'wc_gpd_graphic_export' );
 		const allowMove = document.getElementById( 'wc_gpd_graphic_allow_move' );
 		const allowResize = document.getElementById( 'wc_gpd_graphic_allow_resize' );
 		const lockAspect = document.getElementById( 'wc_gpd_graphic_lock_aspect' );
 
-		if ( exp ) {
-			exp.addEventListener( 'change', () => {
-				const obj = canvas.getActiveObject();
-				if ( isGraphicImage( obj ) ) {
-					obj.wcGpdExportGraphic = exp.checked;
-				}
-			} );
-		}
 		if ( allowMove ) {
 			allowMove.addEventListener( 'change', () => {
 				const obj = canvas.getActiveObject();

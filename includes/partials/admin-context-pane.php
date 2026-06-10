@@ -64,6 +64,8 @@ defined( 'ABSPATH' ) || exit;
 			<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_allow_resize" checked="checked" /> <?php esc_html_e( 'Customer can resize text box', 'wc-generic-product-designer' ); ?></label></div>
 		</div>
 		<div class="wc-gpd-prop-customer-group" id="wc-gpd-customer-dims-image" data-customer-for="image" hidden>
+			<div class="wc-gpd-prop-row"><button type="button" class="button button-small" id="wc-gpd-set-mockup-background"><?php esc_html_e( 'Set as mockup background', 'wc-generic-product-designer' ); ?></button></div>
+			<div class="wc-gpd-prop-row wc-gpd-prop-row--check" id="wc-gpd-image-mockup-visible-row" hidden><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_mockup_visible" checked="checked" /> <?php esc_html_e( 'Show in customer mockup', 'wc-generic-product-designer' ); ?></label></div>
 			<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_graphic_allow_move" checked="checked" /> <?php esc_html_e( 'Customer can move image', 'wc-generic-product-designer' ); ?></label></div>
 			<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_graphic_allow_resize" checked="checked" /> <?php esc_html_e( 'Customer can resize image', 'wc-generic-product-designer' ); ?></label></div>
 			<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_graphic_lock_aspect" /> <?php esc_html_e( 'Customer must keep aspect ratio', 'wc-generic-product-designer' ); ?></label></div>
@@ -235,20 +237,24 @@ defined( 'ABSPATH' ) || exit;
 	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Image', 'wc-generic-product-designer' ); ?></button>
 	<div class="wc-gpd-context-accordion__body">
 		<div class="wc-gpd-tpl-selection" id="wc-gpd-image-props">
-			<div class="wc-gpd-prop-row">
-				<span class="wc-gpd-prop-label"><?php esc_html_e( 'Image role', 'wc-generic-product-designer' ); ?></span>
-				<label class="wc-gpd-prop-check"><input type="radio" name="wc_gpd_image_role" value="fixed" checked="checked" /> <?php esc_html_e( 'Fixed graphic', 'wc-generic-product-designer' ); ?></label>
-				<label class="wc-gpd-prop-check"><input type="radio" name="wc_gpd_image_role" value="repositionable" /> <?php esc_html_e( 'Customer repositionable', 'wc-generic-product-designer' ); ?></label>
-				<label class="wc-gpd-prop-check"><input type="radio" name="wc_gpd_image_role" value="mockup" /> <?php esc_html_e( 'Mockup photo', 'wc-generic-product-designer' ); ?></label>
-			</div>
-			<div id="wc-gpd-image-mockup-options" hidden>
-				<div class="wc-gpd-prop-row"><button type="button" class="button button-small" id="wc-gpd-set-mockup-background"><?php esc_html_e( 'Set as mockup background', 'wc-generic-product-designer' ); ?></button></div>
-				<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_template_mockup_visible" checked="checked" /> <?php esc_html_e( 'Show in customer mockup', 'wc-generic-product-designer' ); ?></label></div>
-			</div>
-			<div id="wc-gpd-image-graphic-options">
-				<div class="wc-gpd-prop-row wc-gpd-prop-row--check"><label class="wc-gpd-prop-check"><input type="checkbox" id="wc_gpd_graphic_export" checked="checked" /> <?php esc_html_e( 'Include in production file', 'wc-generic-product-designer' ); ?></label></div>
-			</div>
 			<div class="wc-gpd-prop-row"><button type="button" class="button button-link-delete" id="wc-gpd-template-delete-image"><?php esc_html_e( 'Remove image', 'wc-generic-product-designer' ); ?></button></div>
+		</div>
+	</div>
+</div>
+
+<div class="wc-gpd-context-accordion is-open" id="wc-gpd-context-block-export-part" data-context-for="all">
+	<button type="button" class="wc-gpd-context-accordion__toggle" aria-expanded="true"><?php esc_html_e( 'Document part', 'wc-generic-product-designer' ); ?></button>
+	<div class="wc-gpd-context-accordion__body">
+		<p class="description"><?php esc_html_e( 'Tag each layer so production and proof downloads can include or omit backgrounds, engraving art, and outlines.', 'wc-generic-product-designer' ); ?></p>
+		<div class="wc-gpd-prop-row">
+			<label class="wc-gpd-prop-label" for="wc_gpd_export_part"><?php esc_html_e( 'Export as', 'wc-generic-product-designer' ); ?></label>
+			<select id="wc_gpd_export_part" class="wc-gpd-prop-control">
+				<option value="engraving"><?php esc_html_e( 'Engraving design', 'wc-generic-product-designer' ); ?></option>
+				<option value="backdrop"><?php esc_html_e( 'Backdrop / mockup photo', 'wc-generic-product-designer' ); ?></option>
+				<option value="product_outline"><?php esc_html_e( 'Product outline', 'wc-generic-product-designer' ); ?></option>
+				<option value="cut_outline"><?php esc_html_e( 'Cut / imprint outline', 'wc-generic-product-designer' ); ?></option>
+				<option value="exclude"><?php esc_html_e( 'Exclude from downloads', 'wc-generic-product-designer' ); ?></option>
+			</select>
 		</div>
 	</div>
 </div>

@@ -135,9 +135,19 @@ class WC_GPD_Design_Json {
 
 			if ( ! empty( $object['wcGpdTemplateEdit'] ) && ! empty( $object['wcGpdUid'] ) ) {
 				$object['wcGpdUid'] = sanitize_text_field( (string) $object['wcGpdUid'] );
+				if ( ! empty( $object['wcGpdExportPart'] ) ) {
+					$object['wcGpdExportPart'] = sanitize_key( (string) $object['wcGpdExportPart'] );
+				}
 				if ( in_array( $type, array( 'i-text', 'text', 'textbox' ), true ) ) {
 					$object['wcGpdLayerType'] = 'text';
 					$object['wcGpdTextLayer']  = true;
+				} elseif ( 'image' === $type ) {
+					$object['wcGpdLayerType']    = 'graphic';
+					$object['wcGpdGraphicLayer'] = true;
+				} elseif ( in_array( $type, array( 'group', 'path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line' ), true ) ) {
+					if ( empty( $object['wcGpdLayerType'] ) ) {
+						$object['wcGpdLayerType'] = 'shape';
+					}
 				}
 				unset( $object['wcGpdTemplateLayer'] );
 				$clean[] = $object;
@@ -189,6 +199,10 @@ class WC_GPD_Design_Json {
 				}
 			} else {
 				$object['wcGpdLayerType'] = 'shape';
+			}
+
+			if ( ! empty( $object['wcGpdExportPart'] ) ) {
+				$object['wcGpdExportPart'] = sanitize_key( (string) $object['wcGpdExportPart'] );
 			}
 
 			$clean[] = $object;

@@ -92,6 +92,99 @@ class WC_GPD_Fabric_Svg {
 	}
 
 	/**
+	 * Resolve document export part for an object.
+	 *
+	 * @param array $object Fabric object.
+	 * @return string backdrop|engraving|product_outline|cut_outline|exclude
+	 */
+	public static function resolve_export_part( $object ) {
+		if ( ! is_array( $object ) ) {
+			return 'exclude';
+		}
+
+		if ( ! empty( $object['wcGpdExportPart'] ) ) {
+			$part = sanitize_key( (string) $object['wcGpdExportPart'] );
+			if ( in_array( $part, array( 'backdrop', 'engraving', 'product_outline', 'cut_outline', 'exclude' ), true ) ) {
+				return $part;
+			}
+		}
+
+		$layer_type = self::resolve_layer_type( $object );
+		if ( 'mockup' === $layer_type ) {
+			return 'backdrop';
+		}
+		if ( 'outline' === $layer_type || ! empty( $object['wcGpdOutlineLayer'] ) ) {
+			return 'cut_outline';
+		}
+		if ( ! empty( $object['wcGpdBboxRole'] ) && 'product_outline' === sanitize_key( (string) $object['wcGpdBboxRole'] ) ) {
+			return 'product_outline';
+		}
+		if ( in_array( $layer_type, array( 'text', 'placeholder', 'graphic', 'shape', 'graphic_slot' ), true ) ) {
+			if ( 'graphic' === $layer_type && isset( $object['wcGpdExportGraphic'] ) && empty( $object['wcGpdExportGraphic'] ) ) {
+				return 'exclude';
+			}
+			return 'engraving';
+		}
+
+		return 'exclude';
+	}
+
+	/**
+	 * Whether an object belongs in an export category.
+	 *
+	 * @param array  $object   Fabric object.
+	 * @param string $category background|text|graphics|shapes|outlines.
+	 * @return bool
+	 */
+	public static function object_in_export_category( $object, $category ) {
+		$part = self::resolve_export_part( $object );
+		if ( 'exclude' === $part ) {
+			return false;
+		}
+
+		switch ( $category ) {
+			case 'background':
+				return 'backdrop' === $part;
+			case 'text':
+				$layer_type = self::resolve_layer_type( $object );
+				return 'engraving' === $part && in_array( $layer_type, array( 'text', 'placeholder' ), true );
+			case 'graphics':
+				return 'engraving' === $part && 'graphic' === self::resolve_layer_type( $object );
+			case 'shapes':
+				return 'engraving' === $part && 'shape' === self::resolve_layer_type( $object );
+			case 'outlines':
+				return in_array( $part, array( 'cut_outline', 'product_outline' ), true );
+			default:
+				return false;
+		}
+	}
+
+	/**
+	 * Filter objects for an export category using document part tags.
+	 *
+	 * @param array  $objects  Fabric objects.
+	 * @param string $category background|text|graphics|shapes|outlines.
+	 * @return array
+	 */
+	public static function filter_for_export_category( $objects, $category ) {
+		if ( ! is_array( $objects ) ) {
+			return array();
+		}
+
+		$filtered = array();
+		foreach ( $objects as $object ) {
+			if ( ! is_array( $object ) ) {
+				continue;
+			}
+			if ( self::object_in_export_category( $object, $category ) ) {
+				$filtered[] = $object;
+			}
+		}
+
+		return $filtered;
+	}
+
+	/**
 	 * Apply production outline stroke from per-product export settings.
 	 *
 	 * @param array $objects          Outline Fabric objects.
